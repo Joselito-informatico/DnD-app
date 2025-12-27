@@ -55,3 +55,24 @@ export const CLASSES = [
     proficiencies: ["Daggers", "Darts", "Slings", "Quarterstaffs", "Light crossbows"]
   }
 ];
+
+export const SKILLS = [
+  { name: "Acrobatics", stat: "dex" },
+  { name: "Animal Handling", stat: "wis" },
+  { name: "Arcana", stat: "int" },
+  { name: "Athletics", stat: "str" },
+  { name: "Deception", stat: "cha" },
+  { name: "History", stat: "int" },
+  { name: "Insight", stat: "wis" },
+  { name: "Intimidation", stat: "cha" },
+  { name: "Investigation", stat: "int" },
+  { name: "Medicine", stat: "wis" },
+  { name: "Nature", stat: "int" },
+  { name: "Perception", stat: "wis" },
+  { name: "Performance", stat: "cha" },
+  { name: "Persuasion", stat: "cha" },
+  { name: "Religion", stat: "int" },
+  { name: "Sleight of Hand", stat: "dex" },
+  { name: "Stealth", stat: "dex" },
+  { name: "Survival", stat: "wis" },
+];
