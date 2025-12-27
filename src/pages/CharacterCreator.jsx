@@ -29,13 +29,30 @@ export function CharacterCreator({ onBack, onSave }) {
     if (step === 1 && selectedRace) setStep(2);
     else if (step === 2 && selectedClass) setStep(3);
     else if (step === 3) {
-      // Guardado final con datos reales
+      
+      // 1. DEFINIMOS EL EQUIPO INICIAL SEGÚN LA CLASE
+      let starterWeapons = [];
+      
+      if (selectedClass.id === 'fighter') {
+        starterWeapons.push({ id: 'w1', name: 'Greatsword', type: 'melee', damage: '2d6', stat: 'str' });
+        starterWeapons.push({ id: 'w2', name: 'Handaxe', type: 'thrown', damage: '1d6', stat: 'str' });
+      } else if (selectedClass.id === 'rogue') {
+        starterWeapons.push({ id: 'w1', name: 'Rapier', type: 'melee', damage: '1d8', stat: 'dex' }); // Finesse usa Dex
+        starterWeapons.push({ id: 'w2', name: 'Shortbow', type: 'ranged', damage: '1d6', stat: 'dex' });
+      } else if (selectedClass.id === 'wizard') {
+        starterWeapons.push({ id: 'w1', name: 'Quarterstaff', type: 'melee', damage: '1d6', stat: 'str' });
+        starterWeapons.push({ id: 's1', name: 'Firebolt', type: 'spell', damage: '1d10', stat: 'int' }); // Hechizo básico
+      }
+
+      // 2. CREAMOS EL HÉROE CON SU INVENTARIO
       const newHero = {
-        name: `${selectedRace.name} ${selectedClass.name}`, // Nombre temporal
+        name: `${selectedRace.name} ${selectedClass.name}`,
         race: selectedRace.name,
         class: selectedClass.name,
-        stats: stats
+        stats: stats,
+        weapons: starterWeapons // <--- Guardamos las armas aquí
       };
+      
       onSave(newHero); 
     }
   };

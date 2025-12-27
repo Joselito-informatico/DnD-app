@@ -1,132 +1,185 @@
-import { ArrowLeft, Shield, Heart, Zap, Sword } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowLeft, Shield, Heart, Zap, Sword, Dices, X } from 'lucide-react';
 
-// Recibimos 'onUpdateHero' para poder guardar los cambios
 export function CombatView({ hero, onBack, onUpdateHero }) {
-  
+  // Estado para el resultado del dado (null = no se está lanzando)
+  const [rollResult, setRollResult] = useState(null);
+
   const getModifier = (score) => Math.floor((score - 10) / 2);
   const proficiencyBonus = 2; 
 
   const dexMod = getModifier(hero.stats.dex);
   const strMod = getModifier(hero.stats.str);
   const conMod = getModifier(hero.stats.con);
+  const intMod = getModifier(hero.stats.int);
 
-  // CÁLCULO DE VIDA MÁXIMA (Regla simple: 10 + CON al nivel 1 + promedio después)
-  // Para MVP simplificamos: Base 10 + CON + (Nivel * 6)
   const maxHP = (10 + conMod) + ((hero.level - 1) * 6);
-  
-  // VIDA ACTUAL: Si no existe en la base de datos, empezamos con la Máxima
-  const currentHP = hero.currentHP !== undefined && hero.currentHP !== null 
-    ? hero.currentHP 
-    : maxHP;
-
-  // Stats derivados
+  const currentHP = hero.currentHP ?? maxHP; // Si es null/undefined, usa maxHP
   const armorClass = 10 + dexMod; 
   const initiative = dexMod >= 0 ? `+${dexMod}` : dexMod;
 
-  // LÓGICA DE BARRA DE VIDA
-  const healthPercentage = Math.max(0, Math.min(100, (currentHP / maxHP) * 100));
-  let healthColor = 'bg-green-500';
-  if (healthPercentage < 50) healthColor = 'bg-yellow-500';
-  if (healthPercentage < 25) healthColor = 'bg-red-600';
+  // Si el héroe es antiguo y no tiene armas, le damos un puñetazo por defecto
+  const weapons = hero.weapons || [
+    { id: 'default', name: 'Unarmed Strike', type: 'melee', damage: '1', stat: 'str' }
+  ];
 
-  // FUNCIONES DE ACCIÓN
+  // --- LÓGICA DE DADOS ---
+  const handleRollAttack = (weapon) => {
+    // 1. Determinar qué stat usa el arma
+    let mod = 0;
+    if (weapon.stat === 'str') mod = strMod;
+    if (weapon.stat === 'dex') mod = dexMod;
+    if (weapon.stat === 'int') mod = intMod;
+
+    // 2. Lanzar el d20
+    const d20 = Math.floor(Math.random() * 20) + 1;
+    const total = d20 + mod + proficiencyBonus;
+
+    // 3. Mostrar resultado
+    setRollResult({
+      weaponName: weapon.name,
+      roll: d20,
+      mod: mod + proficiencyBonus,
+      total: total,
+      isCrit: d20 === 20,
+      isFail: d20 === 1
+    });
+  };
+
   const changeHP = (amount) => {
     const newHP = Math.min(maxHP, Math.max(0, currentHP + amount));
-    // Guardamos el cambio en la base de datos principal
     onUpdateHero({ ...hero, currentHP: newHP });
   };
 
   return (
-    <div className="space-y-6 animate-in slide-in-from-right duration-300 pb-20">
+    <div className="space-y-6 animate-in slide-in-from-right duration-300 pb-20 relative">
       
-      {/* HEADER */}
+      {/* HEADER & STATS (Igual que antes) */}
       <header className="flex items-center gap-4">
-        <button onClick={onBack} className="p-2 text-stone-400 hover:text-stone-100 transition">
-          <ArrowLeft />
-        </button>
+        <button onClick={onBack} className="p-2 text-stone-400 hover:text-stone-100 transition"><ArrowLeft /></button>
         <div>
           <h1 className="text-xl font-bold text-stone-100">{hero.name}</h1>
           <p className="text-xs text-stone-500">Lvl {hero.level} {hero.race} {hero.class}</p>
         </div>
       </header>
 
-      {/* STATS PRINCIPALES */}
       <div className="grid grid-cols-3 gap-3">
         <div className="bg-stone-800 p-3 rounded-xl border border-stone-700 flex flex-col items-center justify-center relative overflow-hidden">
           <Shield className="text-stone-600 absolute opacity-20 -right-2 -bottom-2 w-16 h-16" />
           <span className="text-xs text-stone-400 font-bold uppercase">Armor</span>
           <span className="text-3xl font-bold text-stone-100">{armorClass}</span>
         </div>
-
         <div className="bg-stone-800 p-3 rounded-xl border border-stone-700 flex flex-col items-center justify-center">
           <Zap className="text-yellow-600 mb-1 w-5 h-5" />
           <span className="text-xs text-stone-400 font-bold uppercase">Init</span>
           <span className="text-2xl font-bold text-yellow-500">{initiative}</span>
         </div>
-
         <div className="bg-stone-800 p-3 rounded-xl border border-stone-700 flex flex-col items-center justify-center">
           <span className="text-xs text-stone-400 font-bold uppercase">Speed</span>
           <span className="text-2xl font-bold text-stone-100">30<span className="text-sm font-normal text-stone-500">ft</span></span>
         </div>
       </div>
 
-      {/* GESTIÓN DE VIDA (INTERACTIVA) */}
+      {/* HP BAR (Simplificada para ahorrar espacio en código) */}
       <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 shadow-lg">
         <div className="flex justify-between items-end mb-2">
-          <div className="flex items-center gap-2 text-stone-300">
-            <Heart size={18} className="text-red-500" fill="currentColor" />
-            <span className="font-bold text-sm">Hit Points</span>
-          </div>
-          <span className="text-xl font-bold text-stone-100">
-            {currentHP} <span className="text-stone-500 text-sm">/ {maxHP}</span>
-          </span>
+          <span className="font-bold text-sm text-red-400 flex gap-2"><Heart size={18} fill="currentColor"/> HP</span>
+          <span className="text-xl font-bold text-stone-100">{currentHP} <span className="text-stone-500 text-sm">/ {maxHP}</span></span>
         </div>
-        
-        {/* Barra Visual Dinámica */}
-        <div className="w-full bg-stone-900 h-4 rounded-full overflow-hidden border border-stone-700/50 mb-4 relative">
-          <div 
-            className={`h-full transition-all duration-500 ease-out ${healthColor}`} 
-            style={{ width: `${healthPercentage}%` }}
-          ></div>
+        <div className="w-full bg-stone-900 h-3 rounded-full overflow-hidden mb-3">
+          <div className="bg-red-500 h-full transition-all duration-500" style={{ width: `${(currentHP/maxHP)*100}%` }}></div>
         </div>
-
-        {/* Botones de Acción */}
-        <div className="grid grid-cols-2 gap-3">
-          <button 
-            onClick={() => changeHP(-1)}
-            className="py-3 bg-red-900/30 text-red-400 border border-red-900/50 rounded-lg font-bold hover:bg-red-900/50 active:scale-95 transition flex items-center justify-center gap-2"
-          >
-            Damage (-1)
-          </button>
-          <button 
-            onClick={() => changeHP(1)}
-            className="py-3 bg-green-900/30 text-green-400 border border-green-900/50 rounded-lg font-bold hover:bg-green-900/50 active:scale-95 transition flex items-center justify-center gap-2"
-          >
-            Heal (+1)
-          </button>
+        <div className="flex gap-2">
+          <button onClick={() => changeHP(-1)} className="flex-1 py-2 bg-stone-900 text-red-400 rounded-lg font-bold text-xs">- DMG</button>
+          <button onClick={() => changeHP(1)} className="flex-1 py-2 bg-stone-900 text-green-400 rounded-lg font-bold text-xs">+ HEAL</button>
         </div>
       </div>
 
-      {/* LISTA DE ATAQUES (Aún estática pero con datos reales de stats) */}
+      {/* --- SECCIÓN DE ATAQUES DINÁMICA --- */}
       <div>
-        <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider">Actions</h3>
-        <div className="bg-stone-800 rounded-xl border border-stone-700 divide-y divide-stone-700/50">
-          <div className="p-4 flex justify-between items-center group cursor-pointer hover:bg-stone-700/50 transition">
-            <div className="flex items-center gap-3">
-              <div className="bg-stone-900 p-2 rounded-lg text-stone-500">
-                <Sword size={20} />
+        <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider">Attacks & Spells</h3>
+        <div className="space-y-2">
+          
+          {weapons.map((weapon) => {
+            // Calculamos el bono visualmente para mostrarlo en el botón
+            let statVal = hero.stats[weapon.stat] || 10;
+            let mod = Math.floor((statVal - 10) / 2);
+            let totalBonus = mod + proficiencyBonus;
+            let sign = totalBonus >= 0 ? '+' : '';
+
+            return (
+              <div 
+                key={weapon.id}
+                onClick={() => handleRollAttack(weapon)}
+                className="bg-stone-800 p-4 rounded-xl border border-stone-700 flex justify-between items-center cursor-pointer hover:bg-stone-700 hover:border-yellow-500/50 transition group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="bg-stone-900 p-2 rounded-lg text-stone-500 group-hover:text-yellow-500 transition">
+                    {weapon.type === 'spell' ? <Dices size={20} /> : <Sword size={20} />}
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-stone-200">{weapon.name}</h4>
+                    <p className="text-xs text-stone-500 capitalize">{weapon.type} • {weapon.damage} {weapon.stat}</p>
+                  </div>
+                </div>
+                
+                {/* Badge de Ataque (Clickable visualmente) */}
+                <div className="bg-stone-900 border border-stone-600 px-3 py-1 rounded-lg font-bold text-stone-300 group-hover:bg-yellow-500 group-hover:text-black group-hover:border-yellow-500 transition">
+                  {sign}{totalBonus}
+                </div>
               </div>
-              <div>
-                <h4 className="font-bold text-stone-200">Unarmed Strike</h4>
-                <p className="text-xs text-stone-500">Melee • 1d4 + {strMod} Bludgeoning</p>
-              </div>
-            </div>
-            <div className="bg-stone-700 text-stone-300 border border-stone-600 px-3 py-1 rounded-lg font-bold">
-              {strMod + proficiencyBonus >= 0 ? '+' : ''}{strMod + proficiencyBonus}
-            </div>
-          </div>
+            );
+          })}
         </div>
       </div>
+
+      {/* --- MODAL DE RESULTADO DE DADOS (Popup) --- */}
+      {rollResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-stone-900 border border-stone-700 p-6 rounded-2xl shadow-2xl w-full max-w-sm relative text-center">
+            
+            {/* Botón cerrar */}
+            <button 
+              onClick={() => setRollResult(null)}
+              className="absolute top-4 right-4 text-stone-500 hover:text-white"
+            >
+              <X />
+            </button>
+
+            <h3 className="text-stone-400 text-sm uppercase font-bold tracking-widest mb-4">
+              {rollResult.weaponName} Attack
+            </h3>
+
+            {/* Círculo del Dado */}
+            <div className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-4 border-4 text-4xl font-bold
+              ${rollResult.isCrit ? 'border-yellow-500 text-yellow-500 bg-yellow-500/10 shadow-[0_0_30px_rgba(234,179,8,0.3)]' : ''}
+              ${rollResult.isFail ? 'border-red-600 text-red-600 bg-red-600/10' : ''}
+              ${!rollResult.isCrit && !rollResult.isFail ? 'border-stone-600 text-stone-200 bg-stone-800' : ''}
+            `}>
+              {rollResult.roll}
+            </div>
+
+            {/* Cálculo Matemático */}
+            <div className="text-stone-500 text-sm mb-6 flex justify-center gap-2 items-center font-mono bg-stone-950/50 py-2 rounded-lg">
+              <span>Roll ({rollResult.roll})</span>
+              <span>+</span>
+              <span>Bonus ({rollResult.mod})</span>
+              <span>=</span>
+              <span className="text-xl font-bold text-stone-200">{rollResult.total}</span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <button 
+                onClick={() => setRollResult(null)}
+                className="col-span-2 py-3 bg-stone-800 hover:bg-stone-700 text-stone-100 rounded-xl font-bold transition"
+              >
+                Close
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
 
     </div>
   );
