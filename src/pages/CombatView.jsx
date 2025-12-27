@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { ArrowLeft, Shield, Heart, Zap, Sword, Dices, X, Activity, Settings, Moon, Trash2 } from 'lucide-react';
+import { ArrowLeft, Shield, Heart, Zap, Sword, Dices, X, Activity, Settings, Moon, Trash2, User, ScrollText } from 'lucide-react';
 import { CLASSES, SKILLS } from '../data/srd';
 
 export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const [activeTab, setActiveTab] = useState('combat');
   const [rollResult, setRollResult] = useState(null);
-  const [showMenu, setShowMenu] = useState(false); // Estado para el menú de opciones
+  const [showMenu, setShowMenu] = useState(false);
 
   const getModifier = (score) => Math.floor((score - 10) / 2);
   const proficiencyBonus = 2;
@@ -29,12 +29,14 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const saveProficiencies = heroClassData ? heroClassData.saves : [];
 
   const weapons = hero.weapons || [{ id: 'def', name: 'Unarmed', type: 'melee', damage: '1', stat: 'str' }];
+  
+  // Recuperamos los detalles (si existen) o ponemos valores por defecto
+  const details = hero.details || { alignment: 'Unknown', background: 'Unknown' };
 
-  // --- ACCIONES DEL MENÚ ---
+  // --- ACCIONES ---
   const handleLongRest = () => {
-    onUpdateHero({ ...hero, currentHP: maxHP }); // Cura completa
+    onUpdateHero({ ...hero, currentHP: maxHP });
     setShowMenu(false);
-    // Podrías añadir un toast/aviso aquí
   };
 
   const handleDelete = () => {
@@ -63,7 +65,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   return (
     <div className="flex flex-col h-screen bg-neutral-900 pb-20 relative">
       
-      {/* HEADER con Botón de Menú */}
+      {/* HEADER */}
       <header className="flex items-center justify-between p-6 pb-2 bg-neutral-900 z-10">
         <div className="flex items-center gap-4">
           <button onClick={onBack} className="p-2 text-stone-400 hover:text-stone-100 transition"><ArrowLeft /></button>
@@ -72,67 +74,41 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
             <p className="text-xs text-stone-500">Lvl {hero.level} {hero.race} {hero.class}</p>
           </div>
         </div>
-        {/* Botón de Ajustes */}
-        <button 
-          onClick={() => setShowMenu(!showMenu)} 
-          className={`p-2 rounded-full transition ${showMenu ? 'bg-yellow-500 text-stone-900' : 'text-stone-400 hover:bg-stone-800'}`}
-        >
+        <button onClick={() => setShowMenu(!showMenu)} className={`p-2 rounded-full transition ${showMenu ? 'bg-yellow-500 text-stone-900' : 'text-stone-400 hover:bg-stone-800'}`}>
           <Settings size={20} />
         </button>
       </header>
 
-      {/* MENÚ DESPLEGABLE (OVERLAY) */}
+      {/* MENÚ OVERLAY */}
       {showMenu && (
         <div className="absolute top-20 right-6 z-20 w-48 bg-stone-800 border border-stone-700 rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in duration-200 origin-top-right">
-          <button 
-            onClick={handleLongRest}
-            className="w-full text-left px-4 py-3 text-stone-200 hover:bg-stone-700 flex items-center gap-3 border-b border-stone-700/50"
-          >
-            <Moon size={16} className="text-blue-400" /> Long Rest (Heal)
-          </button>
-          <button 
-            onClick={handleDelete}
-            className="w-full text-left px-4 py-3 text-red-400 hover:bg-red-900/20 flex items-center gap-3"
-          >
-            <Trash2 size={16} /> Delete Hero
-          </button>
+          <button onClick={handleLongRest} className="w-full text-left px-4 py-3 text-stone-200 hover:bg-stone-700 flex items-center gap-3 border-b border-stone-700/50"><Moon size={16} className="text-blue-400" /> Long Rest (Heal)</button>
+          <button onClick={handleDelete} className="w-full text-left px-4 py-3 text-red-400 hover:bg-red-900/20 flex items-center gap-3"><Trash2 size={16} /> Delete Hero</button>
         </div>
       )}
 
-      {/* TABS */}
+      {/* TABS DE NAVEGACIÓN */}
       <div className="flex px-6 border-b border-stone-800 mb-4">
         <button onClick={() => setActiveTab('combat')} className={`flex-1 pb-3 text-sm font-bold border-b-2 transition ${activeTab === 'combat' ? 'border-yellow-500 text-yellow-500' : 'border-transparent text-stone-500'}`}>COMBAT</button>
         <button onClick={() => setActiveTab('skills')} className={`flex-1 pb-3 text-sm font-bold border-b-2 transition ${activeTab === 'skills' ? 'border-yellow-500 text-yellow-500' : 'border-transparent text-stone-500'}`}>SKILLS</button>
+        <button onClick={() => setActiveTab('profile')} className={`flex-1 pb-3 text-sm font-bold border-b-2 transition ${activeTab === 'profile' ? 'border-yellow-500 text-yellow-500' : 'border-transparent text-stone-500'}`}>PROFILE</button>
       </div>
 
-      {/* CONTENIDO (Igual que antes) */}
+      {/* CONTENIDO PRINCIPAL */}
       <div className="flex-1 overflow-y-auto px-6 space-y-6 pb-24" onClick={() => setShowMenu(false)}>
         
+        {/* === PESTAÑA COMBATE === */}
         {activeTab === 'combat' && (
           <div className="space-y-6 animate-in slide-in-from-left duration-200">
             <div className="grid grid-cols-3 gap-3">
-              <div className="bg-stone-800 p-3 rounded-xl border border-stone-700 flex flex-col items-center justify-center">
-                <Shield className="text-stone-600 mb-1 w-5 h-5" />
-                <span className="text-xs text-stone-400 font-bold uppercase">AC</span>
-                <span className="text-2xl font-bold text-stone-100">{armorClass}</span>
-              </div>
-              <div className="bg-stone-800 p-3 rounded-xl border border-stone-700 flex flex-col items-center justify-center">
-                <Zap className="text-yellow-600 mb-1 w-5 h-5" />
-                <span className="text-xs text-stone-400 font-bold uppercase">Init</span>
-                <span className="text-2xl font-bold text-yellow-500">{initiative}</span>
-              </div>
-              <div className="bg-stone-800 p-3 rounded-xl border border-stone-700 flex flex-col items-center justify-center">
-                <Heart className="text-red-500 mb-1 w-5 h-5" />
-                <span className="text-xs text-stone-400 font-bold uppercase">HP</span>
-                <span className="text-xl font-bold text-stone-100">{currentHP}</span>
-              </div>
+              <div className="bg-stone-800 p-3 rounded-xl border border-stone-700 flex flex-col items-center justify-center"><Shield className="text-stone-600 mb-1 w-5 h-5" /><span className="text-xs text-stone-400 font-bold uppercase">AC</span><span className="text-2xl font-bold text-stone-100">{armorClass}</span></div>
+              <div className="bg-stone-800 p-3 rounded-xl border border-stone-700 flex flex-col items-center justify-center"><Zap className="text-yellow-600 mb-1 w-5 h-5" /><span className="text-xs text-stone-400 font-bold uppercase">Init</span><span className="text-2xl font-bold text-yellow-500">{initiative}</span></div>
+              <div className="bg-stone-800 p-3 rounded-xl border border-stone-700 flex flex-col items-center justify-center"><Heart className="text-red-500 mb-1 w-5 h-5" /><span className="text-xs text-stone-400 font-bold uppercase">HP</span><span className="text-xl font-bold text-stone-100">{currentHP}</span></div>
             </div>
-
             <div className="flex gap-2">
               <button onClick={() => changeHP(-1)} className="flex-1 py-3 bg-red-900/20 text-red-400 border border-red-900/50 rounded-lg font-bold hover:bg-red-900/40">- DMG</button>
               <button onClick={() => changeHP(1)} className="flex-1 py-3 bg-green-900/20 text-green-400 border border-green-900/50 rounded-lg font-bold hover:bg-green-900/40">+ HEAL</button>
             </div>
-
             <div>
               <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider">Attacks</h3>
               <div className="space-y-2">
@@ -142,10 +118,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                     <div key={w.id} onClick={() => rollDice(`${w.name} Attack`, mod)} className="bg-stone-800 p-4 rounded-xl border border-stone-700 flex justify-between items-center cursor-pointer hover:border-yellow-500/50 transition">
                       <div className="flex items-center gap-3">
                         <div className="bg-stone-900 p-2 rounded-lg text-stone-500"><Sword size={20} /></div>
-                        <div>
-                          <h4 className="font-bold text-stone-200">{w.name}</h4>
-                          <p className="text-xs text-stone-500">{w.damage} {w.stat.toUpperCase()}</p>
-                        </div>
+                        <div><h4 className="font-bold text-stone-200">{w.name}</h4><p className="text-xs text-stone-500">{w.damage} {w.stat.toUpperCase()}</p></div>
                       </div>
                       <div className="bg-stone-900 px-3 py-1 rounded-lg font-bold text-stone-300">+{mod}</div>
                     </div>
@@ -156,18 +129,16 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           </div>
         )}
 
+        {/* === PESTAÑA SKILLS === */}
         {activeTab === 'skills' && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
             <div>
-              <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
-                <Shield size={16} /> Saving Throws
-              </h3>
+              <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2"><Shield size={16} /> Saving Throws</h3>
               <div className="grid grid-cols-2 gap-2">
                 {Object.keys(mods).map((stat) => {
                   const fullStatName = {str:'Strength', dex:'Dexterity', con:'Constitution', int:'Intelligence', wis:'Wisdom', cha:'Charisma'}[stat];
                   const isSaveProficient = saveProficiencies.includes(fullStatName);
                   const saveMod = mods[stat] + (isSaveProficient ? proficiencyBonus : 0);
-                  
                   return (
                     <button key={stat} onClick={() => rollDice(`${stat.toUpperCase()} Save`, saveMod)} className={`p-3 rounded-lg border flex justify-between items-center ${isSaveProficient ? 'bg-stone-800 border-yellow-600/50' : 'bg-stone-800/50 border-stone-700'}`}>
                       <span className={`font-bold uppercase text-sm ${isSaveProficient ? 'text-yellow-500' : 'text-stone-400'}`}>{stat}</span>
@@ -194,9 +165,83 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           </div>
         )}
 
+        {/* === PESTAÑA PROFILE (NUEVA) === */}
+        {activeTab === 'profile' && (
+          <div className="space-y-6 animate-in slide-in-from-right duration-200">
+            
+            {/* Tarjeta de Identidad */}
+            <div className="bg-stone-800 p-5 rounded-xl border border-stone-700">
+              <div className="flex items-center gap-4 mb-4 pb-4 border-b border-stone-700">
+                <div className="w-16 h-16 bg-stone-700 rounded-full flex items-center justify-center border-2 border-yellow-500/50">
+                  <User size={32} className="text-stone-400" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-stone-100">{hero.name}</h2>
+                  <p className="text-stone-400 text-sm">{details.alignment} {hero.race} {hero.class}</p>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <span className="text-xs text-stone-500 uppercase font-bold">Background</span>
+                  <p className="text-stone-200">{details.background || 'Unknown'}</p>
+                </div>
+                <div>
+                  <span className="text-xs text-stone-500 uppercase font-bold">Experience</span>
+                  <p className="text-stone-200">0 XP</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Rasgos Físicos (Tabla de la Página 2 del PDF) */}
+            <div>
+              <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
+                <Settings size={16} /> Appearance
+              </h3>
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="bg-stone-800 p-2 rounded-lg border border-stone-700">
+                  <span className="block text-[10px] text-stone-500 uppercase">Age</span>
+                  <span className="text-sm font-bold text-stone-200">{details.age || '--'}</span>
+                </div>
+                <div className="bg-stone-800 p-2 rounded-lg border border-stone-700">
+                  <span className="block text-[10px] text-stone-500 uppercase">Height</span>
+                  <span className="text-sm font-bold text-stone-200">{details.height || '--'}</span>
+                </div>
+                <div className="bg-stone-800 p-2 rounded-lg border border-stone-700">
+                  <span className="block text-[10px] text-stone-500 uppercase">Weight</span>
+                  <span className="text-sm font-bold text-stone-200">{details.weight || '--'}</span>
+                </div>
+                <div className="bg-stone-800 p-2 rounded-lg border border-stone-700">
+                  <span className="block text-[10px] text-stone-500 uppercase">Eyes</span>
+                  <span className="text-sm font-bold text-stone-200">{details.eyes || '--'}</span>
+                </div>
+                <div className="bg-stone-800 p-2 rounded-lg border border-stone-700">
+                  <span className="block text-[10px] text-stone-500 uppercase">Skin</span>
+                  <span className="text-sm font-bold text-stone-200">{details.skin || '--'}</span>
+                </div>
+                <div className="bg-stone-800 p-2 rounded-lg border border-stone-700">
+                  <span className="block text-[10px] text-stone-500 uppercase">Hair</span>
+                  <span className="text-sm font-bold text-stone-200">{details.hair || '--'}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Placeholder para Historia */}
+            <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 border-dashed">
+              <h3 className="text-stone-400 font-bold text-sm mb-2 uppercase flex items-center gap-2">
+                <ScrollText size={16} /> Character Backstory
+              </h3>
+              <p className="text-sm text-stone-500 italic">
+                {details.backstory || "No backstory written yet."}
+              </p>
+            </div>
+
+          </div>
+        )}
+
       </div>
 
-      {/* MODAL RESULTADOS */}
+      {/* MODAL RESULTADOS (IGUAL) */}
       {rollResult && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-stone-900 border border-stone-700 p-6 rounded-2xl shadow-2xl w-full max-w-sm relative text-center">
