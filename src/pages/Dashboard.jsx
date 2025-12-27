@@ -1,6 +1,6 @@
 import { Plus, ChevronRight, User } from 'lucide-react';
 
-export function Dashboard({ onNavigate, heroes }) {
+export function Dashboard({ onNavigate, onCreate, heroes }) {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -22,7 +22,7 @@ export function Dashboard({ onNavigate, heroes }) {
           {heroes.map((hero) => (
             <div 
               key={hero.id} 
-              onClick={() => onNavigate('combat')} 
+              onClick={() => onNavigate(hero.id)}
               className="group flex items-center justify-between p-4 bg-stone-800 rounded-2xl border border-stone-700/50 hover:border-yellow-600/50 transition cursor-pointer"
             >
               <div className="flex items-center gap-4">
@@ -42,7 +42,7 @@ export function Dashboard({ onNavigate, heroes }) {
       )}
 
       <button 
-        onClick={() => onNavigate('creator')}
+        onClick={onCreate}
         className="fixed bottom-8 right-8 w-14 h-14 bg-yellow-500 hover:bg-yellow-400 text-stone-900 rounded-full shadow-lg shadow-yellow-500/20 flex items-center justify-center transition transform hover:scale-105 active:scale-95"
       >
         <Plus size={32} strokeWidth={3} />

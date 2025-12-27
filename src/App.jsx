@@ -1,56 +1,63 @@
 import { useState, useEffect } from 'react';
 import { Dashboard } from './pages/Dashboard';
 import { CharacterCreator } from './pages/CharacterCreator';
+import { CombatView } from './pages/CombatView';
 
 function App() {
   const [currentView, setCurrentView] = useState('dashboard');
+  const [selectedHeroId, setSelectedHeroId] = useState(null);
   
-  // 1. ESTADO: Aquí viven los héroes.
-  // Intentamos leer del localStorage primero, si no hay nada, array vacío.
   const [heroes, setHeroes] = useState(() => {
     const saved = localStorage.getItem('dnd_heroes');
     return saved ? JSON.parse(saved) : [];
   });
 
-  // 2. EFECTO: Cada vez que 'heroes' cambie, guardamos en localStorage automáticamente.
   useEffect(() => {
     localStorage.setItem('dnd_heroes', JSON.stringify(heroes));
   }, [heroes]);
 
-  // 3. ACCIÓN: Función para agregar un nuevo héroe
   const handleSaveHero = (newHeroData) => {
     const newHero = {
-      id: Date.now(), // Usamos la hora como ID único temporal
+      id: Date.now(),
       ...newHeroData,
-      level: 1, // Todos empiezan en nivel 1
+      level: 1,
     };
-    
-    setHeroes([...heroes, newHero]); // Agregamos al final de la lista
-    setCurrentView('dashboard'); // Volvemos a la pantalla principal
+    setHeroes([...heroes, newHero]);
+    setCurrentView('dashboard');
   };
+
+  // NUEVO: Función para abrir un héroe específico
+  const handleSelectHero = (heroId) => {
+    setSelectedHeroId(heroId);
+    setCurrentView('combat');
+  };
+
+  // Encontramos el objeto completo del héroe seleccionado
+  const activeHero = heroes.find(h => h.id === selectedHeroId);
 
   return (
     <div className="min-h-screen bg-neutral-900 text-stone-100 font-sans p-6">
       
       {currentView === 'dashboard' && (
         <Dashboard 
-          heroes={heroes} // Le pasamos la lista para que la muestre
-          onNavigate={setCurrentView} 
+          heroes={heroes} 
+          onNavigate={handleSelectHero} // <--- CAMBIO: Ahora pasamos la función de selección
+          onCreate={() => setCurrentView('creator')} // Separamos la creación de la selección
         />
       )}
 
       {currentView === 'creator' && (
         <CharacterCreator 
           onBack={() => setCurrentView('dashboard')}
-          onSave={handleSaveHero} // Le pasamos la función para guardar
+          onSave={handleSaveHero} 
         />
       )}
 
-      {currentView === 'combat' && (
-        <div className="text-center mt-20">
-          <h2 className="text-xl font-bold">Combat View</h2>
-          <button onClick={() => setCurrentView('dashboard')} className="text-yellow-500 underline mt-4">Back</button>
-        </div>
+      {currentView === 'combat' && activeHero && ( // Solo mostramos si hay héroe válido
+        <CombatView 
+          hero={activeHero} 
+          onBack={() => setCurrentView('dashboard')} 
+        />
       )}
 
     </div>
