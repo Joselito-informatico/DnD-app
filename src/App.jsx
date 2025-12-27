@@ -21,18 +21,26 @@ function App() {
       id: Date.now(),
       ...newHeroData,
       level: 1,
+      // Inicializamos la vida actual igual a la máxima teórica (luego se recalcula)
+      currentHP: null 
     };
     setHeroes([...heroes, newHero]);
     setCurrentView('dashboard');
   };
 
-  // NUEVO: Función para abrir un héroe específico
+  // NUEVO: Función para actualizar un héroe existente (Ej. recibir daño)
+  const handleUpdateHero = (updatedHero) => {
+    const newHeroes = heroes.map(h => 
+      h.id === updatedHero.id ? updatedHero : h
+    );
+    setHeroes(newHeroes);
+  };
+
   const handleSelectHero = (heroId) => {
     setSelectedHeroId(heroId);
     setCurrentView('combat');
   };
 
-  // Encontramos el objeto completo del héroe seleccionado
   const activeHero = heroes.find(h => h.id === selectedHeroId);
 
   return (
@@ -41,8 +49,8 @@ function App() {
       {currentView === 'dashboard' && (
         <Dashboard 
           heroes={heroes} 
-          onNavigate={handleSelectHero} // <--- CAMBIO: Ahora pasamos la función de selección
-          onCreate={() => setCurrentView('creator')} // Separamos la creación de la selección
+          onNavigate={handleSelectHero} 
+          onCreate={() => setCurrentView('creator')} 
         />
       )}
 
@@ -53,9 +61,10 @@ function App() {
         />
       )}
 
-      {currentView === 'combat' && activeHero && ( // Solo mostramos si hay héroe válido
+      {currentView === 'combat' && activeHero && (
         <CombatView 
           hero={activeHero} 
+          onUpdateHero={handleUpdateHero} // <--- Pasamos la herramienta al trabajador
           onBack={() => setCurrentView('dashboard')} 
         />
       )}
