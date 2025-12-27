@@ -1,11 +1,14 @@
 import { useState } from 'react';
-import { ArrowLeft, Shield, Heart, Zap, Sword, Dices, X, Activity, Settings, Moon, Trash2, User, ScrollText } from 'lucide-react';
+import { ArrowLeft, Shield, Heart, Zap, Sword, X, Activity, Settings, Moon, Trash2, User, ScrollText, Backpack, Plus, Minus } from 'lucide-react';
 import { CLASSES, SKILLS } from '../data/srd';
 
 export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const [activeTab, setActiveTab] = useState('combat');
   const [rollResult, setRollResult] = useState(null);
   const [showMenu, setShowMenu] = useState(false);
+  
+  // Estado local para agregar items nuevos
+  const [newItemName, setNewItemName] = useState("");
 
   const getModifier = (score) => Math.floor((score - 10) / 2);
   const proficiencyBonus = 2;
@@ -29,9 +32,12 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const saveProficiencies = heroClassData ? heroClassData.saves : [];
 
   const weapons = hero.weapons || [{ id: 'def', name: 'Unarmed', type: 'melee', damage: '1', stat: 'str' }];
-  
-  // Recuperamos los detalles (si existen) o ponemos valores por defecto
   const details = hero.details || { alignment: 'Unknown', background: 'Unknown' };
+
+  // --- INVENTARIO Y DINERO (NUEVO) ---
+  // Inicializamos si no existen
+  const inventory = hero.inventory || []; 
+  const money = hero.money || { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 };
 
   // --- ACCIONES ---
   const handleLongRest = () => {
@@ -43,6 +49,23 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     if (confirm("Are you sure you want to delete this hero permanently?")) {
       onDeleteHero(hero.id);
     }
+  };
+
+  const updateMoney = (currency, value) => {
+    const newMoney = { ...money, [currency]: parseInt(value) || 0 };
+    onUpdateHero({ ...hero, money: newMoney });
+  };
+
+  const addItem = () => {
+    if (!newItemName.trim()) return;
+    const newItem = { id: Date.now(), name: newItemName, qty: 1 };
+    onUpdateHero({ ...hero, inventory: [...inventory, newItem] });
+    setNewItemName("");
+  };
+
+  const removeItem = (itemId) => {
+    const newInv = inventory.filter(i => i.id !== itemId);
+    onUpdateHero({ ...hero, inventory: newInv });
   };
 
   const rollDice = (name, modifier) => {
@@ -87,11 +110,12 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         </div>
       )}
 
-      {/* TABS DE NAVEGACIÓN */}
-      <div className="flex px-6 border-b border-stone-800 mb-4">
-        <button onClick={() => setActiveTab('combat')} className={`flex-1 pb-3 text-sm font-bold border-b-2 transition ${activeTab === 'combat' ? 'border-yellow-500 text-yellow-500' : 'border-transparent text-stone-500'}`}>COMBAT</button>
-        <button onClick={() => setActiveTab('skills')} className={`flex-1 pb-3 text-sm font-bold border-b-2 transition ${activeTab === 'skills' ? 'border-yellow-500 text-yellow-500' : 'border-transparent text-stone-500'}`}>SKILLS</button>
-        <button onClick={() => setActiveTab('profile')} className={`flex-1 pb-3 text-sm font-bold border-b-2 transition ${activeTab === 'profile' ? 'border-yellow-500 text-yellow-500' : 'border-transparent text-stone-500'}`}>PROFILE</button>
+      {/* TABS DE NAVEGACIÓN (AHORA SON 4) */}
+      <div className="flex px-4 border-b border-stone-800 mb-4 overflow-x-auto no-scrollbar">
+        <button onClick={() => setActiveTab('combat')} className={`flex-1 min-w-[80px] pb-3 text-xs font-bold border-b-2 transition ${activeTab === 'combat' ? 'border-yellow-500 text-yellow-500' : 'border-transparent text-stone-500'}`}>COMBAT</button>
+        <button onClick={() => setActiveTab('skills')} className={`flex-1 min-w-[80px] pb-3 text-xs font-bold border-b-2 transition ${activeTab === 'skills' ? 'border-yellow-500 text-yellow-500' : 'border-transparent text-stone-500'}`}>SKILLS</button>
+        <button onClick={() => setActiveTab('inventory')} className={`flex-1 min-w-[80px] pb-3 text-xs font-bold border-b-2 transition ${activeTab === 'inventory' ? 'border-yellow-500 text-yellow-500' : 'border-transparent text-stone-500'}`}>EQUIP</button>
+        <button onClick={() => setActiveTab('profile')} className={`flex-1 min-w-[80px] pb-3 text-xs font-bold border-b-2 transition ${activeTab === 'profile' ? 'border-yellow-500 text-yellow-500' : 'border-transparent text-stone-500'}`}>PROFILE</button>
       </div>
 
       {/* CONTENIDO PRINCIPAL */}
@@ -165,83 +189,111 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           </div>
         )}
 
-        {/* === PESTAÑA PROFILE (NUEVA) === */}
-        {activeTab === 'profile' && (
+        {/* === PESTAÑA INVENTORY (NUEVA) === */}
+        {activeTab === 'inventory' && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
             
-            {/* Tarjeta de Identidad */}
+            {/* Dinero (Coins) */}
+            <div className="bg-stone-800 p-4 rounded-xl border border-stone-700">
+              <h3 className="text-stone-400 font-bold text-xs uppercase mb-3 flex items-center gap-2">
+                <span className="text-yellow-500">●</span> Currency
+              </h3>
+              <div className="grid grid-cols-5 gap-2">
+                {['cp', 'sp', 'ep', 'gp', 'pp'].map((coin) => (
+                  <div key={coin} className="flex flex-col items-center">
+                     <label className="text-[10px] uppercase font-bold text-stone-500 mb-1">{coin}</label>
+                     <input 
+                      type="number" 
+                      value={money[coin]} 
+                      onChange={(e) => updateMoney(coin, e.target.value)}
+                      className="w-full bg-stone-900 border border-stone-600 rounded-lg p-1 text-center text-sm font-bold text-stone-200 focus:border-yellow-500 outline-none"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Lista de Equipo */}
+            <div>
+              <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
+                <Backpack size={16} /> Equipment
+              </h3>
+              
+              {/* Input para agregar */}
+              <div className="flex gap-2 mb-4">
+                <input 
+                  type="text" 
+                  placeholder="Add item (e.g. Rope, 50ft)" 
+                  value={newItemName}
+                  onChange={(e) => setNewItemName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && addItem()}
+                  className="flex-1 bg-stone-800 border border-stone-700 rounded-xl px-4 py-3 text-stone-200 placeholder-stone-500 focus:border-yellow-500 outline-none"
+                />
+                <button 
+                  onClick={addItem}
+                  className="bg-stone-800 border border-stone-700 hover:bg-stone-700 text-stone-200 w-12 rounded-xl flex items-center justify-center transition"
+                >
+                  <Plus />
+                </button>
+              </div>
+
+              {/* Lista */}
+              <div className="space-y-2">
+                {inventory.length === 0 && (
+                  <p className="text-center text-stone-600 text-sm py-4">Your backpack is empty.</p>
+                )}
+                {inventory.map((item) => (
+                  <div key={item.id} className="group flex items-center justify-between p-3 bg-stone-800/50 rounded-xl border border-stone-700/50 hover:bg-stone-800 transition">
+                    <span className="text-stone-200">{item.name}</span>
+                    <button 
+                      onClick={() => removeItem(item.id)}
+                      className="text-stone-600 hover:text-red-400 p-1"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* === PESTAÑA PROFILE === */}
+        {activeTab === 'profile' && (
+          <div className="space-y-6 animate-in slide-in-from-right duration-200">
             <div className="bg-stone-800 p-5 rounded-xl border border-stone-700">
               <div className="flex items-center gap-4 mb-4 pb-4 border-b border-stone-700">
                 <div className="w-16 h-16 bg-stone-700 rounded-full flex items-center justify-center border-2 border-yellow-500/50">
                   <User size={32} className="text-stone-400" />
                 </div>
-                <div>
-                  <h2 className="text-xl font-bold text-stone-100">{hero.name}</h2>
-                  <p className="text-stone-400 text-sm">{details.alignment} {hero.race} {hero.class}</p>
-                </div>
+                <div><h2 className="text-xl font-bold text-stone-100">{hero.name}</h2><p className="text-stone-400 text-sm">{details.alignment} {hero.race} {hero.class}</p></div>
               </div>
-              
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <span className="text-xs text-stone-500 uppercase font-bold">Background</span>
-                  <p className="text-stone-200">{details.background || 'Unknown'}</p>
-                </div>
-                <div>
-                  <span className="text-xs text-stone-500 uppercase font-bold">Experience</span>
-                  <p className="text-stone-200">0 XP</p>
-                </div>
+                <div><span className="text-xs text-stone-500 uppercase font-bold">Background</span><p className="text-stone-200">{details.background || 'Unknown'}</p></div>
+                <div><span className="text-xs text-stone-500 uppercase font-bold">Experience</span><p className="text-stone-200">0 XP</p></div>
               </div>
             </div>
-
-            {/* Rasgos Físicos (Tabla de la Página 2 del PDF) */}
             <div>
-              <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
-                <Settings size={16} /> Appearance
-              </h3>
+              <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2"><Settings size={16} /> Appearance</h3>
               <div className="grid grid-cols-3 gap-2 text-center">
-                <div className="bg-stone-800 p-2 rounded-lg border border-stone-700">
-                  <span className="block text-[10px] text-stone-500 uppercase">Age</span>
-                  <span className="text-sm font-bold text-stone-200">{details.age || '--'}</span>
-                </div>
-                <div className="bg-stone-800 p-2 rounded-lg border border-stone-700">
-                  <span className="block text-[10px] text-stone-500 uppercase">Height</span>
-                  <span className="text-sm font-bold text-stone-200">{details.height || '--'}</span>
-                </div>
-                <div className="bg-stone-800 p-2 rounded-lg border border-stone-700">
-                  <span className="block text-[10px] text-stone-500 uppercase">Weight</span>
-                  <span className="text-sm font-bold text-stone-200">{details.weight || '--'}</span>
-                </div>
-                <div className="bg-stone-800 p-2 rounded-lg border border-stone-700">
-                  <span className="block text-[10px] text-stone-500 uppercase">Eyes</span>
-                  <span className="text-sm font-bold text-stone-200">{details.eyes || '--'}</span>
-                </div>
-                <div className="bg-stone-800 p-2 rounded-lg border border-stone-700">
-                  <span className="block text-[10px] text-stone-500 uppercase">Skin</span>
-                  <span className="text-sm font-bold text-stone-200">{details.skin || '--'}</span>
-                </div>
-                <div className="bg-stone-800 p-2 rounded-lg border border-stone-700">
-                  <span className="block text-[10px] text-stone-500 uppercase">Hair</span>
-                  <span className="text-sm font-bold text-stone-200">{details.hair || '--'}</span>
-                </div>
+                <div className="bg-stone-800 p-2 rounded-lg border border-stone-700"><span className="block text-[10px] text-stone-500 uppercase">Age</span><span className="text-sm font-bold text-stone-200">{details.age || '--'}</span></div>
+                <div className="bg-stone-800 p-2 rounded-lg border border-stone-700"><span className="block text-[10px] text-stone-500 uppercase">Height</span><span className="text-sm font-bold text-stone-200">{details.height || '--'}</span></div>
+                <div className="bg-stone-800 p-2 rounded-lg border border-stone-700"><span className="block text-[10px] text-stone-500 uppercase">Weight</span><span className="text-sm font-bold text-stone-200">{details.weight || '--'}</span></div>
+                <div className="bg-stone-800 p-2 rounded-lg border border-stone-700"><span className="block text-[10px] text-stone-500 uppercase">Eyes</span><span className="text-sm font-bold text-stone-200">{details.eyes || '--'}</span></div>
+                <div className="bg-stone-800 p-2 rounded-lg border border-stone-700"><span className="block text-[10px] text-stone-500 uppercase">Skin</span><span className="text-sm font-bold text-stone-200">{details.skin || '--'}</span></div>
+                <div className="bg-stone-800 p-2 rounded-lg border border-stone-700"><span className="block text-[10px] text-stone-500 uppercase">Hair</span><span className="text-sm font-bold text-stone-200">{details.hair || '--'}</span></div>
               </div>
             </div>
-
-            {/* Placeholder para Historia */}
             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 border-dashed">
-              <h3 className="text-stone-400 font-bold text-sm mb-2 uppercase flex items-center gap-2">
-                <ScrollText size={16} /> Character Backstory
-              </h3>
-              <p className="text-sm text-stone-500 italic">
-                {details.backstory || "No backstory written yet."}
-              </p>
+              <h3 className="text-stone-400 font-bold text-sm mb-2 uppercase flex items-center gap-2"><ScrollText size={16} /> Character Backstory</h3>
+              <p className="text-sm text-stone-500 italic">{details.backstory || "No backstory written yet."}</p>
             </div>
-
           </div>
         )}
 
       </div>
 
-      {/* MODAL RESULTADOS (IGUAL) */}
+      {/* MODAL RESULTADOS */}
       {rollResult && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-stone-900 border border-stone-700 p-6 rounded-2xl shadow-2xl w-full max-w-sm relative text-center">
