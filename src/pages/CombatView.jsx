@@ -1,15 +1,14 @@
 import { useState } from 'react';
-import { ArrowLeft, Shield, Heart, Zap, Sword, X, Activity, Settings, Moon, Trash2, User, ScrollText, Backpack, Plus, Minus } from 'lucide-react';
-import { CLASSES, SKILLS } from '../data/srd';
+import { ArrowLeft, Shield, Heart, Zap, Sword, X, Activity, Settings, Moon, Trash2, User, ScrollText, Backpack, Plus, Flame, BookOpen } from 'lucide-react';
+import { CLASSES, SKILLS, SPELLS } from '../data/srd';
 
 export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const [activeTab, setActiveTab] = useState('combat');
   const [rollResult, setRollResult] = useState(null);
   const [showMenu, setShowMenu] = useState(false);
-  
-  // Estado local para agregar items nuevos
   const [newItemName, setNewItemName] = useState("");
 
+  // --- REGLAS & CALCULOS ---
   const getModifier = (score) => Math.floor((score - 10) / 2);
   const proficiencyBonus = 2;
 
@@ -31,17 +30,26 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const heroClassData = CLASSES.find(c => c.name === hero.class);
   const saveProficiencies = heroClassData ? heroClassData.saves : [];
 
+  // DATOS PERSISTENTES
   const weapons = hero.weapons || [{ id: 'def', name: 'Unarmed', type: 'melee', damage: '1', stat: 'str' }];
   const details = hero.details || { alignment: 'Unknown', background: 'Unknown' };
-
-  // --- INVENTARIO Y DINERO (NUEVO) ---
-  // Inicializamos si no existen
   const inventory = hero.inventory || []; 
   const money = hero.money || { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 };
+  
+  // MAGIA (NUEVO)
+  const spellSlots = hero.spellSlots || { 1: { total: 2, used: 0 } }; // Por defecto 2 slots de nivel 1
+  // Detectar atributo mágico según clase (simplificado)
+  const spellCastingStat = hero.class === 'Wizard' ? 'int' : (hero.class === 'Bard' ? 'cha' : 'wis');
+  const spellAttackBonus = mods[spellCastingStat] + proficiencyBonus;
+  const spellSaveDC = 8 + proficiencyBonus + mods[spellCastingStat];
 
   // --- ACCIONES ---
   const handleLongRest = () => {
-    onUpdateHero({ ...hero, currentHP: maxHP });
+    // Restaurar HP y Slots
+    const resetSlots = { ...spellSlots };
+    Object.keys(resetSlots).forEach(level => resetSlots[level].used = 0);
+    
+    onUpdateHero({ ...hero, currentHP: maxHP, spellSlots: resetSlots });
     setShowMenu(false);
   };
 
@@ -64,8 +72,18 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   };
 
   const removeItem = (itemId) => {
-    const newInv = inventory.filter(i => i.id !== itemId);
-    onUpdateHero({ ...hero, inventory: newInv });
+    onUpdateHero({ ...hero, inventory: inventory.filter(i => i.id !== itemId) });
+  };
+
+  const toggleSlot = (level, slotIndex) => {
+    const currentLevel = spellSlots[level] || { total: 0, used: 0 };
+    // Si clicamos un slot usado, lo recuperamos. Si está libre, lo gastamos.
+    // Lógica visual: SlotIndex < Used => Está gastado.
+    const isUsed = slotIndex < currentLevel.used;
+    
+    const newUsed = isUsed ? currentLevel.used - 1 : currentLevel.used + 1;
+    const newSlots = { ...spellSlots, [level]: { ...currentLevel, used: Math.max(0, Math.min(currentLevel.total, newUsed)) } };
+    onUpdateHero({ ...hero, spellSlots: newSlots });
   };
 
   const rollDice = (name, modifier) => {
@@ -88,18 +106,13 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   return (
     <div className="flex flex-col h-screen bg-neutral-900 pb-20 relative">
       
-      {/* HEADER */}
+      {/* HEADER & MENU (Igual) */}
       <header className="flex items-center justify-between p-6 pb-2 bg-neutral-900 z-10">
         <div className="flex items-center gap-4">
           <button onClick={onBack} className="p-2 text-stone-400 hover:text-stone-100 transition"><ArrowLeft /></button>
-          <div>
-            <h1 className="text-xl font-bold text-stone-100">{hero.name}</h1>
-            <p className="text-xs text-stone-500">Lvl {hero.level} {hero.race} {hero.class}</p>
-          </div>
+          <div><h1 className="text-xl font-bold text-stone-100">{hero.name}</h1><p className="text-xs text-stone-500">Lvl {hero.level} {hero.race} {hero.class}</p></div>
         </div>
-        <button onClick={() => setShowMenu(!showMenu)} className={`p-2 rounded-full transition ${showMenu ? 'bg-yellow-500 text-stone-900' : 'text-stone-400 hover:bg-stone-800'}`}>
-          <Settings size={20} />
-        </button>
+        <button onClick={() => setShowMenu(!showMenu)} className={`p-2 rounded-full transition ${showMenu ? 'bg-yellow-500 text-stone-900' : 'text-stone-400 hover:bg-stone-800'}`}><Settings size={20} /></button>
       </header>
 
       {/* MENÚ OVERLAY */}
@@ -110,18 +123,19 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         </div>
       )}
 
-      {/* TABS DE NAVEGACIÓN (AHORA SON 4) */}
+      {/* TABS (5 PESTAÑAS) */}
       <div className="flex px-4 border-b border-stone-800 mb-4 overflow-x-auto no-scrollbar">
-        <button onClick={() => setActiveTab('combat')} className={`flex-1 min-w-[80px] pb-3 text-xs font-bold border-b-2 transition ${activeTab === 'combat' ? 'border-yellow-500 text-yellow-500' : 'border-transparent text-stone-500'}`}>COMBAT</button>
-        <button onClick={() => setActiveTab('skills')} className={`flex-1 min-w-[80px] pb-3 text-xs font-bold border-b-2 transition ${activeTab === 'skills' ? 'border-yellow-500 text-yellow-500' : 'border-transparent text-stone-500'}`}>SKILLS</button>
-        <button onClick={() => setActiveTab('inventory')} className={`flex-1 min-w-[80px] pb-3 text-xs font-bold border-b-2 transition ${activeTab === 'inventory' ? 'border-yellow-500 text-yellow-500' : 'border-transparent text-stone-500'}`}>EQUIP</button>
-        <button onClick={() => setActiveTab('profile')} className={`flex-1 min-w-[80px] pb-3 text-xs font-bold border-b-2 transition ${activeTab === 'profile' ? 'border-yellow-500 text-yellow-500' : 'border-transparent text-stone-500'}`}>PROFILE</button>
+        <button onClick={() => setActiveTab('combat')} className={`flex-1 min-w-[70px] pb-3 text-[10px] font-bold border-b-2 transition ${activeTab === 'combat' ? 'border-yellow-500 text-yellow-500' : 'border-transparent text-stone-500'}`}>COMBAT</button>
+        <button onClick={() => setActiveTab('skills')} className={`flex-1 min-w-[70px] pb-3 text-[10px] font-bold border-b-2 transition ${activeTab === 'skills' ? 'border-yellow-500 text-yellow-500' : 'border-transparent text-stone-500'}`}>SKILLS</button>
+        <button onClick={() => setActiveTab('spells')} className={`flex-1 min-w-[70px] pb-3 text-[10px] font-bold border-b-2 transition ${activeTab === 'spells' ? 'border-yellow-500 text-yellow-500' : 'border-transparent text-stone-500'}`}>SPELLS</button>
+        <button onClick={() => setActiveTab('inventory')} className={`flex-1 min-w-[70px] pb-3 text-[10px] font-bold border-b-2 transition ${activeTab === 'inventory' ? 'border-yellow-500 text-yellow-500' : 'border-transparent text-stone-500'}`}>EQUIP</button>
+        <button onClick={() => setActiveTab('profile')} className={`flex-1 min-w-[70px] pb-3 text-[10px] font-bold border-b-2 transition ${activeTab === 'profile' ? 'border-yellow-500 text-yellow-500' : 'border-transparent text-stone-500'}`}>PROFILE</button>
       </div>
 
-      {/* CONTENIDO PRINCIPAL */}
+      {/* CONTENIDO */}
       <div className="flex-1 overflow-y-auto px-6 space-y-6 pb-24" onClick={() => setShowMenu(false)}>
         
-        {/* === PESTAÑA COMBATE === */}
+        {/* === COMBAT === */}
         {activeTab === 'combat' && (
           <div className="space-y-6 animate-in slide-in-from-left duration-200">
             <div className="grid grid-cols-3 gap-3">
@@ -153,10 +167,10 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           </div>
         )}
 
-        {/* === PESTAÑA SKILLS === */}
+        {/* === SKILLS === */}
         {activeTab === 'skills' && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
-            <div>
+             <div>
               <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2"><Shield size={16} /> Saving Throws</h3>
               <div className="grid grid-cols-2 gap-2">
                 {Object.keys(mods).map((stat) => {
@@ -189,68 +203,109 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           </div>
         )}
 
-        {/* === PESTAÑA INVENTORY (NUEVA) === */}
-        {activeTab === 'inventory' && (
+        {/* === SPELLS (NUEVO) === */}
+        {activeTab === 'spells' && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
             
-            {/* Dinero (Coins) */}
-            <div className="bg-stone-800 p-4 rounded-xl border border-stone-700">
-              <h3 className="text-stone-400 font-bold text-xs uppercase mb-3 flex items-center gap-2">
-                <span className="text-yellow-500">●</span> Currency
-              </h3>
-              <div className="grid grid-cols-5 gap-2">
-                {['cp', 'sp', 'ep', 'gp', 'pp'].map((coin) => (
-                  <div key={coin} className="flex flex-col items-center">
-                     <label className="text-[10px] uppercase font-bold text-stone-500 mb-1">{coin}</label>
-                     <input 
-                      type="number" 
-                      value={money[coin]} 
-                      onChange={(e) => updateMoney(coin, e.target.value)}
-                      className="w-full bg-stone-900 border border-stone-600 rounded-lg p-1 text-center text-sm font-bold text-stone-200 focus:border-yellow-500 outline-none"
-                    />
-                  </div>
+            {/* Header Mágico (Page 3 Header) */}
+            <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 grid grid-cols-2 gap-4">
+              <div className="flex flex-col items-center border-r border-stone-700">
+                <span className="text-[10px] uppercase font-bold text-stone-500">Spell Save DC</span>
+                <span className="text-2xl font-bold text-stone-100">{spellSaveDC}</span>
+                <span className="text-[10px] text-stone-600">8 + Prof + {spellCastingStat.toUpperCase()}</span>
+              </div>
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] uppercase font-bold text-stone-500">Attack Bonus</span>
+                <span className="text-2xl font-bold text-yellow-500">+{spellAttackBonus}</span>
+                <span className="text-[10px] text-stone-600">Prof + {spellCastingStat.toUpperCase()}</span>
+              </div>
+            </div>
+
+            {/* Slots de Nivel 1 */}
+            <div>
+              <div className="flex justify-between items-end mb-2">
+                <h3 className="text-stone-400 font-bold text-sm uppercase flex items-center gap-2"><Flame size={16} /> Level 1 Slots</h3>
+                <span className="text-xs text-stone-500">{spellSlots[1]?.used || 0} / {spellSlots[1]?.total || 0} Used</span>
+              </div>
+              <div className="flex gap-2">
+                {Array.from({ length: spellSlots[1]?.total || 0 }).map((_, i) => (
+                  <button 
+                    key={i}
+                    onClick={() => toggleSlot(1, i)}
+                    className={`w-8 h-8 rounded-full border-2 transition ${i < (spellSlots[1]?.used || 0) ? 'bg-stone-900 border-stone-700' : 'bg-yellow-500 border-yellow-600 shadow-[0_0_10px_rgba(234,179,8,0.5)]'}`}
+                  ></button>
                 ))}
               </div>
             </div>
 
-            {/* Lista de Equipo */}
-            <div>
-              <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
-                <Backpack size={16} /> Equipment
-              </h3>
-              
-              {/* Input para agregar */}
-              <div className="flex gap-2 mb-4">
-                <input 
-                  type="text" 
-                  placeholder="Add item (e.g. Rope, 50ft)" 
-                  value={newItemName}
-                  onChange={(e) => setNewItemName(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && addItem()}
-                  className="flex-1 bg-stone-800 border border-stone-700 rounded-xl px-4 py-3 text-stone-200 placeholder-stone-500 focus:border-yellow-500 outline-none"
-                />
-                <button 
-                  onClick={addItem}
-                  className="bg-stone-800 border border-stone-700 hover:bg-stone-700 text-stone-200 w-12 rounded-xl flex items-center justify-center transition"
-                >
-                  <Plus />
-                </button>
-              </div>
+            {/* Lista de Conjuros */}
+            <div className="space-y-4">
+               {/* Cantrips */}
+               <div>
+                  <h3 className="text-stone-500 font-bold text-xs uppercase mb-2">Cantrips (0)</h3>
+                  <div className="space-y-2">
+                    {SPELLS.filter(s => s.level === 0).map(spell => (
+                      <div key={spell.id} className="bg-stone-800 p-3 rounded-lg border border-stone-700 flex justify-between items-center group cursor-pointer hover:border-yellow-500/50" onClick={() => rollDice(`${spell.name}`, spellAttackBonus)}>
+                        <div>
+                          <p className="font-bold text-stone-200 text-sm">{spell.name}</p>
+                          <p className="text-[10px] text-stone-500">{spell.school} • {spell.time}</p>
+                        </div>
+                        <BookOpen size={16} className="text-stone-600 group-hover:text-yellow-500" />
+                      </div>
+                    ))}
+                  </div>
+               </div>
 
-              {/* Lista */}
+               {/* Level 1 */}
+               <div>
+                  <h3 className="text-stone-500 font-bold text-xs uppercase mb-2">Level 1</h3>
+                  <div className="space-y-2">
+                    {SPELLS.filter(s => s.level === 1).map(spell => (
+                      <div key={spell.id} className="bg-stone-800 p-3 rounded-lg border border-stone-700 flex justify-between items-center group cursor-pointer hover:border-yellow-500/50" onClick={() => rollDice(`${spell.name}`, spellAttackBonus)}>
+                        <div>
+                          <p className="font-bold text-stone-200 text-sm">{spell.name}</p>
+                          <p className="text-[10px] text-stone-500">{spell.desc}</p>
+                        </div>
+                         {/* Botón para lanzar dado si es de ataque */}
+                         {spell.desc.includes('damage') && (
+                           <div className="bg-stone-900 px-2 py-1 rounded text-xs font-bold text-stone-400 group-hover:text-yellow-500">
+                             Roll
+                           </div>
+                         )}
+                      </div>
+                    ))}
+                  </div>
+               </div>
+            </div>
+
+          </div>
+        )}
+
+        {/* === INVENTORY === */}
+        {activeTab === 'inventory' && (
+          <div className="space-y-6 animate-in slide-in-from-right duration-200">
+            <div className="bg-stone-800 p-4 rounded-xl border border-stone-700">
+              <h3 className="text-stone-400 font-bold text-xs uppercase mb-3 flex items-center gap-2"><span className="text-yellow-500">●</span> Currency</h3>
+              <div className="grid grid-cols-5 gap-2">
+                {['cp', 'sp', 'ep', 'gp', 'pp'].map((coin) => (
+                  <div key={coin} className="flex flex-col items-center">
+                     <label className="text-[10px] uppercase font-bold text-stone-500 mb-1">{coin}</label>
+                     <input type="number" value={money[coin]} onChange={(e) => updateMoney(coin, e.target.value)} className="w-full bg-stone-900 border border-stone-600 rounded-lg p-1 text-center text-sm font-bold text-stone-200 focus:border-yellow-500 outline-none" />
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div>
+              <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2"><Backpack size={16} /> Equipment</h3>
+              <div className="flex gap-2 mb-4">
+                <input type="text" placeholder="Add item..." value={newItemName} onChange={(e) => setNewItemName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addItem()} className="flex-1 bg-stone-800 border border-stone-700 rounded-xl px-4 py-3 text-stone-200 placeholder-stone-500 focus:border-yellow-500 outline-none" />
+                <button onClick={addItem} className="bg-stone-800 border border-stone-700 hover:bg-stone-700 text-stone-200 w-12 rounded-xl flex items-center justify-center transition"><Plus /></button>
+              </div>
               <div className="space-y-2">
-                {inventory.length === 0 && (
-                  <p className="text-center text-stone-600 text-sm py-4">Your backpack is empty.</p>
-                )}
                 {inventory.map((item) => (
                   <div key={item.id} className="group flex items-center justify-between p-3 bg-stone-800/50 rounded-xl border border-stone-700/50 hover:bg-stone-800 transition">
                     <span className="text-stone-200">{item.name}</span>
-                    <button 
-                      onClick={() => removeItem(item.id)}
-                      className="text-stone-600 hover:text-red-400 p-1"
-                    >
-                      <X size={16} />
-                    </button>
+                    <button onClick={() => removeItem(item.id)} className="text-stone-600 hover:text-red-400 p-1"><X size={16} /></button>
                   </div>
                 ))}
               </div>
@@ -258,14 +313,12 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           </div>
         )}
 
-        {/* === PESTAÑA PROFILE === */}
+        {/* === PROFILE === */}
         {activeTab === 'profile' && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
             <div className="bg-stone-800 p-5 rounded-xl border border-stone-700">
               <div className="flex items-center gap-4 mb-4 pb-4 border-b border-stone-700">
-                <div className="w-16 h-16 bg-stone-700 rounded-full flex items-center justify-center border-2 border-yellow-500/50">
-                  <User size={32} className="text-stone-400" />
-                </div>
+                <div className="w-16 h-16 bg-stone-700 rounded-full flex items-center justify-center border-2 border-yellow-500/50"><User size={32} className="text-stone-400" /></div>
                 <div><h2 className="text-xl font-bold text-stone-100">{hero.name}</h2><p className="text-stone-400 text-sm">{details.alignment} {hero.race} {hero.class}</p></div>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -284,16 +337,11 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 <div className="bg-stone-800 p-2 rounded-lg border border-stone-700"><span className="block text-[10px] text-stone-500 uppercase">Hair</span><span className="text-sm font-bold text-stone-200">{details.hair || '--'}</span></div>
               </div>
             </div>
-            <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 border-dashed">
-              <h3 className="text-stone-400 font-bold text-sm mb-2 uppercase flex items-center gap-2"><ScrollText size={16} /> Character Backstory</h3>
-              <p className="text-sm text-stone-500 italic">{details.backstory || "No backstory written yet."}</p>
-            </div>
           </div>
         )}
-
       </div>
 
-      {/* MODAL RESULTADOS */}
+      {/* MODAL RESULTADOS (IGUAL) */}
       {rollResult && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-stone-900 border border-stone-700 p-6 rounded-2xl shadow-2xl w-full max-w-sm relative text-center">

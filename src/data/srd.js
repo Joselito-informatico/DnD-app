@@ -76,3 +76,15 @@ export const SKILLS = [
   { name: "Stealth", stat: "dex" },
   { name: "Survival", stat: "wis" },
 ];
+
+export const SPELLS = [
+  // Trucos (Nivel 0)
+  { id: 'firebolt', name: 'Fire Bolt', level: 0, school: 'Evocation', time: '1 Action', range: '120ft', desc: '1d10 Fire damage.' },
+  { id: 'magehand', name: 'Mage Hand', level: 0, school: 'Conjuration', time: '1 Action', range: '30ft', desc: 'Move object up to 10 lbs.' },
+  { id: 'light', name: 'Light', level: 0, school: 'Evocation', time: '1 Action', range: 'Touch', desc: 'Object shines like a torch.' },
+  
+  // Nivel 1
+  { id: 'magicmissile', name: 'Magic Missile', level: 1, school: 'Evocation', time: '1 Action', range: '120ft', desc: '3 darts, 1d4+1 force each. Auto-hit.' },
+  { id: 'shield', name: 'Shield', level: 1, school: 'Abjuration', time: '1 Reaction', range: 'Self', desc: '+5 AC until start of next turn.' },
+  { id: 'curewounds', name: 'Cure Wounds', level: 1, school: 'Evocation', time: '1 Action', range: 'Touch', desc: 'Heal 1d8 + Mod.' },
+];
