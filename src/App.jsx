@@ -36,6 +36,15 @@ function App() {
     setHeroes(newHeroes);
   };
 
+  // NUEVO: Función para borrar héroe
+  const handleDeleteHero = (heroId) => {
+    // Filtramos la lista para dejar fuera al que queremos borrar
+    const newHeroes = heroes.filter(h => h.id !== heroId);
+    setHeroes(newHeroes);
+    setSelectedHeroId(null); // Deseleccionamos
+    setCurrentView('dashboard'); // Volvemos a casa
+  };
+
   const handleSelectHero = (heroId) => {
     setSelectedHeroId(heroId);
     setCurrentView('combat');
@@ -64,7 +73,8 @@ function App() {
       {currentView === 'combat' && activeHero && (
         <CombatView 
           hero={activeHero} 
-          onUpdateHero={handleUpdateHero} // <--- Pasamos la herramienta al trabajador
+          onUpdateHero={handleUpdateHero} 
+          onDeleteHero={handleDeleteHero} // <--- Pasamos la nueva herramienta
           onBack={() => setCurrentView('dashboard')} 
         />
       )}
