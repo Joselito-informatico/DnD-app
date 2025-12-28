@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, Shield, Heart, Zap, Sword, X, Activity, Settings, Moon, Trash2, User, ScrollText, Backpack, Plus, Flame, BookOpen, Sparkles, Star, Languages, Eye } from 'lucide-react';
+import { ArrowLeft, Shield, Heart, Zap, Sword, X, Activity, Settings, Moon, Trash2, User, ScrollText, Backpack, Plus, Flame, BookOpen, Sparkles, Star, Languages, Eye, Skull, Coffee } from 'lucide-react';
 import { CLASSES, SKILLS, SPELLS } from '../data/srd';
 
 export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
@@ -27,17 +27,19 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const armorClass = 10 + mods.dex; 
   const initiative = mods.dex >= 0 ? `+${mods.dex}` : mods.dex;
   
-  // NUEVO: Inspiración y Percepción Pasiva
   const inspiration = hero.inspiration || false;
-  // Pasiva = 10 + Mod Sabiduría + (Proficiency si tienes la skill Percepción, asumimos no por ahora en MVP)
   const passivePerception = 10 + mods.wis; 
 
   const heroClassData = CLASSES.find(c => c.name === hero.class);
   const saveProficiencies = heroClassData ? heroClassData.saves : [];
-  // Recuperamos competencias de la clase (Armaduras/Armas) del SRD
   const proficiencies = heroClassData ? heroClassData.proficiencies : [];
-  
-  // Idiomas básicos (Hardcoded por ahora según raza para MVP)
+  const hitDieType = heroClassData ? heroClassData.hitDie : 'd8'; // d6, d8, d10, d12
+
+  // NUEVO: Estado de Dados de Golpe y Death Saves
+  const hitDiceUsed = hero.hitDiceUsed || 0;
+  const hitDiceTotal = hero.level;
+  const deathSaves = hero.deathSaves || { successes: 0, failures: 0 };
+
   const languages = ["Common"];
   if (hero.race === "Elf") languages.push("Elvish");
   if (hero.race === "Dwarf") languages.push("Dwarvish");
@@ -61,9 +63,65 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const handleLongRest = () => {
     const resetSlots = { ...spellSlots };
     Object.keys(resetSlots).forEach(level => resetSlots[level].used = 0);
-    // Recupera HP, Slots e Inspiración (opcional, algunas mesas lo hacen)
-    onUpdateHero({ ...hero, currentHP: maxHP, spellSlots: resetSlots });
+    // Recupera HP, Slots, Dados de Golpe (mitad del total, min 1) y resetea Death Saves
+    const regainedHitDice = Math.max(1, Math.floor(hitDiceTotal / 2));
+    const newHitDiceUsed = Math.max(0, hitDiceUsed - regainedHitDice);
+
+    onUpdateHero({ 
+      ...hero, 
+      currentHP: maxHP, 
+      spellSlots: resetSlots,
+      hitDiceUsed: newHitDiceUsed,
+      deathSaves: { successes: 0, failures: 0 }
+    });
     setShowMenu(false);
+  };
+
+  // NUEVO: Descanso Corto (Gastas Dados de Golpe para curarte)
+  const handleShortRest = () => {
+    // Solo lógica visual por ahora, el gasto se hace manual en la UI
+    setShowMenu(false);
+    setActiveTab('combat'); // Nos lleva al combate donde están los dados
+    alert("Use the Hit Dice section in the Combat tab to heal.");
+  };
+
+  const useHitDie = () => {
+    if (hitDiceUsed < hitDiceTotal) {
+      // Tirar el dado de golpe
+      const dieMax = parseInt(hitDieType.substring(1));
+      const roll = Math.floor(Math.random() * dieMax) + 1;
+      const healAmount = Math.max(0, roll + mods.con);
+      
+      const newHP = Math.min(maxHP, currentHP + healAmount);
+      
+      onUpdateHero({
+        ...hero,
+        currentHP: newHP,
+        hitDiceUsed: hitDiceUsed + 1
+      });
+
+      setRollResult({
+        title: "Short Rest Heal",
+        roll: roll,
+        mod: mods.con,
+        total: healAmount, // Total curado
+        isCrit: false,
+        isFail: false
+      });
+    }
+  };
+
+  const updateDeathSave = (type, index) => {
+    // type: 'successes' or 'failures'
+    // Logica toggle: si clickas el 2 y el 1 no está, rellena hasta el 2. Si clickas uno relleno, lo quita.
+    const currentVal = deathSaves[type];
+    // Si clickamos el que ya es el máximo actual, restamos uno (desmarcar)
+    // Si clickamos uno mayor, seteamos ese valor.
+    const newVal = index + 1 === currentVal ? index : index + 1;
+    
+    // Si llegamos a 3 fallos... RIP (Visualmente)
+    const newSaves = { ...deathSaves, [type]: newVal };
+    onUpdateHero({ ...hero, deathSaves: newSaves });
   };
 
   const toggleInspiration = () => {
@@ -114,7 +172,9 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
 
   const changeHP = (val) => {
     const newHP = Math.min(maxHP, Math.max(0, currentHP + val));
-    onUpdateHero({ ...hero, currentHP: newHP });
+    // Resetear death saves si nos curamos desde 0 (Regla casera común, o al menos estabiliza)
+    const newSaves = (currentHP === 0 && val > 0) ? { successes: 0, failures: 0 } : deathSaves;
+    onUpdateHero({ ...hero, currentHP: newHP, deathSaves: newSaves });
   };
 
   return (
@@ -132,7 +192,8 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
       {/* MENÚ OVERLAY */}
       {showMenu && (
         <div className="absolute top-20 right-6 z-20 w-48 bg-stone-800 border border-stone-700 rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in duration-200 origin-top-right">
-          <button onClick={handleLongRest} className="w-full text-left px-4 py-3 text-stone-200 hover:bg-stone-700 flex items-center gap-3 border-b border-stone-700/50"><Moon size={16} className="text-blue-400" /> Long Rest (Heal)</button>
+          <button onClick={handleShortRest} className="w-full text-left px-4 py-3 text-stone-200 hover:bg-stone-700 flex items-center gap-3 border-b border-stone-700/50"><Coffee size={16} className="text-orange-400" /> Short Rest</button>
+          <button onClick={handleLongRest} className="w-full text-left px-4 py-3 text-stone-200 hover:bg-stone-700 flex items-center gap-3 border-b border-stone-700/50"><Moon size={16} className="text-blue-400" /> Long Rest</button>
           <button onClick={handleDelete} className="w-full text-left px-4 py-3 text-red-400 hover:bg-red-900/20 flex items-center gap-3"><Trash2 size={16} /> Delete Hero</button>
         </div>
       )}
@@ -152,35 +213,23 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         {/* === COMBAT === */}
         {activeTab === 'combat' && (
           <div className="space-y-6 animate-in slide-in-from-left duration-200">
-            {/* Header Combate con Inspiración */}
+            {/* Header Combate */}
             <div className="flex gap-3 mb-2">
-               {/* Botón de Inspiración */}
-               <button 
-                onClick={toggleInspiration}
-                className={`flex-1 p-3 rounded-xl border flex flex-col items-center justify-center transition ${inspiration ? 'bg-yellow-500/20 border-yellow-500 text-yellow-500' : 'bg-stone-800 border-stone-700 text-stone-500 grayscale'}`}
-               >
-                 <Star size={20} fill={inspiration ? "currentColor" : "none"} />
-                 <span className="text-[10px] font-bold uppercase mt-1">Inspiration</span>
+               <button onClick={toggleInspiration} className={`flex-1 p-3 rounded-xl border flex flex-col items-center justify-center transition ${inspiration ? 'bg-yellow-500/20 border-yellow-500 text-yellow-500' : 'bg-stone-800 border-stone-700 text-stone-500 grayscale'}`}>
+                 <Star size={20} fill={inspiration ? "currentColor" : "none"} /><span className="text-[10px] font-bold uppercase mt-1">Inspiration</span>
                </button>
-               {/* Iniciativa (Ya existente) */}
                <div className="bg-stone-800 p-3 rounded-xl border border-stone-700 flex flex-col items-center justify-center flex-1">
-                 <Zap className="text-yellow-600 mb-1 w-5 h-5" />
-                 <span className="text-xs text-stone-400 font-bold uppercase">Init</span>
-                 <span className="text-2xl font-bold text-yellow-500">{initiative}</span>
+                 <Zap className="text-yellow-600 mb-1 w-5 h-5" /><span className="text-xs text-stone-400 font-bold uppercase">Init</span><span className="text-2xl font-bold text-yellow-500">{initiative}</span>
                </div>
             </div>
 
             {/* Stats Vitales */}
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-stone-800 p-3 rounded-xl border border-stone-700 flex flex-col items-center justify-center relative overflow-hidden">
-                <Shield className="text-stone-600 absolute opacity-20 -right-2 -bottom-2 w-16 h-16" />
-                <span className="text-xs text-stone-400 font-bold uppercase">Armor Class</span>
-                <span className="text-3xl font-bold text-stone-100">{armorClass}</span>
+                <Shield className="text-stone-600 absolute opacity-20 -right-2 -bottom-2 w-16 h-16" /><span className="text-xs text-stone-400 font-bold uppercase">Armor Class</span><span className="text-3xl font-bold text-stone-100">{armorClass}</span>
               </div>
-              <div className="bg-stone-800 p-3 rounded-xl border border-stone-700 flex flex-col items-center justify-center">
-                <Heart className="text-red-500 mb-1 w-5 h-5" />
-                <span className="text-xs text-stone-400 font-bold uppercase">Hit Points</span>
-                <span className="text-xl font-bold text-stone-100">{currentHP} <span className="text-sm text-stone-500">/ {maxHP}</span></span>
+              <div className={`p-3 rounded-xl border flex flex-col items-center justify-center transition duration-300 ${currentHP === 0 ? 'bg-red-900/30 border-red-500 animate-pulse' : 'bg-stone-800 border-stone-700'}`}>
+                <Heart className={`mb-1 w-5 h-5 ${currentHP === 0 ? 'text-red-500' : 'text-red-500'}`} /><span className="text-xs text-stone-400 font-bold uppercase">Hit Points</span><span className="text-xl font-bold text-stone-100">{currentHP} <span className="text-sm text-stone-500">/ {maxHP}</span></span>
               </div>
             </div>
 
@@ -190,6 +239,53 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               <button onClick={() => changeHP(1)} className="flex-1 py-3 bg-green-900/20 text-green-400 border border-green-900/50 rounded-lg font-bold hover:bg-green-900/40">+ HEAL</button>
             </div>
 
+            {/* DEATH SAVES (Solo visible si HP es 0) */}
+            {currentHP === 0 && (
+              <div className="bg-stone-900/80 p-4 rounded-xl border border-red-900/50 animate-in zoom-in duration-300">
+                <h3 className="text-red-400 font-bold text-sm mb-3 uppercase flex items-center gap-2"><Skull size={16} /> Death Saves</h3>
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-xs font-bold text-stone-400 w-16">SUCCESS</span>
+                  <div className="flex gap-2">
+                    {[0, 1, 2].map((i) => (
+                      <button key={i} onClick={() => updateDeathSave('successes', i)} className={`w-6 h-6 rounded-full border-2 transition ${i < deathSaves.successes ? 'bg-green-500 border-green-600' : 'bg-stone-800 border-stone-700'}`}></button>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-bold text-stone-400 w-16">FAILURE</span>
+                  <div className="flex gap-2">
+                    {[0, 1, 2].map((i) => (
+                      <button key={i} onClick={() => updateDeathSave('failures', i)} className={`w-6 h-6 rounded-full border-2 transition ${i < deathSaves.failures ? 'bg-red-600 border-red-700' : 'bg-stone-800 border-stone-700'}`}></button>
+                    ))}
+                  </div>
+                </div>
+                {(deathSaves.failures >= 3) && <div className="mt-3 text-center font-bold text-red-500 text-sm">CHARACTER IS DEAD</div>}
+              </div>
+            )}
+
+            {/* HIT DICE (Para curarse) */}
+            {currentHP > 0 && currentHP < maxHP && (
+               <div className="bg-stone-800 p-4 rounded-xl border border-stone-700">
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="text-stone-400 font-bold text-sm uppercase flex items-center gap-2"><Coffee size={16} /> Hit Dice ({hitDieType})</h3>
+                    <span className="text-xs text-stone-500">{hitDiceTotal - hitDiceUsed} / {hitDiceTotal} Available</span>
+                  </div>
+                  <p className="text-[10px] text-stone-500 mb-3">Use during a Short Rest to regain HP.</p>
+                  <div className="flex gap-2">
+                    {Array.from({ length: hitDiceTotal }).map((_, i) => (
+                      <div key={i} className={`w-6 h-6 rounded border transition ${i < (hitDiceTotal - hitDiceUsed) ? 'bg-stone-600 border-stone-500' : 'bg-stone-900 border-stone-800 opacity-30'}`}></div>
+                    ))}
+                  </div>
+                  <button 
+                    onClick={useHitDie}
+                    disabled={hitDiceUsed >= hitDiceTotal || currentHP >= maxHP}
+                    className="mt-3 w-full py-2 bg-stone-700 hover:bg-stone-600 disabled:opacity-50 disabled:cursor-not-allowed text-stone-200 text-xs font-bold rounded-lg transition"
+                  >
+                    Roll Hit Die (1{hitDieType} + {mods.con})
+                  </button>
+               </div>
+            )}
+
             {/* Attacks */}
             <div>
               <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider">Attacks</h3>
@@ -198,11 +294,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                   const mod = mods[w.stat] + proficiencyBonus;
                   return (
                     <div key={w.id} onClick={() => rollDice(`${w.name} Attack`, mod)} className="bg-stone-800 p-4 rounded-xl border border-stone-700 flex justify-between items-center cursor-pointer hover:border-yellow-500/50 transition">
-                      <div className="flex items-center gap-3">
-                        <div className="bg-stone-900 p-2 rounded-lg text-stone-500"><Sword size={20} /></div>
-                        <div><h4 className="font-bold text-stone-200">{w.name}</h4><p className="text-xs text-stone-500">{w.damage} {w.stat.toUpperCase()}</p></div>
-                      </div>
-                      <div className="bg-stone-900 px-3 py-1 rounded-lg font-bold text-stone-300">+{mod}</div>
+                      <div className="flex items-center gap-3"><div className="bg-stone-900 p-2 rounded-lg text-stone-500"><Sword size={20} /></div><div><h4 className="font-bold text-stone-200">{w.name}</h4><p className="text-xs text-stone-500">{w.damage} {w.stat.toUpperCase()}</p></div></div><div className="bg-stone-900 px-3 py-1 rounded-lg font-bold text-stone-300">+{mod}</div>
                     </div>
                   );
                 })}
@@ -225,16 +317,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         {/* === SKILLS === */}
         {activeTab === 'skills' && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
-             
-             {/* Percepción Pasiva (NUEVO) */}
-             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Eye className="text-stone-400" />
-                  <span className="font-bold text-stone-200">Passive Perception</span>
-                </div>
-                <span className="text-xl font-bold text-stone-100">{passivePerception}</span>
-             </div>
-
+             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 flex items-center justify-between"><div className="flex items-center gap-3"><Eye className="text-stone-400" /><span className="font-bold text-stone-200">Passive Perception</span></div><span className="text-xl font-bold text-stone-100">{passivePerception}</span></div>
              <div>
               <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2"><Shield size={16} /> Saving Throws</h3>
               <div className="grid grid-cols-2 gap-2">
@@ -243,51 +326,27 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                   const isSaveProficient = saveProficiencies.includes(fullStatName);
                   const saveMod = mods[stat] + (isSaveProficient ? proficiencyBonus : 0);
                   return (
-                    <button key={stat} onClick={() => rollDice(`${stat.toUpperCase()} Save`, saveMod)} className={`p-3 rounded-lg border flex justify-between items-center ${isSaveProficient ? 'bg-stone-800 border-yellow-600/50' : 'bg-stone-800/50 border-stone-700'}`}>
-                      <span className={`font-bold uppercase text-sm ${isSaveProficient ? 'text-yellow-500' : 'text-stone-400'}`}>{stat}</span>
-                      <span className="font-mono text-stone-200">{saveMod >= 0 ? '+' : ''}{saveMod}</span>
-                    </button>
+                    <button key={stat} onClick={() => rollDice(`${stat.toUpperCase()} Save`, saveMod)} className={`p-3 rounded-lg border flex justify-between items-center ${isSaveProficient ? 'bg-stone-800 border-yellow-600/50' : 'bg-stone-800/50 border-stone-700'}`}><span className={`font-bold uppercase text-sm ${isSaveProficient ? 'text-yellow-500' : 'text-stone-400'}`}>{stat}</span><span className="font-mono text-stone-200">{saveMod >= 0 ? '+' : ''}{saveMod}</span></button>
                   );
                 })}
               </div>
             </div>
-            
-            {/* Skills List */}
             <div>
               <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2"><Activity size={16} /> Skills</h3>
               <div className="bg-stone-800 rounded-xl border border-stone-700 divide-y divide-stone-700/50">
                 {SKILLS.map((skill) => {
                   const mod = mods[skill.stat];
                   return (
-                    <div key={skill.name} onClick={() => rollDice(skill.name, mod)} className="p-3 flex justify-between items-center cursor-pointer hover:bg-stone-700/50 transition">
-                      <div className="flex items-center gap-3"><span className="text-stone-300 text-sm font-medium">{skill.name}</span><span className="text-xs text-stone-600 uppercase">({skill.stat})</span></div>
-                      <span className="text-stone-400 font-mono text-sm">{mod >= 0 ? '+' : ''}{mod}</span>
-                    </div>
+                    <div key={skill.name} onClick={() => rollDice(skill.name, mod)} className="p-3 flex justify-between items-center cursor-pointer hover:bg-stone-700/50 transition"><div className="flex items-center gap-3"><span className="text-stone-300 text-sm font-medium">{skill.name}</span><span className="text-xs text-stone-600 uppercase">({skill.stat})</span></div><span className="text-stone-400 font-mono text-sm">{mod >= 0 ? '+' : ''}{mod}</span></div>
                   );
                 })}
               </div>
             </div>
-
-            {/* Competencias e Idiomas (NUEVO) */}
             <div>
               <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2"><Languages size={16} /> Proficiencies & Languages</h3>
               <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 space-y-4">
-                <div>
-                  <h4 className="text-xs font-bold text-stone-500 uppercase mb-2">Languages</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {languages.map(lang => (
-                      <span key={lang} className="text-xs px-2 py-1 bg-stone-900 rounded border border-stone-600 text-stone-300">{lang}</span>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-stone-500 uppercase mb-2">Proficiencies</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {proficiencies.map((prof, idx) => (
-                      <span key={idx} className="text-xs px-2 py-1 bg-stone-900 rounded border border-stone-600 text-stone-300">{prof}</span>
-                    ))}
-                  </div>
-                </div>
+                <div><h4 className="text-xs font-bold text-stone-500 uppercase mb-2">Languages</h4><div className="flex flex-wrap gap-2">{languages.map(lang => (<span key={lang} className="text-xs px-2 py-1 bg-stone-900 rounded border border-stone-600 text-stone-300">{lang}</span>))}</div></div>
+                <div><h4 className="text-xs font-bold text-stone-500 uppercase mb-2">Proficiencies</h4><div className="flex flex-wrap gap-2">{proficiencies.map((prof, idx) => (<span key={idx} className="text-xs px-2 py-1 bg-stone-900 rounded border border-stone-600 text-stone-300">{prof}</span>))}</div></div>
               </div>
             </div>
           </div>
@@ -315,16 +374,12 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           </div>
         )}
 
-        {/* === INVENTORY & PROFILE (IGUAL QUE ANTES) === */}
+        {/* === INVENTORY & PROFILE (IGUAL) === */}
         {activeTab === 'inventory' && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700">
               <h3 className="text-stone-400 font-bold text-xs uppercase mb-3 flex items-center gap-2"><span className="text-yellow-500">●</span> Currency</h3>
-              <div className="grid grid-cols-5 gap-2">
-                {['cp', 'sp', 'ep', 'gp', 'pp'].map((coin) => (
-                  <div key={coin} className="flex flex-col items-center"><label className="text-[10px] uppercase font-bold text-stone-500 mb-1">{coin}</label><input type="number" value={money[coin]} onChange={(e) => updateMoney(coin, e.target.value)} className="w-full bg-stone-900 border border-stone-600 rounded-lg p-1 text-center text-sm font-bold text-stone-200 focus:border-yellow-500 outline-none" /></div>
-                ))}
-              </div>
+              <div className="grid grid-cols-5 gap-2">{['cp', 'sp', 'ep', 'gp', 'pp'].map((coin) => (<div key={coin} className="flex flex-col items-center"><label className="text-[10px] uppercase font-bold text-stone-500 mb-1">{coin}</label><input type="number" value={money[coin]} onChange={(e) => updateMoney(coin, e.target.value)} className="w-full bg-stone-900 border border-stone-600 rounded-lg p-1 text-center text-sm font-bold text-stone-200 focus:border-yellow-500 outline-none" /></div>))}</div>
             </div>
             <div>
               <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2"><Backpack size={16} /> Equipment</h3>
