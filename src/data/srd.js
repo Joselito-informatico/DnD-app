@@ -36,7 +36,12 @@ export const CLASSES = [
     hitDie: "d10",
     primaryStat: "Strength or Dexterity",
     saves: ["Strength", "Constitution"],
-    proficiencies: ["All armor", "Shields", "Simple weapons", "Martial weapons"]
+    proficiencies: ["All armor", "Shields", "Simple weapons", "Martial weapons"],
+    // NUEVO: Rasgos de nivel 1
+    features: [
+      { name: "Second Wind", desc: "Bonus Action. Regain 1d10 + Level HP. Once per rest." },
+      { name: "Fighting Style (Defense)", desc: "+1 bonus to AC while wearing armor." }
+    ]
   },
   {
     id: "rogue",
@@ -44,7 +49,11 @@ export const CLASSES = [
     hitDie: "d8",
     primaryStat: "Dexterity",
     saves: ["Dexterity", "Intelligence"],
-    proficiencies: ["Light armor", "Simple weapons", "Hand crossbows", "Longswords", "Rapiers", "Shortswords"]
+    proficiencies: ["Light armor", "Simple weapons", "Hand crossbows", "Longswords", "Rapiers", "Shortswords"],
+    features: [
+      { name: "Sneak Attack", desc: "Once per turn, deal extra 1d6 damage to adv/flanked target." },
+      { name: "Thieves' Cant", desc: "A secret mix of dialect, jargon, and code." }
+    ]
   },
   {
     id: "wizard",
@@ -52,7 +61,11 @@ export const CLASSES = [
     hitDie: "d6",
     primaryStat: "Intelligence",
     saves: ["Intelligence", "Wisdom"],
-    proficiencies: ["Daggers", "Darts", "Slings", "Quarterstaffs", "Light crossbows"]
+    proficiencies: ["Daggers", "Darts", "Slings", "Quarterstaffs", "Light crossbows"],
+    features: [
+      { name: "Arcane Recovery", desc: "Recover spell slots (combined level = half wizard level) on Short Rest." },
+      { name: "Spellcasting", desc: "You have a spellbook containing spells that show on your spell list." }
+    ]
   }
 ];
 
