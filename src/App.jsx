@@ -3,8 +3,14 @@ import { Dashboard } from "./pages/Dashboard";
 import { CharacterCreator } from "./pages/CharacterCreator";
 import { CombatView } from "./pages/CombatView";
 import { generateRandomHero } from "./utils/randomizer";
+import { useLanguage } from "./context/LanguageContext";
+import { useToast } from "./context/ToastContext"; // <--- Importar
+import { Globe } from "lucide-react";
 
 function App() {
+  const { t, language, toggleLanguage } = useLanguage();
+  const { showToast } = useToast(); // <--- Usar Hook
+
   const [currentView, setCurrentView] = useState("dashboard");
   const [selectedHeroId, setSelectedHeroId] = useState(null);
 
@@ -17,7 +23,6 @@ function App() {
     localStorage.setItem("dnd_heroes", JSON.stringify(heroes));
   }, [heroes]);
 
-  // --- CRUD ---
   const handleSaveHero = (newHeroData) => {
     const newHero = {
       id: Date.now(),
@@ -28,51 +33,33 @@ function App() {
     };
     setHeroes([...heroes, newHero]);
     setCurrentView("dashboard");
+    showToast(t("successImport"), "success"); // Reutilizamos mensaje de éxito o pon uno custom
   };
 
   const handleUpdateHero = (updatedHero) => {
-    const newHeroes = heroes.map((h) =>
-      h.id === updatedHero.id ? updatedHero : h
-    );
-    setHeroes(newHeroes);
+    setHeroes(heroes.map((h) => (h.id === updatedHero.id ? updatedHero : h)));
   };
 
   const handleDeleteHero = (heroId) => {
-    const newHeroes = heroes.filter((h) => h.id !== heroId);
-    setHeroes(newHeroes);
+    setHeroes(heroes.filter((h) => h.id !== heroId));
     setSelectedHeroId(null);
     setCurrentView("dashboard");
+    showToast("Hero deleted", "info");
   };
 
-  // --- BACKUP & RANDOM ---
   const handleImportHeroes = (importedHeroes) => {
-    if (
-      confirm(
-        `This backup contains ${importedHeroes.length} heroes.\n\nClick OK to REPLACE your current list.\nClick CANCEL to MERGE.`
-      )
-    ) {
+    if (confirm(t("confirmImport"))) {
       setHeroes(importedHeroes);
-    } else {
-      const currentIds = new Set(heroes.map((h) => h.id));
-      const uniqueNewHeroes = importedHeroes.filter(
-        (h) => !currentIds.has(h.id)
-      );
-      if (uniqueNewHeroes.length > 0) {
-        setHeroes([...heroes, ...uniqueNewHeroes]);
-        alert(`Added ${uniqueNewHeroes.length} heroes.`);
-      } else {
-        alert("No new heroes found.");
-      }
+      showToast(t("successImport"), "success"); // <--- TOAST
     }
   };
 
   const handleCreateRandom = () => {
     const randomHero = generateRandomHero();
     setHeroes([...heroes, randomHero]);
-    alert(`Random hero "${randomHero.name}" created!`);
+    showToast(`${randomHero.name} joined the party!`, "success"); // <--- TOAST
   };
 
-  // --- NAVEGACIÓN ---
   const handleSelectHero = (heroId) => {
     setSelectedHeroId(heroId);
     setCurrentView("combat");
@@ -82,6 +69,13 @@ function App() {
 
   return (
     <div className="min-h-screen bg-neutral-900 text-stone-100 font-sans p-6">
+      <button
+        onClick={toggleLanguage}
+        className="fixed top-6 right-6 z-50 bg-stone-800 border border-stone-600 p-2 rounded-full hover:bg-yellow-600 hover:text-stone-900 transition flex items-center gap-2 text-xs font-bold shadow-lg"
+      >
+        <Globe size={16} /> {language.toUpperCase()}
+      </button>
+
       {currentView === "dashboard" && (
         <Dashboard
           heroes={heroes}

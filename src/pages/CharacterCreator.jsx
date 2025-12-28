@@ -15,8 +15,10 @@ import {
 } from "lucide-react";
 import { RACES, CLASSES } from "../data/srd";
 import { getRandomDetails } from "../utils/randomizer";
+import { useLanguage } from "../context/LanguageContext"; // <--- Importar Hook
 
 export function CharacterCreator({ onBack, onSave }) {
+  const { t } = useLanguage(); // <--- Usar Hook
   const [step, setStep] = useState(1);
   const [selectedRace, setSelectedRace] = useState(null);
   const [selectedClass, setSelectedClass] = useState(null);
@@ -134,15 +136,16 @@ export function CharacterCreator({ onBack, onSave }) {
     }
   };
 
+  // Configuración de stats dentro del componente para usar t()
   const statConfig = [
-    { id: "str", label: "Strength", icon: Sword, color: "text-red-400" },
-    { id: "dex", label: "Dexterity", icon: Zap, color: "text-yellow-400" },
-    { id: "con", label: "Constitution", icon: Heart, color: "text-orange-400" },
-    { id: "int", label: "Intelligence", icon: Brain, color: "text-blue-400" },
-    { id: "wis", label: "Wisdom", icon: Eye, color: "text-emerald-400" },
+    { id: "str", label: t("str"), icon: Sword, color: "text-red-400" },
+    { id: "dex", label: t("dex"), icon: Zap, color: "text-yellow-400" },
+    { id: "con", label: t("con"), icon: Heart, color: "text-orange-400" },
+    { id: "int", label: t("int"), icon: Brain, color: "text-blue-400" },
+    { id: "wis", label: t("wis"), icon: Eye, color: "text-emerald-400" },
     {
       id: "cha",
-      label: "Charisma",
+      label: t("cha"),
       icon: MessageCircle,
       color: "text-purple-400",
     },
@@ -160,12 +163,14 @@ export function CharacterCreator({ onBack, onSave }) {
           </button>
           <div>
             <h1 className="text-xl font-bold text-stone-100">
-              {step === 1 && "Choose Ancestry"}
-              {step === 2 && "Choose Class"}
-              {step === 3 && "Assign Abilities"}
-              {step === 4 && "Identity & Details"}
+              {step === 1 && t("step1")}
+              {step === 2 && t("step2")}
+              {step === 3 && t("step3")}
+              {step === 4 && t("step4")}
             </h1>
-            <p className="text-xs text-stone-500">Step {step} of 4</p>
+            <p className="text-xs text-stone-500">
+              {t("level")} {step} / 4
+            </p>
           </div>
         </div>
       </header>
@@ -293,12 +298,12 @@ export function CharacterCreator({ onBack, onSave }) {
                 onClick={handleAutoFill}
                 className="flex items-center gap-2 text-xs bg-purple-900/30 text-purple-400 border border-purple-500/50 px-3 py-2 rounded-lg hover:bg-purple-900/50 transition"
               >
-                <Sparkles size={14} /> Auto-Fill Details
+                <Sparkles size={14} /> {t("autoFill")}
               </button>
             </div>
             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 space-y-2">
               <label className="text-sm font-bold text-stone-300 flex items-center gap-2">
-                <User size={16} /> Character Name
+                <User size={16} /> {t("charName")}
               </label>
               <input
                 type="text"
@@ -314,7 +319,7 @@ export function CharacterCreator({ onBack, onSave }) {
               <div className="grid grid-cols-2 gap-3">
                 <input
                   type="text"
-                  placeholder="Alignment"
+                  placeholder={t("alignment")}
                   value={details.alignment}
                   onChange={(e) =>
                     setDetails({ ...details, alignment: e.target.value })
@@ -323,7 +328,7 @@ export function CharacterCreator({ onBack, onSave }) {
                 />
                 <input
                   type="text"
-                  placeholder="Background"
+                  placeholder={t("background")}
                   value={details.background}
                   onChange={(e) =>
                     setDetails({ ...details, background: e.target.value })
@@ -334,7 +339,7 @@ export function CharacterCreator({ onBack, onSave }) {
               <div className="grid grid-cols-3 gap-3">
                 <input
                   type="text"
-                  placeholder="Age"
+                  placeholder={t("age")}
                   className="bg-stone-900 border border-stone-600 rounded-lg p-2 text-sm text-stone-100 outline-none"
                   value={details.age}
                   onChange={(e) =>
@@ -343,7 +348,7 @@ export function CharacterCreator({ onBack, onSave }) {
                 />
                 <input
                   type="text"
-                  placeholder="Height"
+                  placeholder={t("height")}
                   className="bg-stone-900 border border-stone-600 rounded-lg p-2 text-sm text-stone-100 outline-none"
                   value={details.height}
                   onChange={(e) =>
@@ -352,7 +357,7 @@ export function CharacterCreator({ onBack, onSave }) {
                 />
                 <input
                   type="text"
-                  placeholder="Weight"
+                  placeholder={t("weight")}
                   className="bg-stone-900 border border-stone-600 rounded-lg p-2 text-sm text-stone-100 outline-none"
                   value={details.weight}
                   onChange={(e) =>
@@ -363,10 +368,10 @@ export function CharacterCreator({ onBack, onSave }) {
             </div>
             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 space-y-3">
               <h3 className="text-xs font-bold text-stone-500 uppercase flex items-center gap-2">
-                <ScrollText size={14} /> Roleplay Characteristics
+                <ScrollText size={14} /> {t("roleplayTitle")}
               </h3>
               <textarea
-                placeholder="Personality Traits"
+                placeholder={t("traits")}
                 value={details.traits}
                 onChange={(e) =>
                   setDetails({ ...details, traits: e.target.value })
@@ -374,7 +379,7 @@ export function CharacterCreator({ onBack, onSave }) {
                 className="w-full bg-stone-900 border border-stone-600 rounded-lg p-2 text-sm text-stone-100 h-16 resize-none outline-none focus:border-yellow-500"
               />
               <textarea
-                placeholder="Ideals"
+                placeholder={t("ideals")}
                 value={details.ideals}
                 onChange={(e) =>
                   setDetails({ ...details, ideals: e.target.value })
@@ -382,7 +387,7 @@ export function CharacterCreator({ onBack, onSave }) {
                 className="w-full bg-stone-900 border border-stone-600 rounded-lg p-2 text-sm text-stone-100 h-16 resize-none outline-none focus:border-yellow-500"
               />
               <textarea
-                placeholder="Bonds"
+                placeholder={t("bonds")}
                 value={details.bonds}
                 onChange={(e) =>
                   setDetails({ ...details, bonds: e.target.value })
@@ -390,7 +395,7 @@ export function CharacterCreator({ onBack, onSave }) {
                 className="w-full bg-stone-900 border border-stone-600 rounded-lg p-2 text-sm text-stone-100 h-16 resize-none outline-none focus:border-yellow-500"
               />
               <textarea
-                placeholder="Flaws"
+                placeholder={t("flaws")}
                 value={details.flaws}
                 onChange={(e) =>
                   setDetails({ ...details, flaws: e.target.value })
@@ -408,7 +413,7 @@ export function CharacterCreator({ onBack, onSave }) {
           disabled={step === 1 ? !selectedRace : !selectedClass}
           className="w-full py-4 bg-yellow-500 text-stone-900 font-bold rounded-xl shadow-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-yellow-400 transition flex items-center justify-center gap-2"
         >
-          {step === 4 ? "Create Character Sheet" : "Next Step"}{" "}
+          {step === 4 ? t("complete") : t("next")}{" "}
           {step !== 4 && <ArrowLeft className="rotate-180" size={20} />}
         </button>
       </div>

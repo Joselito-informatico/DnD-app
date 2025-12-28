@@ -1,0 +1,180 @@
+export const dictionary = {
+  en: {
+    // General
+    appTitle: "D&D Character Manager",
+    subTitle: "Manage your 5e characters locally.",
+    loading: "Loading...",
+    confirmDelete: "Are you sure you want to delete this hero permanently?",
+    confirmImport: "This will replace your current list. Are you sure?",
+    successImport: "Heroes imported successfully!",
+    
+    // Dashboard
+    myHeroes: "My Heroes",
+    createHero: "Create New Hero",
+    randomHero: "I'm Feeling Lucky",
+    backup: "Backup (Export)",
+    restore: "Restore (Import)",
+    noHeroes: "No heroes found. Create one or import a backup.",
+    edit: "Edit",
+    
+    // Creator
+    step1: "Choose Ancestry",
+    step2: "Choose Class",
+    step3: "Assign Abilities",
+    step4: "Identity & Details",
+    next: "Next Step",
+    complete: "Create Character Sheet",
+    autoFill: "Auto-Fill Details",
+    charName: "Character Name",
+    alignment: "Alignment",
+    background: "Background",
+    age: "Age",
+    height: "Height",
+    weight: "Weight",
+    eyes: "Eyes",
+    skin: "Skin",
+    hair: "Hair",
+    roleplayTitle: "Roleplay Characteristics",
+    
+    // Stats & Skills
+    str: "Strength", dex: "Dexterity", con: "Constitution", 
+    int: "Intelligence", wis: "Wisdom", cha: "Charisma",
+    ac: "Armor Class", init: "Init", speed: "Speed", hp: "Hit Points",
+    proficiency: "Proficiency Bonus",
+    passivePerception: "Passive Perception",
+    savingThrows: "Saving Throws",
+    skills: "Skills",
+    
+    // Tabs
+    tabCombat: "COMBAT",
+    tabSkills: "SKILLS",
+    tabSpells: "SPELLS",
+    tabEquip: "EQUIP",
+    tabProfile: "PROFILE",
+    
+    // Combat
+    attacks: "Attacks",
+    addWeapon: "Add Weapon",
+    features: "Features",
+    deathSaves: "Death Saves",
+    hitDice: "Hit Dice",
+    inspiration: "Inspiration",
+    shortRest: "Short Rest",
+    longRest: "Long Rest",
+    deleteHero: "Delete Hero",
+    heal: "HEAL",
+    dmg: "DMG",
+    
+    // Spells
+    spellDC: "Spell Save DC",
+    spellAtk: "Attack Bonus",
+    cantrips: "Cantrips",
+    level: "Level",
+    scribe: "Scribe Spell",
+    
+    // Inventory
+    currency: "Currency",
+    equipment: "Equipment",
+    addItem: "Add item...",
+    
+    // Profile
+    allies: "Allies & Organizations",
+    treasure: "Treasure",
+    backstory: "Character Backstory",
+    appearance: "Appearance",
+    traits: "Personality Traits",
+    ideals: "Ideals",
+    bonds: "Bonds",
+    flaws: "Flaws",
+    xp: "Experience"
+  },
+  es: {
+    // General
+    appTitle: "Gestor de Personajes D&D",
+    subTitle: "Gestiona tus personajes de 5e localmente.",
+    loading: "Cargando...",
+    confirmDelete: "¿Estás seguro de que quieres borrar este héroe permanentemente?",
+    confirmImport: "Esto reemplazará tu lista actual. ¿Estás seguro?",
+    successImport: "¡Héroes importados con éxito!",
+    
+    // Dashboard
+    myHeroes: "Mis Héroes",
+    createHero: "Crear Nuevo Héroe",
+    randomHero: "Voy a tener suerte",
+    backup: "Respaldar (Exportar)",
+    restore: "Restaurar (Importar)",
+    noHeroes: "No hay héroes. Crea uno o importa un respaldo.",
+    edit: "Editar",
+    
+    // Creator
+    step1: "Elegir Linaje",
+    step2: "Elegir Clase",
+    step3: "Asignar Atributos",
+    step4: "Identidad y Detalles",
+    next: "Siguiente",
+    complete: "Crear Hoja de Personaje",
+    autoFill: "Autocompletar",
+    charName: "Nombre del Personaje",
+    alignment: "Alineamiento",
+    background: "Trasfondo",
+    age: "Edad",
+    height: "Altura",
+    weight: "Peso",
+    eyes: "Ojos",
+    skin: "Piel",
+    hair: "Pelo",
+    roleplayTitle: "Características de Rol",
+    
+    // Stats & Skills
+    str: "Fuerza", dex: "Destreza", con: "Constitución", 
+    int: "Inteligencia", wis: "Sabiduría", cha: "Carisma",
+    ac: "Clase de Armadura", init: "Inic", speed: "Velocidad", hp: "Puntos de Golpe",
+    proficiency: "Bono de Competencia",
+    passivePerception: "Percepción Pasiva",
+    savingThrows: "Tiradas de Salvación",
+    skills: "Habilidades",
+    
+    // Tabs
+    tabCombat: "COMBATE",
+    tabSkills: "HABILID.",
+    tabSpells: "CONJUROS",
+    tabEquip: "EQUIPO",
+    tabProfile: "PERFIL",
+    
+    // Combat
+    attacks: "Ataques",
+    addWeapon: "Añadir Arma",
+    features: "Rasgos",
+    deathSaves: "Salv. Muerte",
+    hitDice: "Dados de Golpe",
+    inspiration: "Inspiración",
+    shortRest: "Descanso Corto",
+    longRest: "Descanso Largo",
+    deleteHero: "Borrar Héroe",
+    heal: "CURAR",
+    dmg: "DAÑO",
+    
+    // Spells
+    spellDC: "CD Salvación",
+    spellAtk: "Bono Ataque",
+    cantrips: "Trucos",
+    level: "Nivel",
+    scribe: "Escribir Conjuro",
+    
+    // Inventory
+    currency: "Monedas",
+    equipment: "Equipo",
+    addItem: "Añadir objeto...",
+    
+    // Profile
+    allies: "Aliados y Organizaciones",
+    treasure: "Tesoro",
+    backstory: "Historia del Personaje",
+    appearance: "Apariencia",
+    traits: "Rasgos de Personalidad",
+    ideals: "Ideales",
+    bonds: "Vínculos",
+    flaws: "Defectos",
+    xp: "Experiencia"
+  }
+};

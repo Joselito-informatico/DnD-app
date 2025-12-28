@@ -27,15 +27,18 @@ import {
   Gem,
 } from "lucide-react";
 import { CLASSES, SKILLS, SPELLS as SRD_SPELLS } from "../data/srd";
+import { useLanguage } from "../context/LanguageContext"; // <--- Importar Hook
+import { useToast } from "../context/ToastContext";
 
 export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
+  const { t } = useLanguage();
+  const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState("combat");
   const [rollResult, setRollResult] = useState(null);
   const [showMenu, setShowMenu] = useState(false);
   const [newItemName, setNewItemName] = useState("");
   const [editingStat, setEditingStat] = useState(null);
 
-  // ESTADOS PARA AGREGAR COSAS
   const [isAddingAttack, setIsAddingAttack] = useState(false);
   const [newAttack, setNewAttack] = useState({
     name: "",
@@ -55,7 +58,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
 
   // --- REGLAS & CALCULOS ---
   const proficiencyBonus = Math.floor(2 + (hero.level - 1) / 4);
-
   const getModifier = (score) => Math.floor((score - 10) / 2);
   const stats = hero.stats;
   const mods = {
@@ -100,9 +102,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const money = hero.money || { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 };
   const features = hero.features || [];
 
-  // LÓGICA DE HECHIZOS (Modificada para usar lista personalizada o fallback al SRD)
-  const mySpells = hero.spells || SRD_SPELLS; // Si el héroe no tiene lista propia, usa la default
-
+  const mySpells = hero.spells || SRD_SPELLS;
   const spellSlots = hero.spellSlots || { 1: { total: 2, used: 0 } };
   const spellCastingStat =
     hero.class === "Wizard"
@@ -117,7 +117,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
 
   // --- ACCIONES ---
 
-  // Gestión de Ataques
   const addAttack = () => {
     if (!newAttack.name) return;
     const attackToAdd = { id: Date.now(), ...newAttack };
@@ -136,7 +135,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     }
   };
 
-  // NUEVO: Gestión de Hechizos
   const addSpell = () => {
     if (!newSpell.name) return;
     const spellToAdd = {
@@ -144,7 +142,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
       ...newSpell,
       level: parseInt(newSpell.level),
     };
-    // Importante: Si es la primera vez, copiamos los del SRD para no perderlos, + el nuevo
     const currentList = hero.spells ? hero.spells : SRD_SPELLS;
     onUpdateHero({ ...hero, spells: [...currentList, spellToAdd] });
     setIsAddingSpell(false);
@@ -160,7 +157,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const removeSpell = (spellId, e) => {
     e.stopPropagation();
     if (confirm("Remove this spell from your spellbook?")) {
-      // Si estamos borrando, nos aseguramos de estar operando sobre una copia guardada
       const currentList = hero.spells ? hero.spells : SRD_SPELLS;
       onUpdateHero({
         ...hero,
@@ -193,12 +189,13 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
       deathSaves: { successes: 0, failures: 0 },
     });
     setShowMenu(false);
+    showToast("Long Rest completed. HP & Slots restored.", "success"); // <--- TOAST
   };
 
   const handleShortRest = () => {
     setShowMenu(false);
     setActiveTab("combat");
-    alert("Use the Hit Dice section in the Combat tab to heal.");
+    showToast("Use the Hit Dice section below HP to heal.", "info"); // <--- TOAST REEMPLAZANDO ALERT
   };
 
   const useHitDie = () => {
@@ -209,7 +206,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
       const newHP = Math.min(maxHP, currentHP + healAmount);
       onUpdateHero({ ...hero, currentHP: newHP, hitDiceUsed: hitDiceUsed + 1 });
       setRollResult({
-        title: "Short Rest Heal",
+        title: t("shortRest"),
         roll: roll,
         mod: mods.con,
         total: healAmount,
@@ -230,8 +227,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     onUpdateHero({ ...hero, inspiration: !inspiration });
   };
   const handleDelete = () => {
-    if (confirm("Are you sure you want to delete this hero permanently?"))
-      onDeleteHero(hero.id);
+    if (confirm(t("confirmDelete"))) onDeleteHero(hero.id);
   };
   const updateMoney = (currency, value) => {
     const newMoney = { ...money, [currency]: parseInt(value) || 0 };
@@ -297,9 +293,9 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               onClick={() => setEditingStat("level")}
               className="text-xs text-stone-500 cursor-pointer hover:text-yellow-500 hover:underline"
             >
-              Lvl {hero.level} {hero.race} {hero.class}{" "}
+              {t("level")} {hero.level} {hero.race} {hero.class}{" "}
               <span className="text-[10px] bg-stone-800 px-1 rounded ml-1">
-                Edit
+                {t("edit")}
               </span>
             </p>
           </div>
@@ -321,12 +317,12 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-stone-900 border border-stone-700 p-6 rounded-2xl w-full max-w-xs">
             <h3 className="text-stone-100 font-bold mb-4">
-              Edit {editingStat === "level" ? "Level" : "Experience"}
+              {t("edit")} {editingStat === "level" ? t("level") : t("xp")}
             </h3>
             <input
               type="number"
               autoFocus
-              placeholder="Enter new value"
+              placeholder="Value"
               className="w-full bg-stone-950 border border-stone-600 rounded-lg p-3 text-stone-100 mb-4 focus:border-yellow-500 outline-none"
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
@@ -353,19 +349,19 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
             onClick={handleShortRest}
             className="w-full text-left px-4 py-3 text-stone-200 hover:bg-stone-700 flex items-center gap-3 border-b border-stone-700/50"
           >
-            <Coffee size={16} className="text-orange-400" /> Short Rest
+            <Coffee size={16} className="text-orange-400" /> {t("shortRest")}
           </button>
           <button
             onClick={handleLongRest}
             className="w-full text-left px-4 py-3 text-stone-200 hover:bg-stone-700 flex items-center gap-3 border-b border-stone-700/50"
           >
-            <Moon size={16} className="text-blue-400" /> Long Rest
+            <Moon size={16} className="text-blue-400" /> {t("longRest")}
           </button>
           <button
             onClick={handleDelete}
             className="w-full text-left px-4 py-3 text-red-400 hover:bg-red-900/20 flex items-center gap-3"
           >
-            <Trash2 size={16} /> Delete Hero
+            <Trash2 size={16} /> {t("deleteHero")}
           </button>
         </div>
       )}
@@ -380,7 +376,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               : "border-transparent text-stone-500"
           }`}
         >
-          COMBAT
+          {t("tabCombat")}
         </button>
         <button
           onClick={() => setActiveTab("skills")}
@@ -390,7 +386,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               : "border-transparent text-stone-500"
           }`}
         >
-          SKILLS
+          {t("tabSkills")}
         </button>
         <button
           onClick={() => setActiveTab("spells")}
@@ -400,7 +396,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               : "border-transparent text-stone-500"
           }`}
         >
-          SPELLS
+          {t("tabSpells")}
         </button>
         <button
           onClick={() => setActiveTab("inventory")}
@@ -410,7 +406,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               : "border-transparent text-stone-500"
           }`}
         >
-          EQUIP
+          {t("tabEquip")}
         </button>
         <button
           onClick={() => setActiveTab("profile")}
@@ -420,7 +416,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               : "border-transparent text-stone-500"
           }`}
         >
-          PROFILE
+          {t("tabProfile")}
         </button>
       </div>
 
@@ -443,13 +439,13 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               >
                 <Star size={20} fill={inspiration ? "currentColor" : "none"} />
                 <span className="text-[10px] font-bold uppercase mt-1">
-                  Inspiration
+                  {t("inspiration")}
                 </span>
               </button>
               <div className="bg-stone-800 p-3 rounded-xl border border-stone-700 flex flex-col items-center justify-center flex-1">
                 <Zap className="text-yellow-600 mb-1 w-5 h-5" />
                 <span className="text-xs text-stone-400 font-bold uppercase">
-                  Init
+                  {t("init")}
                 </span>
                 <span className="text-2xl font-bold text-yellow-500">
                   {initiative}
@@ -458,7 +454,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
             </div>
             <div className="flex justify-center mb-2">
               <span className="text-[10px] text-stone-500 uppercase tracking-widest font-bold">
-                Proficiency Bonus:{" "}
+                {t("proficiency")}:{" "}
                 <span className="text-stone-300">+{proficiencyBonus}</span>
               </span>
             </div>
@@ -466,7 +462,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               <div className="bg-stone-800 p-3 rounded-xl border border-stone-700 flex flex-col items-center justify-center relative overflow-hidden">
                 <Shield className="text-stone-600 absolute opacity-20 -right-2 -bottom-2 w-16 h-16" />
                 <span className="text-xs text-stone-400 font-bold uppercase">
-                  Armor Class
+                  {t("ac")}
                 </span>
                 <span className="text-3xl font-bold text-stone-100">
                   {armorClass}
@@ -485,7 +481,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                   }`}
                 />
                 <span className="text-xs text-stone-400 font-bold uppercase">
-                  Hit Points
+                  {t("hp")}
                 </span>
                 <span className="text-xl font-bold text-stone-100">
                   {currentHP}{" "}
@@ -498,20 +494,20 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 onClick={() => changeHP(-1)}
                 className="flex-1 py-3 bg-red-900/20 text-red-400 border border-red-900/50 rounded-lg font-bold hover:bg-red-900/40"
               >
-                - DMG
+                - {t("dmg")}
               </button>
               <button
                 onClick={() => changeHP(1)}
                 className="flex-1 py-3 bg-green-900/20 text-green-400 border border-green-900/50 rounded-lg font-bold hover:bg-green-900/40"
               >
-                + HEAL
+                + {t("heal")}
               </button>
             </div>
 
             {currentHP === 0 && (
               <div className="bg-stone-900/80 p-4 rounded-xl border border-red-900/50 animate-in zoom-in duration-300">
                 <h3 className="text-red-400 font-bold text-sm mb-3 uppercase flex items-center gap-2">
-                  <Skull size={16} /> Death Saves
+                  <Skull size={16} /> {t("deathSaves")}
                 </h3>
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-xs font-bold text-stone-400 w-16">
@@ -555,10 +551,10 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               <div className="bg-stone-800 p-4 rounded-xl border border-stone-700">
                 <div className="flex justify-between items-center mb-2">
                   <h3 className="text-stone-400 font-bold text-sm uppercase flex items-center gap-2">
-                    <Coffee size={16} /> Hit Dice ({hitDieType})
+                    <Coffee size={16} /> {t("hitDice")} ({hitDieType})
                   </h3>
                   <span className="text-xs text-stone-500">
-                    {hitDiceTotal - hitDiceUsed} / {hitDiceTotal} Available
+                    {hitDiceTotal - hitDiceUsed} / {hitDiceTotal}
                   </span>
                 </div>
                 <div className="flex gap-2">
@@ -578,7 +574,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                   disabled={hitDiceUsed >= hitDiceTotal || currentHP >= maxHP}
                   className="mt-3 w-full py-2 bg-stone-700 hover:bg-stone-600 disabled:opacity-50 disabled:cursor-not-allowed text-stone-200 text-xs font-bold rounded-lg transition"
                 >
-                  Roll Hit Die (1{hitDieType} + {mods.con})
+                  Roll (1{hitDieType} + {mods.con})
                 </button>
               </div>
             )}
@@ -586,18 +582,17 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
             <div>
               <div className="flex justify-between items-center mb-3">
                 <h3 className="text-stone-400 font-bold text-sm uppercase tracking-wider">
-                  Attacks
+                  {t("attacks")}
                 </h3>
                 <button
                   onClick={() => setIsAddingAttack(!isAddingAttack)}
                   className="text-xs bg-stone-800 border border-stone-600 px-2 py-1 rounded text-stone-300 hover:text-white hover:border-yellow-500 flex items-center gap-1"
                 >
                   {isAddingAttack ? <X size={12} /> : <Plus size={12} />}{" "}
-                  {isAddingAttack ? "Cancel" : "Add Weapon"}
+                  {isAddingAttack ? "Cancel" : t("addWeapon")}
                 </button>
               </div>
 
-              {/* Formulario para agregar ataque */}
               {isAddingAttack && (
                 <div className="bg-stone-800 p-3 rounded-xl border border-yellow-500/50 mb-3 animate-in fade-in zoom-in duration-200">
                   <div className="grid grid-cols-2 gap-2 mb-2">
@@ -637,7 +632,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                     onClick={addAttack}
                     className="w-full py-2 bg-yellow-600 text-stone-100 text-xs font-bold rounded hover:bg-yellow-500"
                   >
-                    Save Attack
+                    Save
                   </button>
                 </div>
               )}
@@ -676,17 +671,12 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                     </div>
                   );
                 })}
-                {weapons.length === 0 && (
-                  <p className="text-stone-600 text-xs italic text-center py-2">
-                    No weapons equipped.
-                  </p>
-                )}
               </div>
             </div>
 
             <div>
               <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
-                <Sparkles size={16} /> Features
+                <Sparkles size={16} /> {t("features")}
               </h3>
               <div className="space-y-2">
                 {features.map((feat, idx) => (
@@ -719,7 +709,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               <div className="flex items-center gap-3">
                 <Eye className="text-stone-400" />
                 <span className="font-bold text-stone-200">
-                  Passive Perception
+                  {t("passivePerception")}
                 </span>
               </div>
               <span className="text-xl font-bold text-stone-100">
@@ -728,7 +718,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
             </div>
             <div>
               <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
-                <Shield size={16} /> Saving Throws
+                <Shield size={16} /> {t("savingThrows")}
               </h3>
               <div className="grid grid-cols-2 gap-2">
                 {Object.keys(mods).map((stat) => {
@@ -763,7 +753,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                             : "text-stone-400"
                         }`}
                       >
-                        {stat}
+                        {t(stat).slice(0, 3)}
                       </span>
                       <span className="font-mono text-stone-200">
                         {saveMod >= 0 ? "+" : ""}
@@ -776,7 +766,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
             </div>
             <div>
               <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
-                <Activity size={16} /> Skills
+                <Activity size={16} /> {t("skills")}
               </h3>
               <div className="bg-stone-800 rounded-xl border border-stone-700 divide-y divide-stone-700/50">
                 {SKILLS.map((skill) => {
@@ -806,7 +796,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
             </div>
             <div>
               <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
-                <Languages size={16} /> Proficiencies & Languages
+                <Languages size={16} /> Proficiencies
               </h3>
               <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 space-y-4">
                 <div>
@@ -844,40 +834,40 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           </div>
         )}
 
-        {/* SPELLS (MEJORADO) */}
+        {/* SPELLS */}
         {activeTab === "spells" && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 grid grid-cols-2 gap-4">
               <div className="flex flex-col items-center border-r border-stone-700">
                 <span className="text-[10px] uppercase font-bold text-stone-500">
-                  Spell Save DC
+                  {t("spellDC")}
                 </span>
                 <span className="text-2xl font-bold text-stone-100">
                   {spellSaveDC}
                 </span>
                 <span className="text-[10px] text-stone-600">
-                  8 + Prof + {spellCastingStat.toUpperCase()}
+                  8 + Prof + {t(spellCastingStat).slice(0, 3)}
                 </span>
               </div>
               <div className="flex flex-col items-center">
                 <span className="text-[10px] uppercase font-bold text-stone-500">
-                  Attack Bonus
+                  {t("spellAtk")}
                 </span>
                 <span className="text-2xl font-bold text-yellow-500">
                   +{spellAttackBonus}
                 </span>
                 <span className="text-[10px] text-stone-600">
-                  Prof + {spellCastingStat.toUpperCase()}
+                  Prof + {t(spellCastingStat).slice(0, 3)}
                 </span>
               </div>
             </div>
             <div>
               <div className="flex justify-between items-end mb-2">
                 <h3 className="text-stone-400 font-bold text-sm uppercase flex items-center gap-2">
-                  <Flame size={16} /> Level 1 Slots
+                  <Flame size={16} /> {t("level")} 1 Slots
                 </h3>
                 <span className="text-xs text-stone-500">
-                  {spellSlots[1]?.used || 0} / {spellSlots[1]?.total || 0} Used
+                  {spellSlots[1]?.used || 0} / {spellSlots[1]?.total || 0}
                 </span>
               </div>
               <div className="flex gap-2">
@@ -897,26 +887,23 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               </div>
             </div>
 
-            {/* Lista de Conjuros Interactiva */}
             <div className="space-y-4">
-              {/* Controles de gestión */}
               <div className="flex justify-end">
                 <button
                   onClick={() => setIsAddingSpell(!isAddingSpell)}
                   className="text-xs bg-stone-800 border border-stone-600 px-2 py-1 rounded text-stone-300 hover:text-white hover:border-yellow-500 flex items-center gap-1"
                 >
                   {isAddingSpell ? <X size={12} /> : <Plus size={12} />}{" "}
-                  {isAddingSpell ? "Cancel" : "Scribe Spell"}
+                  {isAddingSpell ? "Cancel" : t("scribe")}
                 </button>
               </div>
 
-              {/* Formulario de agregar hechizo */}
               {isAddingSpell && (
                 <div className="bg-stone-800 p-3 rounded-xl border border-yellow-500/50 mb-3 animate-in fade-in zoom-in duration-200">
                   <div className="space-y-2 mb-2">
                     <input
                       type="text"
-                      placeholder="Spell Name (e.g. Fireball)"
+                      placeholder="Spell Name"
                       value={newSpell.name}
                       onChange={(e) =>
                         setNewSpell({ ...newSpell, name: e.target.value })
@@ -931,14 +918,14 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                         }
                         className="bg-stone-900 border border-stone-600 rounded p-2 text-xs text-white outline-none"
                       >
-                        <option value="0">Cantrip (0)</option>
+                        <option value="0">{t("cantrips")}</option>
                         <option value="1">Level 1</option>
                         <option value="2">Level 2</option>
                         <option value="3">Level 3</option>
                       </select>
                       <input
                         type="text"
-                        placeholder="School (e.g. Evocation)"
+                        placeholder="School"
                         value={newSpell.school}
                         onChange={(e) =>
                           setNewSpell({ ...newSpell, school: e.target.value })
@@ -947,7 +934,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                       />
                     </div>
                     <textarea
-                      placeholder="Description (e.g. 8d6 fire damage, 20ft radius...)"
+                      placeholder="Description"
                       value={newSpell.desc}
                       onChange={(e) =>
                         setNewSpell({ ...newSpell, desc: e.target.value })
@@ -959,16 +946,14 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                     onClick={addSpell}
                     className="w-full py-2 bg-yellow-600 text-stone-100 text-xs font-bold rounded hover:bg-yellow-500"
                   >
-                    Add to Spellbook
+                    Add
                   </button>
                 </div>
               )}
 
-              {/* Renderizado de listas por nivel */}
-              {/* Cantrips */}
               <div>
                 <h3 className="text-stone-500 font-bold text-xs uppercase mb-2">
-                  Cantrips (0)
+                  {t("cantrips")} (0)
                 </h3>
                 <div className="space-y-2">
                   {mySpells
@@ -986,7 +971,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                             {spell.name}
                           </p>
                           <p className="text-[10px] text-stone-500">
-                            {spell.school} • {spell.time || "1 Action"}
+                            {spell.school}
                           </p>
                         </div>
                         <BookOpen
@@ -1009,14 +994,13 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 </div>
               </div>
 
-              {/* Level 1+ */}
               {[1, 2, 3].map((lvl) => {
                 const spellsOfLevel = mySpells.filter((s) => s.level === lvl);
-                if (spellsOfLevel.length === 0 && lvl > 1) return null; // Ocultar niveles vacíos altos para no ensuciar
+                if (spellsOfLevel.length === 0 && lvl > 1) return null;
                 return (
                   <div key={lvl}>
                     <h3 className="text-stone-500 font-bold text-xs uppercase mb-2">
-                      Level {lvl}
+                      {t("level")} {lvl}
                     </h3>
                     <div className="space-y-2">
                       {spellsOfLevel.map((spell) => (
@@ -1066,7 +1050,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700">
               <h3 className="text-stone-400 font-bold text-xs uppercase mb-3 flex items-center gap-2">
-                <span className="text-yellow-500">●</span> Currency
+                <span className="text-yellow-500">●</span> {t("currency")}
               </h3>
               <div className="grid grid-cols-5 gap-2">
                 {["cp", "sp", "ep", "gp", "pp"].map((coin) => (
@@ -1086,12 +1070,12 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
             </div>
             <div>
               <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
-                <Backpack size={16} /> Equipment
+                <Backpack size={16} /> {t("equipment")}
               </h3>
               <div className="flex gap-2 mb-4">
                 <input
                   type="text"
-                  placeholder="Add item..."
+                  placeholder={t("addItem")}
                   value={newItemName}
                   onChange={(e) => setNewItemName(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && addItem()}
@@ -1149,7 +1133,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <span className="text-xs text-stone-500 uppercase font-bold">
-                    Background
+                    {t("background")}
                   </span>
                   <p className="text-stone-200">
                     {details.background || "Unknown"}
@@ -1160,7 +1144,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                   className="cursor-pointer group"
                 >
                   <span className="text-xs text-stone-500 uppercase font-bold group-hover:text-yellow-500">
-                    Experience (Edit)
+                    {t("xp")} ({t("edit")})
                   </span>
                   <p className="text-stone-200 font-mono">{xp} XP</p>
                 </div>
@@ -1168,12 +1152,12 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
             </div>
             <div>
               <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
-                <Settings size={16} /> Appearance
+                <Settings size={16} /> {t("appearance")}
               </h3>
               <div className="grid grid-cols-3 gap-2 text-center">
                 <div className="bg-stone-800 p-2 rounded-lg border border-stone-700">
                   <span className="block text-[10px] text-stone-500 uppercase">
-                    Age
+                    {t("age")}
                   </span>
                   <span className="text-sm font-bold text-stone-200">
                     {details.age || "--"}
@@ -1181,7 +1165,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 </div>
                 <div className="bg-stone-800 p-2 rounded-lg border border-stone-700">
                   <span className="block text-[10px] text-stone-500 uppercase">
-                    Height
+                    {t("height")}
                   </span>
                   <span className="text-sm font-bold text-stone-200">
                     {details.height || "--"}
@@ -1189,7 +1173,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 </div>
                 <div className="bg-stone-800 p-2 rounded-lg border border-stone-700">
                   <span className="block text-[10px] text-stone-500 uppercase">
-                    Weight
+                    {t("weight")}
                   </span>
                   <span className="text-sm font-bold text-stone-200">
                     {details.weight || "--"}
@@ -1197,7 +1181,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 </div>
                 <div className="bg-stone-800 p-2 rounded-lg border border-stone-700">
                   <span className="block text-[10px] text-stone-500 uppercase">
-                    Eyes
+                    {t("eyes")}
                   </span>
                   <span className="text-sm font-bold text-stone-200">
                     {details.eyes || "--"}
@@ -1205,7 +1189,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 </div>
                 <div className="bg-stone-800 p-2 rounded-lg border border-stone-700">
                   <span className="block text-[10px] text-stone-500 uppercase">
-                    Skin
+                    {t("skin")}
                   </span>
                   <span className="text-sm font-bold text-stone-200">
                     {details.skin || "--"}
@@ -1213,7 +1197,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 </div>
                 <div className="bg-stone-800 p-2 rounded-lg border border-stone-700">
                   <span className="block text-[10px] text-stone-500 uppercase">
-                    Hair
+                    {t("hair")}
                   </span>
                   <span className="text-sm font-bold text-stone-200">
                     {details.hair || "--"}
@@ -1224,7 +1208,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
             <div className="grid grid-cols-1 gap-4">
               <div className="bg-stone-800 p-4 rounded-xl border border-stone-700">
                 <h3 className="text-stone-500 font-bold text-xs uppercase mb-1 flex items-center gap-2">
-                  <Quote size={12} /> Personality Traits
+                  <Quote size={12} /> {t("traits")}
                 </h3>
                 <p className="text-stone-200 text-sm italic">
                   "{details.traits || "..."}"
@@ -1232,7 +1216,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               </div>
               <div className="bg-stone-800 p-4 rounded-xl border border-stone-700">
                 <h3 className="text-stone-500 font-bold text-xs uppercase mb-1">
-                  Ideals
+                  {t("ideals")}
                 </h3>
                 <p className="text-stone-200 text-sm">
                   {details.ideals || "..."}
@@ -1240,7 +1224,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               </div>
               <div className="bg-stone-800 p-4 rounded-xl border border-stone-700">
                 <h3 className="text-stone-500 font-bold text-xs uppercase mb-1">
-                  Bonds
+                  {t("bonds")}
                 </h3>
                 <p className="text-stone-200 text-sm">
                   {details.bonds || "..."}
@@ -1248,7 +1232,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               </div>
               <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 border-red-900/30">
                 <h3 className="text-red-400 font-bold text-xs uppercase mb-1">
-                  Flaws
+                  {t("flaws")}
                 </h3>
                 <p className="text-stone-300 text-sm">
                   {details.flaws || "..."}
@@ -1258,27 +1242,27 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
             <div className="grid grid-cols-1 gap-4">
               <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 border-dashed">
                 <h3 className="text-stone-400 font-bold text-sm mb-2 uppercase flex items-center gap-2">
-                  <Users size={16} /> Allies & Organizations
+                  <Users size={16} /> {t("allies")}
                 </h3>
                 <textarea
                   className="w-full bg-transparent text-stone-300 text-sm italic outline-none resize-none h-20 placeholder-stone-600"
-                  placeholder="Write here..."
+                  placeholder="..."
                   defaultValue={details.allies || ""}
                 ></textarea>
               </div>
               <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 border-dashed">
                 <h3 className="text-stone-400 font-bold text-sm mb-2 uppercase flex items-center gap-2">
-                  <Gem size={16} /> Treasure
+                  <Gem size={16} /> {t("treasure")}
                 </h3>
                 <textarea
                   className="w-full bg-transparent text-stone-300 text-sm italic outline-none resize-none h-20 placeholder-stone-600"
-                  placeholder="List valuable items..."
+                  placeholder="..."
                   defaultValue={details.treasure || ""}
                 ></textarea>
               </div>
               <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 border-dashed">
                 <h3 className="text-stone-400 font-bold text-sm mb-2 uppercase flex items-center gap-2">
-                  <ScrollText size={16} /> Character Backstory
+                  <ScrollText size={16} /> {t("backstory")}
                 </h3>
                 <p className="text-sm text-stone-500 italic leading-relaxed">
                   {details.backstory || "No backstory written yet."}
