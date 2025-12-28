@@ -11,15 +11,15 @@ import {
   MessageCircle,
   User,
   ScrollText,
+  Sparkles,
 } from "lucide-react";
 import { RACES, CLASSES } from "../data/srd";
+import { getRandomDetails } from "../utils/randomizer";
 
 export function CharacterCreator({ onBack, onSave }) {
   const [step, setStep] = useState(1);
-
   const [selectedRace, setSelectedRace] = useState(null);
   const [selectedClass, setSelectedClass] = useState(null);
-
   const [stats, setStats] = useState({
     str: 10,
     dex: 10,
@@ -29,7 +29,6 @@ export function CharacterCreator({ onBack, onSave }) {
     cha: 10,
   });
 
-  // AHORA INCLUIMOS LOS 4 PILARES DE ROL
   const [details, setDetails] = useState({
     name: "",
     alignment: "",
@@ -40,10 +39,10 @@ export function CharacterCreator({ onBack, onSave }) {
     eyes: "",
     skin: "",
     hair: "",
-    traits: "", // Nuevo
-    ideals: "", // Nuevo
-    bonds: "", // Nuevo
-    flaws: "", // Nuevo
+    traits: "",
+    ideals: "",
+    bonds: "",
+    flaws: "",
   });
 
   const getMod = (score) => {
@@ -56,6 +55,11 @@ export function CharacterCreator({ onBack, onSave }) {
       ...prev,
       [key]: Math.max(1, Math.min(20, prev[key] + value)),
     }));
+  };
+
+  const handleAutoFill = () => {
+    const random = getRandomDetails();
+    setDetails((prev) => ({ ...random, name: prev.name || random.name }));
   };
 
   const handleNext = () => {
@@ -146,7 +150,6 @@ export function CharacterCreator({ onBack, onSave }) {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300 pb-24">
-      {/* HEADER */}
       <header className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
           <button
@@ -167,9 +170,7 @@ export function CharacterCreator({ onBack, onSave }) {
         </div>
       </header>
 
-      {/* CONTENIDO */}
       <div className="grid grid-cols-1 gap-4">
-        {/* PASO 1, 2 y 3 (Se mantienen igual visualmente, lógica interna ya cargada arriba) */}
         {step === 1 &&
           RACES.map((race) => (
             <div
@@ -285,9 +286,16 @@ export function CharacterCreator({ onBack, onSave }) {
           </div>
         )}
 
-        {/* PASO 4: IDENTITY & PERSONALITY (ACTUALIZADO) */}
         {step === 4 && (
           <div className="space-y-4 animate-in slide-in-from-right duration-300">
+            <div className="flex justify-end">
+              <button
+                onClick={handleAutoFill}
+                className="flex items-center gap-2 text-xs bg-purple-900/30 text-purple-400 border border-purple-500/50 px-3 py-2 rounded-lg hover:bg-purple-900/50 transition"
+              >
+                <Sparkles size={14} /> Auto-Fill Details
+              </button>
+            </div>
             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 space-y-2">
               <label className="text-sm font-bold text-stone-300 flex items-center gap-2">
                 <User size={16} /> Character Name
@@ -302,8 +310,6 @@ export function CharacterCreator({ onBack, onSave }) {
                 className="w-full bg-stone-900 border border-stone-600 rounded-lg p-3 text-stone-100 placeholder-stone-600 focus:outline-none focus:border-yellow-500 transition"
               />
             </div>
-
-            {/* Físico y Trasfondo */}
             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <input
@@ -355,42 +361,36 @@ export function CharacterCreator({ onBack, onSave }) {
                 />
               </div>
             </div>
-
-            {/* NUEVO: PERSONALITY SECTION */}
             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 space-y-3">
               <h3 className="text-xs font-bold text-stone-500 uppercase flex items-center gap-2">
                 <ScrollText size={14} /> Roleplay Characteristics
               </h3>
-
               <textarea
-                placeholder="Personality Traits (Ex: I always have a plan)"
+                placeholder="Personality Traits"
                 value={details.traits}
                 onChange={(e) =>
                   setDetails({ ...details, traits: e.target.value })
                 }
                 className="w-full bg-stone-900 border border-stone-600 rounded-lg p-2 text-sm text-stone-100 h-16 resize-none outline-none focus:border-yellow-500"
               />
-
               <textarea
-                placeholder="Ideals (Ex: Freedom, Respect)"
+                placeholder="Ideals"
                 value={details.ideals}
                 onChange={(e) =>
                   setDetails({ ...details, ideals: e.target.value })
                 }
                 className="w-full bg-stone-900 border border-stone-600 rounded-lg p-2 text-sm text-stone-100 h-16 resize-none outline-none focus:border-yellow-500"
               />
-
               <textarea
-                placeholder="Bonds (Ex: My sword belongs to my father)"
+                placeholder="Bonds"
                 value={details.bonds}
                 onChange={(e) =>
                   setDetails({ ...details, bonds: e.target.value })
                 }
                 className="w-full bg-stone-900 border border-stone-600 rounded-lg p-2 text-sm text-stone-100 h-16 resize-none outline-none focus:border-yellow-500"
               />
-
               <textarea
-                placeholder="Flaws (Ex: I can't resist gold)"
+                placeholder="Flaws"
                 value={details.flaws}
                 onChange={(e) =>
                   setDetails({ ...details, flaws: e.target.value })
@@ -408,7 +408,7 @@ export function CharacterCreator({ onBack, onSave }) {
           disabled={step === 1 ? !selectedRace : !selectedClass}
           className="w-full py-4 bg-yellow-500 text-stone-900 font-bold rounded-xl shadow-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-yellow-400 transition flex items-center justify-center gap-2"
         >
-          {step === 4 ? "Create Character Sheet" : "Next Step"}
+          {step === 4 ? "Create Character Sheet" : "Next Step"}{" "}
           {step !== 4 && <ArrowLeft className="rotate-180" size={20} />}
         </button>
       </div>
