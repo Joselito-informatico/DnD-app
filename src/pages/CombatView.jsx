@@ -23,6 +23,8 @@ import {
   Skull,
   Coffee,
   Quote,
+  Users,
+  Gem,
 } from "lucide-react";
 import { CLASSES, SKILLS, SPELLS } from "../data/srd";
 
@@ -32,10 +34,16 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const [showMenu, setShowMenu] = useState(false);
   const [newItemName, setNewItemName] = useState("");
 
-  // --- REGLAS & CALCULOS ---
-  const getModifier = (score) => Math.floor((score - 10) / 2);
-  const proficiencyBonus = 2;
+  // Estado para edición rápida (Modal simple)
+  const [editingStat, setEditingStat] = useState(null); // 'level', 'xp'
 
+  // --- REGLAS & CALCULOS DINÁMICOS ---
+
+  // 1. Bono de Competencia Dinámico (Formula D&D 5e: 2 + (Nivel-1)/4 redondeado abajo)
+  // Lvl 1-4: +2, Lvl 5-8: +3, etc.
+  const proficiencyBonus = Math.floor(2 + (hero.level - 1) / 4);
+
+  const getModifier = (score) => Math.floor((score - 10) / 2);
   const stats = hero.stats;
   const mods = {
     str: getModifier(stats.str),
@@ -46,7 +54,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     cha: getModifier(stats.cha),
   };
 
-  const maxHP = 10 + mods.con + (hero.level - 1) * 6;
+  const maxHP = 10 + mods.con + (hero.level - 1) * 6; // Fórmula simplificada de HP
   const currentHP = hero.currentHP ?? maxHP;
   const armorClass = 10 + mods.dex;
   const initiative = mods.dex >= 0 ? `+${mods.dex}` : mods.dex;
@@ -54,6 +62,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const inspiration = hero.inspiration || false;
   const passivePerception = 10 + mods.wis;
 
+  // Datos de Clase y Persistencia
   const heroClassData = CLASSES.find((c) => c.name === hero.class);
   const saveProficiencies = heroClassData ? heroClassData.saves : [];
   const proficiencies = heroClassData ? heroClassData.proficiencies : [];
@@ -62,14 +71,15 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const hitDiceUsed = hero.hitDiceUsed || 0;
   const hitDiceTotal = hero.level;
   const deathSaves = hero.deathSaves || { successes: 0, failures: 0 };
+  const xp = hero.xp || 0; // Experiencia actual
 
+  // Idiomas
   const languages = ["Common"];
   if (hero.race === "Elf") languages.push("Elvish");
   if (hero.race === "Dwarf") languages.push("Dwarvish");
   if (hero.race === "Tiefling") languages.push("Infernal");
   if (hero.race === "Human") languages.push("One extra choice");
 
-  // DATOS PERSISTENTES
   const weapons = hero.weapons || [
     { id: "def", name: "Unarmed", type: "melee", damage: "1", stat: "str" },
   ];
@@ -81,7 +91,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const money = hero.money || { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 };
   const features = hero.features || [];
 
-  // MAGIA
+  // Magia
   const spellSlots = hero.spellSlots || { 1: { total: 2, used: 0 } };
   const spellCastingStat =
     hero.class === "Wizard"
@@ -94,7 +104,20 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const spellAttackBonus = mods[spellCastingStat] + proficiencyBonus;
   const spellSaveDC = 8 + proficiencyBonus + mods[spellCastingStat];
 
-  // --- ACCIONES ---
+  // --- ACCIONES DE DATOS ---
+
+  const updateLevel = (newLevel) => {
+    const lvl = Math.max(1, Math.min(20, parseInt(newLevel) || 1));
+    // Al cambiar nivel, podríamos querer recalcular HP actual o dejarlo igual
+    onUpdateHero({ ...hero, level: lvl });
+    setEditingStat(null);
+  };
+
+  const updateXP = (newXP) => {
+    onUpdateHero({ ...hero, xp: parseInt(newXP) || 0 });
+    setEditingStat(null);
+  };
+
   const handleLongRest = () => {
     const resetSlots = { ...spellSlots };
     Object.keys(resetSlots).forEach((level) => (resetSlots[level].used = 0));
@@ -197,7 +220,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
 
   return (
     <div className="flex flex-col h-screen bg-neutral-900 pb-20 relative">
-      {/* HEADER & MENU (Igual) */}
+      {/* HEADER & MENU */}
       <header className="flex items-center justify-between p-6 pb-2 bg-neutral-900 z-10">
         <div className="flex items-center gap-4">
           <button
@@ -208,8 +231,15 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           </button>
           <div>
             <h1 className="text-xl font-bold text-stone-100">{hero.name}</h1>
-            <p className="text-xs text-stone-500">
-              Lvl {hero.level} {hero.race} {hero.class}
+            {/* Nivel clickeable para editar */}
+            <p
+              onClick={() => setEditingStat("level")}
+              className="text-xs text-stone-500 cursor-pointer hover:text-yellow-500 hover:underline"
+            >
+              Lvl {hero.level} {hero.race} {hero.class}{" "}
+              <span className="text-[10px] bg-stone-800 px-1 rounded ml-1">
+                Edit
+              </span>
             </p>
           </div>
         </div>
@@ -225,7 +255,37 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         </button>
       </header>
 
-      {/* MENÚ OVERLAY */}
+      {/* MODAL DE EDICIÓN RÁPIDA (Nivel/XP) */}
+      {editingStat && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-stone-900 border border-stone-700 p-6 rounded-2xl w-full max-w-xs">
+            <h3 className="text-stone-100 font-bold mb-4">
+              Edit {editingStat === "level" ? "Level" : "Experience"}
+            </h3>
+            <input
+              type="number"
+              autoFocus
+              placeholder="Enter new value"
+              className="w-full bg-stone-950 border border-stone-600 rounded-lg p-3 text-stone-100 mb-4 focus:border-yellow-500 outline-none"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  editingStat === "level"
+                    ? updateLevel(e.target.value)
+                    : updateXP(e.target.value);
+                }
+              }}
+            />
+            <button
+              onClick={() => setEditingStat(null)}
+              className="w-full py-2 bg-stone-800 text-stone-400 rounded-lg"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* MENÚ OVERLAY (Igual) */}
       {showMenu && (
         <div className="absolute top-20 right-6 z-20 w-48 bg-stone-800 border border-stone-700 rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in duration-200 origin-top-right">
           <button
@@ -308,7 +368,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         className="flex-1 overflow-y-auto px-6 space-y-6 pb-24"
         onClick={() => setShowMenu(false)}
       >
-        {/* COMBAT (Igual) */}
+        {/* COMBAT */}
         {activeTab === "combat" && (
           <div className="space-y-6 animate-in slide-in-from-left duration-200">
             <div className="flex gap-3 mb-2">
@@ -335,6 +395,14 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 </span>
               </div>
             </div>
+            {/* Stats Vitales con Proficiency Visible */}
+            <div className="flex justify-center mb-2">
+              <span className="text-[10px] text-stone-500 uppercase tracking-widest font-bold">
+                Proficiency Bonus:{" "}
+                <span className="text-stone-300">+{proficiencyBonus}</span>
+              </span>
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-stone-800 p-3 rounded-xl border border-stone-700 flex flex-col items-center justify-center relative overflow-hidden">
                 <Shield className="text-stone-600 absolute opacity-20 -right-2 -bottom-2 w-16 h-16" />
@@ -380,6 +448,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 + HEAL
               </button>
             </div>
+
             {currentHP === 0 && (
               <div className="bg-stone-900/80 p-4 rounded-xl border border-red-900/50 animate-in zoom-in duration-300">
                 <h3 className="text-red-400 font-bold text-sm mb-3 uppercase flex items-center gap-2">
@@ -454,6 +523,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 </button>
               </div>
             )}
+
             <div>
               <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider">
                 Attacks
@@ -514,7 +584,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           </div>
         )}
 
-        {/* SKILLS, SPELLS, INVENTORY (Iguales, omitidos por brevedad pero incluidos en el archivo anterior) */}
+        {/* SKILLS */}
         {activeTab === "skills" && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 flex items-center justify-between">
@@ -646,6 +716,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           </div>
         )}
 
+        {/* SPELLS (Misma lógica, actualizado con nuevo Proficiency Bonus) */}
         {activeTab === "spells" && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 grid grid-cols-2 gap-4">
@@ -761,6 +832,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           </div>
         )}
 
+        {/* INVENTORY */}
         {activeTab === "inventory" && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700">
@@ -828,7 +900,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           </div>
         )}
 
-        {/* PROFILE (ACTUALIZADO CON ROL) */}
+        {/* PROFILE COMPLETADO */}
         {activeTab === "profile" && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
             <div className="bg-stone-800 p-5 rounded-xl border border-stone-700">
@@ -854,14 +926,20 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                     {details.background || "Unknown"}
                   </p>
                 </div>
-                <div>
-                  <span className="text-xs text-stone-500 uppercase font-bold">
-                    Experience
+                {/* XP Clickeable */}
+                <div
+                  onClick={() => setEditingStat("xp")}
+                  className="cursor-pointer group"
+                >
+                  <span className="text-xs text-stone-500 uppercase font-bold group-hover:text-yellow-500">
+                    Experience (Edit)
                   </span>
-                  <p className="text-stone-200">0 XP</p>
+                  <p className="text-stone-200 font-mono">{xp} XP</p>
                 </div>
               </div>
             </div>
+
+            {/* Apariencia */}
             <div>
               <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
                 <Settings size={16} /> Appearance
@@ -918,7 +996,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               </div>
             </div>
 
-            {/* NUEVA SECCIÓN DE ROL */}
+            {/* Roleplay (Igual) */}
             <div className="grid grid-cols-1 gap-4">
               <div className="bg-stone-800 p-4 rounded-xl border border-stone-700">
                 <h3 className="text-stone-500 font-bold text-xs uppercase mb-1 flex items-center gap-2">
@@ -950,6 +1028,38 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 </h3>
                 <p className="text-stone-300 text-sm">
                   {details.flaws || "..."}
+                </p>
+              </div>
+            </div>
+
+            {/* NUEVO: Aliados y Tesoros (Page 2 PDF) */}
+            <div className="grid grid-cols-1 gap-4">
+              <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 border-dashed">
+                <h3 className="text-stone-400 font-bold text-sm mb-2 uppercase flex items-center gap-2">
+                  <Users size={16} /> Allies & Organizations
+                </h3>
+                <textarea
+                  className="w-full bg-transparent text-stone-300 text-sm italic outline-none resize-none h-20 placeholder-stone-600"
+                  placeholder="Write here..."
+                  defaultValue={details.allies || ""}
+                ></textarea>
+              </div>
+              <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 border-dashed">
+                <h3 className="text-stone-400 font-bold text-sm mb-2 uppercase flex items-center gap-2">
+                  <Gem size={16} /> Treasure
+                </h3>
+                <textarea
+                  className="w-full bg-transparent text-stone-300 text-sm italic outline-none resize-none h-20 placeholder-stone-600"
+                  placeholder="List valuable items..."
+                  defaultValue={details.treasure || ""}
+                ></textarea>
+              </div>
+              <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 border-dashed">
+                <h3 className="text-stone-400 font-bold text-sm mb-2 uppercase flex items-center gap-2">
+                  <ScrollText size={16} /> Character Backstory
+                </h3>
+                <p className="text-sm text-stone-500 italic leading-relaxed">
+                  {details.backstory || "No backstory written yet."}
                 </p>
               </div>
             </div>
