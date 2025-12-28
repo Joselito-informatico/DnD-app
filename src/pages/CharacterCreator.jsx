@@ -10,17 +10,16 @@ import {
   Eye,
   MessageCircle,
   User,
+  ScrollText,
 } from "lucide-react";
 import { RACES, CLASSES } from "../data/srd";
 
 export function CharacterCreator({ onBack, onSave }) {
   const [step, setStep] = useState(1);
 
-  // Estados de selección
   const [selectedRace, setSelectedRace] = useState(null);
   const [selectedClass, setSelectedClass] = useState(null);
 
-  // Stats (Paso 3)
   const [stats, setStats] = useState({
     str: 10,
     dex: 10,
@@ -30,7 +29,7 @@ export function CharacterCreator({ onBack, onSave }) {
     cha: 10,
   });
 
-  // Detalles Personales (Paso 4 - Nuevo)
+  // AHORA INCLUIMOS LOS 4 PILARES DE ROL
   const [details, setDetails] = useState({
     name: "",
     alignment: "",
@@ -41,9 +40,12 @@ export function CharacterCreator({ onBack, onSave }) {
     eyes: "",
     skin: "",
     hair: "",
+    traits: "", // Nuevo
+    ideals: "", // Nuevo
+    bonds: "", // Nuevo
+    flaws: "", // Nuevo
   });
 
-  // Helpers
   const getMod = (score) => {
     const mod = Math.floor((score - 10) / 2);
     return mod > 0 ? `+${mod}` : mod;
@@ -59,11 +61,8 @@ export function CharacterCreator({ onBack, onSave }) {
   const handleNext = () => {
     if (step === 1 && selectedRace) setStep(2);
     else if (step === 2 && selectedClass) setStep(3);
-    else if (step === 3) setStep(4); // Vamos al paso de detalles
+    else if (step === 3) setStep(4);
     else if (step === 4) {
-      // --- FINALIZAR Y GUARDAR ---
-
-      // 1. Equipo Inicial
       let starterWeapons = [];
       if (selectedClass.id === "fighter") {
         starterWeapons.push({
@@ -112,7 +111,6 @@ export function CharacterCreator({ onBack, onSave }) {
         });
       }
 
-      // 2. Construir objeto final (Mapeando a la hoja oficial)
       const newHero = {
         name:
           details.name.trim() || `${selectedRace.name} ${selectedClass.name}`,
@@ -120,17 +118,11 @@ export function CharacterCreator({ onBack, onSave }) {
         class: selectedClass.name,
         stats: stats,
         weapons: starterWeapons,
-        // NUEVO: Guardamos los rasgos de la clase automáticamente
         features: selectedClass.features || [],
         details: {
-          alignment: details.alignment || "Neutral",
+          ...details,
           background: details.background || "Unknown",
-          age: details.age,
-          height: details.height,
-          weight: details.weight,
-          eyes: details.eyes,
-          skin: details.skin,
-          hair: details.hair,
+          alignment: details.alignment || "Neutral",
         },
       };
 
@@ -175,9 +167,9 @@ export function CharacterCreator({ onBack, onSave }) {
         </div>
       </header>
 
-      {/* CONTENIDO PRINCIPAL */}
+      {/* CONTENIDO */}
       <div className="grid grid-cols-1 gap-4">
-        {/* PASO 1: RAZAS */}
+        {/* PASO 1, 2 y 3 (Se mantienen igual visualmente, lógica interna ya cargada arriba) */}
         {step === 1 &&
           RACES.map((race) => (
             <div
@@ -213,7 +205,6 @@ export function CharacterCreator({ onBack, onSave }) {
             </div>
           ))}
 
-        {/* PASO 2: CLASES */}
         {step === 2 &&
           CLASSES.map((cls) => (
             <div
@@ -249,7 +240,6 @@ export function CharacterCreator({ onBack, onSave }) {
             </div>
           ))}
 
-        {/* PASO 3: ATRIBUTOS */}
         {step === 3 && (
           <div className="space-y-3">
             <div className="bg-stone-800/50 p-4 rounded-xl border border-stone-700 mb-4 text-center">
@@ -295,10 +285,9 @@ export function CharacterCreator({ onBack, onSave }) {
           </div>
         )}
 
-        {/* PASO 4: DETALLES (NUEVO) */}
+        {/* PASO 4: IDENTITY & PERSONALITY (ACTUALIZADO) */}
         {step === 4 && (
           <div className="space-y-4 animate-in slide-in-from-right duration-300">
-            {/* Nombre (Importante) */}
             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 space-y-2">
               <label className="text-sm font-bold text-stone-300 flex items-center gap-2">
                 <User size={16} /> Character Name
@@ -314,15 +303,12 @@ export function CharacterCreator({ onBack, onSave }) {
               />
             </div>
 
-            {/* Datos RPG */}
+            {/* Físico y Trasfondo */}
             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 space-y-4">
-              <h3 className="text-xs font-bold text-stone-500 uppercase">
-                Background & Alignment
-              </h3>
               <div className="grid grid-cols-2 gap-3">
                 <input
                   type="text"
-                  placeholder="Alignment (Ex: Chaotic Good)"
+                  placeholder="Alignment"
                   value={details.alignment}
                   onChange={(e) =>
                     setDetails({ ...details, alignment: e.target.value })
@@ -331,7 +317,7 @@ export function CharacterCreator({ onBack, onSave }) {
                 />
                 <input
                   type="text"
-                  placeholder="Background (Ex: Soldier)"
+                  placeholder="Background"
                   value={details.background}
                   onChange={(e) =>
                     setDetails({ ...details, background: e.target.value })
@@ -339,13 +325,6 @@ export function CharacterCreator({ onBack, onSave }) {
                   className="bg-stone-900 border border-stone-600 rounded-lg p-2 text-sm text-stone-100 focus:border-yellow-500 outline-none"
                 />
               </div>
-            </div>
-
-            {/* Datos Físicos (Opcionales) */}
-            <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 space-y-4">
-              <h3 className="text-xs font-bold text-stone-500 uppercase">
-                Physical Traits (Optional)
-              </h3>
               <div className="grid grid-cols-3 gap-3">
                 <input
                   type="text"
@@ -375,41 +354,54 @@ export function CharacterCreator({ onBack, onSave }) {
                   }
                 />
               </div>
-              <div className="grid grid-cols-3 gap-3">
-                <input
-                  type="text"
-                  placeholder="Eyes"
-                  className="bg-stone-900 border border-stone-600 rounded-lg p-2 text-sm text-stone-100 outline-none"
-                  value={details.eyes}
-                  onChange={(e) =>
-                    setDetails({ ...details, eyes: e.target.value })
-                  }
-                />
-                <input
-                  type="text"
-                  placeholder="Skin"
-                  className="bg-stone-900 border border-stone-600 rounded-lg p-2 text-sm text-stone-100 outline-none"
-                  value={details.skin}
-                  onChange={(e) =>
-                    setDetails({ ...details, skin: e.target.value })
-                  }
-                />
-                <input
-                  type="text"
-                  placeholder="Hair"
-                  className="bg-stone-900 border border-stone-600 rounded-lg p-2 text-sm text-stone-100 outline-none"
-                  value={details.hair}
-                  onChange={(e) =>
-                    setDetails({ ...details, hair: e.target.value })
-                  }
-                />
-              </div>
+            </div>
+
+            {/* NUEVO: PERSONALITY SECTION */}
+            <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 space-y-3">
+              <h3 className="text-xs font-bold text-stone-500 uppercase flex items-center gap-2">
+                <ScrollText size={14} /> Roleplay Characteristics
+              </h3>
+
+              <textarea
+                placeholder="Personality Traits (Ex: I always have a plan)"
+                value={details.traits}
+                onChange={(e) =>
+                  setDetails({ ...details, traits: e.target.value })
+                }
+                className="w-full bg-stone-900 border border-stone-600 rounded-lg p-2 text-sm text-stone-100 h-16 resize-none outline-none focus:border-yellow-500"
+              />
+
+              <textarea
+                placeholder="Ideals (Ex: Freedom, Respect)"
+                value={details.ideals}
+                onChange={(e) =>
+                  setDetails({ ...details, ideals: e.target.value })
+                }
+                className="w-full bg-stone-900 border border-stone-600 rounded-lg p-2 text-sm text-stone-100 h-16 resize-none outline-none focus:border-yellow-500"
+              />
+
+              <textarea
+                placeholder="Bonds (Ex: My sword belongs to my father)"
+                value={details.bonds}
+                onChange={(e) =>
+                  setDetails({ ...details, bonds: e.target.value })
+                }
+                className="w-full bg-stone-900 border border-stone-600 rounded-lg p-2 text-sm text-stone-100 h-16 resize-none outline-none focus:border-yellow-500"
+              />
+
+              <textarea
+                placeholder="Flaws (Ex: I can't resist gold)"
+                value={details.flaws}
+                onChange={(e) =>
+                  setDetails({ ...details, flaws: e.target.value })
+                }
+                className="w-full bg-stone-900 border border-stone-600 rounded-lg p-2 text-sm text-stone-100 h-16 resize-none outline-none focus:border-red-500/50"
+              />
             </div>
           </div>
         )}
       </div>
 
-      {/* FOOTER BUTTON */}
       <div className="fixed bottom-0 left-0 w-full p-6 bg-gradient-to-t from-neutral-900 via-neutral-900 to-transparent">
         <button
           onClick={handleNext}
