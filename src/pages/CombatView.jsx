@@ -26,7 +26,7 @@ import {
   Users,
   Gem,
 } from "lucide-react";
-import { CLASSES, SKILLS, SPELLS } from "../data/srd";
+import { CLASSES, SKILLS, SPELLS as SRD_SPELLS } from "../data/srd";
 
 export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const [activeTab, setActiveTab] = useState("combat");
@@ -35,13 +35,22 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const [newItemName, setNewItemName] = useState("");
   const [editingStat, setEditingStat] = useState(null);
 
-  // NUEVO: Estados para agregar ataque
+  // ESTADOS PARA AGREGAR COSAS
   const [isAddingAttack, setIsAddingAttack] = useState(false);
   const [newAttack, setNewAttack] = useState({
     name: "",
     damage: "1d6",
     stat: "str",
     type: "melee",
+  });
+
+  const [isAddingSpell, setIsAddingSpell] = useState(false);
+  const [newSpell, setNewSpell] = useState({
+    name: "",
+    level: 0,
+    school: "Evocation",
+    desc: "",
+    time: "1 Action",
   });
 
   // --- REGLAS & CALCULOS ---
@@ -82,7 +91,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   if (hero.race === "Tiefling") languages.push("Infernal");
   if (hero.race === "Human") languages.push("One extra choice");
 
-  const weapons = hero.weapons || []; // Ahora permitimos array vacío
+  const weapons = hero.weapons || [];
   const details = hero.details || {
     alignment: "Unknown",
     background: "Unknown",
@@ -90,6 +99,9 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const inventory = hero.inventory || [];
   const money = hero.money || { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 };
   const features = hero.features || [];
+
+  // LÓGICA DE HECHIZOS (Modificada para usar lista personalizada o fallback al SRD)
+  const mySpells = hero.spells || SRD_SPELLS; // Si el héroe no tiene lista propia, usa la default
 
   const spellSlots = hero.spellSlots || { 1: { total: 2, used: 0 } };
   const spellCastingStat =
@@ -105,21 +117,54 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
 
   // --- ACCIONES ---
 
-  // NUEVO: Gestión de Ataques
+  // Gestión de Ataques
   const addAttack = () => {
     if (!newAttack.name) return;
     const attackToAdd = { id: Date.now(), ...newAttack };
     onUpdateHero({ ...hero, weapons: [...weapons, attackToAdd] });
     setIsAddingAttack(false);
-    setNewAttack({ name: "", damage: "1d6", stat: "str", type: "melee" }); // Reset
+    setNewAttack({ name: "", damage: "1d6", stat: "str", type: "melee" });
   };
 
   const removeAttack = (attackId, e) => {
-    e.stopPropagation(); // Evitar que se lance el dado al borrar
+    e.stopPropagation();
     if (confirm("Remove this attack?")) {
       onUpdateHero({
         ...hero,
         weapons: weapons.filter((w) => w.id !== attackId),
+      });
+    }
+  };
+
+  // NUEVO: Gestión de Hechizos
+  const addSpell = () => {
+    if (!newSpell.name) return;
+    const spellToAdd = {
+      id: Date.now(),
+      ...newSpell,
+      level: parseInt(newSpell.level),
+    };
+    // Importante: Si es la primera vez, copiamos los del SRD para no perderlos, + el nuevo
+    const currentList = hero.spells ? hero.spells : SRD_SPELLS;
+    onUpdateHero({ ...hero, spells: [...currentList, spellToAdd] });
+    setIsAddingSpell(false);
+    setNewSpell({
+      name: "",
+      level: 0,
+      school: "Evocation",
+      desc: "",
+      time: "1 Action",
+    });
+  };
+
+  const removeSpell = (spellId, e) => {
+    e.stopPropagation();
+    if (confirm("Remove this spell from your spellbook?")) {
+      // Si estamos borrando, nos aseguramos de estar operando sobre una copia guardada
+      const currentList = hero.spells ? hero.spells : SRD_SPELLS;
+      onUpdateHero({
+        ...hero,
+        spells: currentList.filter((s) => s.id !== spellId),
       });
     }
   };
@@ -387,7 +432,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         {/* COMBAT */}
         {activeTab === "combat" && (
           <div className="space-y-6 animate-in slide-in-from-left duration-200">
-            {/* Header / Stats Vitales */}
             <div className="flex gap-3 mb-2">
               <button
                 onClick={toggleInspiration}
@@ -464,7 +508,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               </button>
             </div>
 
-            {/* Death Saves & Hit Dice */}
             {currentHP === 0 && (
               <div className="bg-stone-900/80 p-4 rounded-xl border border-red-900/50 animate-in zoom-in duration-300">
                 <h3 className="text-red-400 font-bold text-sm mb-3 uppercase flex items-center gap-2">
@@ -540,7 +583,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               </div>
             )}
 
-            {/* --- SECCIÓN DE ATAQUES (DINÁMICA) --- */}
             <div>
               <div className="flex justify-between items-center mb-3">
                 <h3 className="text-stone-400 font-bold text-sm uppercase tracking-wider">
@@ -600,7 +642,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 </div>
               )}
 
-              {/* Lista de armas */}
               <div className="space-y-2">
                 {weapons.map((w) => {
                   const mod = mods[w.stat] + proficiencyBonus;
@@ -625,7 +666,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                         <div className="bg-stone-900 px-3 py-1 rounded-lg font-bold text-stone-300">
                           +{mod}
                         </div>
-                        {/* Botón Borrar (Visible en Hover) */}
                         <button
                           onClick={(e) => removeAttack(w.id, e)}
                           className="p-2 text-stone-600 hover:text-red-500 hover:bg-stone-900 rounded-full transition opacity-0 group-hover:opacity-100 absolute right-1 top-1"
@@ -804,7 +844,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           </div>
         )}
 
-        {/* SPELLS */}
+        {/* SPELLS (MEJORADO) */}
         {activeTab === "spells" && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 grid grid-cols-2 gap-4">
@@ -856,66 +896,167 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 )}
               </div>
             </div>
+
+            {/* Lista de Conjuros Interactiva */}
             <div className="space-y-4">
+              {/* Controles de gestión */}
+              <div className="flex justify-end">
+                <button
+                  onClick={() => setIsAddingSpell(!isAddingSpell)}
+                  className="text-xs bg-stone-800 border border-stone-600 px-2 py-1 rounded text-stone-300 hover:text-white hover:border-yellow-500 flex items-center gap-1"
+                >
+                  {isAddingSpell ? <X size={12} /> : <Plus size={12} />}{" "}
+                  {isAddingSpell ? "Cancel" : "Scribe Spell"}
+                </button>
+              </div>
+
+              {/* Formulario de agregar hechizo */}
+              {isAddingSpell && (
+                <div className="bg-stone-800 p-3 rounded-xl border border-yellow-500/50 mb-3 animate-in fade-in zoom-in duration-200">
+                  <div className="space-y-2 mb-2">
+                    <input
+                      type="text"
+                      placeholder="Spell Name (e.g. Fireball)"
+                      value={newSpell.name}
+                      onChange={(e) =>
+                        setNewSpell({ ...newSpell, name: e.target.value })
+                      }
+                      className="w-full bg-stone-900 border border-stone-600 rounded p-2 text-xs text-white outline-none focus:border-yellow-500"
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <select
+                        value={newSpell.level}
+                        onChange={(e) =>
+                          setNewSpell({ ...newSpell, level: e.target.value })
+                        }
+                        className="bg-stone-900 border border-stone-600 rounded p-2 text-xs text-white outline-none"
+                      >
+                        <option value="0">Cantrip (0)</option>
+                        <option value="1">Level 1</option>
+                        <option value="2">Level 2</option>
+                        <option value="3">Level 3</option>
+                      </select>
+                      <input
+                        type="text"
+                        placeholder="School (e.g. Evocation)"
+                        value={newSpell.school}
+                        onChange={(e) =>
+                          setNewSpell({ ...newSpell, school: e.target.value })
+                        }
+                        className="bg-stone-900 border border-stone-600 rounded p-2 text-xs text-white outline-none"
+                      />
+                    </div>
+                    <textarea
+                      placeholder="Description (e.g. 8d6 fire damage, 20ft radius...)"
+                      value={newSpell.desc}
+                      onChange={(e) =>
+                        setNewSpell({ ...newSpell, desc: e.target.value })
+                      }
+                      className="w-full bg-stone-900 border border-stone-600 rounded p-2 text-xs text-white outline-none h-16 resize-none"
+                    />
+                  </div>
+                  <button
+                    onClick={addSpell}
+                    className="w-full py-2 bg-yellow-600 text-stone-100 text-xs font-bold rounded hover:bg-yellow-500"
+                  >
+                    Add to Spellbook
+                  </button>
+                </div>
+              )}
+
+              {/* Renderizado de listas por nivel */}
+              {/* Cantrips */}
               <div>
                 <h3 className="text-stone-500 font-bold text-xs uppercase mb-2">
                   Cantrips (0)
                 </h3>
                 <div className="space-y-2">
-                  {SPELLS.filter((s) => s.level === 0).map((spell) => (
-                    <div
-                      key={spell.id}
-                      className="bg-stone-800 p-3 rounded-lg border border-stone-700 flex justify-between items-center group cursor-pointer hover:border-yellow-500/50"
-                      onClick={() =>
-                        rollDice(`${spell.name}`, spellAttackBonus)
-                      }
-                    >
-                      <div>
-                        <p className="font-bold text-stone-200 text-sm">
-                          {spell.name}
-                        </p>
-                        <p className="text-[10px] text-stone-500">
-                          {spell.school} • {spell.time}
-                        </p>
+                  {mySpells
+                    .filter((s) => s.level === 0)
+                    .map((spell) => (
+                      <div
+                        key={spell.id}
+                        className="bg-stone-800 p-3 rounded-lg border border-stone-700 flex justify-between items-center group cursor-pointer hover:border-yellow-500/50 relative"
+                        onClick={() =>
+                          rollDice(`${spell.name}`, spellAttackBonus)
+                        }
+                      >
+                        <div>
+                          <p className="font-bold text-stone-200 text-sm">
+                            {spell.name}
+                          </p>
+                          <p className="text-[10px] text-stone-500">
+                            {spell.school} • {spell.time || "1 Action"}
+                          </p>
+                        </div>
+                        <BookOpen
+                          size={16}
+                          className="text-stone-600 group-hover:text-yellow-500"
+                        />
+                        <button
+                          onClick={(e) => removeSpell(spell.id, e)}
+                          className="p-2 text-stone-600 hover:text-red-500 hover:bg-stone-900 rounded-full transition opacity-0 group-hover:opacity-100 absolute right-1 top-1"
+                        >
+                          <Trash2 size={14} />
+                        </button>
                       </div>
-                      <BookOpen
-                        size={16}
-                        className="text-stone-600 group-hover:text-yellow-500"
-                      />
-                    </div>
-                  ))}
+                    ))}
+                  {mySpells.filter((s) => s.level === 0).length === 0 && (
+                    <p className="text-stone-600 text-xs italic">
+                      No cantrips known.
+                    </p>
+                  )}
                 </div>
               </div>
-              <div>
-                <h3 className="text-stone-500 font-bold text-xs uppercase mb-2">
-                  Level 1
-                </h3>
-                <div className="space-y-2">
-                  {SPELLS.filter((s) => s.level === 1).map((spell) => (
-                    <div
-                      key={spell.id}
-                      className="bg-stone-800 p-3 rounded-lg border border-stone-700 flex justify-between items-center group cursor-pointer hover:border-yellow-500/50"
-                      onClick={() =>
-                        rollDice(`${spell.name}`, spellAttackBonus)
-                      }
-                    >
-                      <div>
-                        <p className="font-bold text-stone-200 text-sm">
-                          {spell.name}
-                        </p>
-                        <p className="text-[10px] text-stone-500">
-                          {spell.desc}
-                        </p>
-                      </div>
-                      {spell.desc.includes("damage") && (
-                        <div className="bg-stone-900 px-2 py-1 rounded text-xs font-bold text-stone-400 group-hover:text-yellow-500">
-                          Roll
+
+              {/* Level 1+ */}
+              {[1, 2, 3].map((lvl) => {
+                const spellsOfLevel = mySpells.filter((s) => s.level === lvl);
+                if (spellsOfLevel.length === 0 && lvl > 1) return null; // Ocultar niveles vacíos altos para no ensuciar
+                return (
+                  <div key={lvl}>
+                    <h3 className="text-stone-500 font-bold text-xs uppercase mb-2">
+                      Level {lvl}
+                    </h3>
+                    <div className="space-y-2">
+                      {spellsOfLevel.map((spell) => (
+                        <div
+                          key={spell.id}
+                          className="bg-stone-800 p-3 rounded-lg border border-stone-700 flex justify-between items-center group cursor-pointer hover:border-yellow-500/50 relative"
+                          onClick={() =>
+                            rollDice(`${spell.name}`, spellAttackBonus)
+                          }
+                        >
+                          <div className="pr-6">
+                            <p className="font-bold text-stone-200 text-sm">
+                              {spell.name}
+                            </p>
+                            <p className="text-[10px] text-stone-500 line-clamp-2">
+                              {spell.desc}
+                            </p>
+                          </div>
+                          {spell.desc.toLowerCase().includes("damage") && (
+                            <div className="bg-stone-900 px-2 py-1 rounded text-xs font-bold text-stone-400 group-hover:text-yellow-500">
+                              Roll
+                            </div>
+                          )}
+                          <button
+                            onClick={(e) => removeSpell(spell.id, e)}
+                            className="p-2 text-stone-600 hover:text-red-500 hover:bg-stone-900 rounded-full transition opacity-0 group-hover:opacity-100 absolute right-1 top-1"
+                          >
+                            <Trash2 size={14} />
+                          </button>
                         </div>
+                      ))}
+                      {spellsOfLevel.length === 0 && (
+                        <p className="text-stone-600 text-xs italic">
+                          No spells learned.
+                        </p>
                       )}
                     </div>
-                  ))}
-                </div>
-              </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
