@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, Shield, Heart, Zap, Sword, X, Activity, Settings, Moon, Trash2, User, ScrollText, Backpack, Plus, Flame, BookOpen, Sparkles } from 'lucide-react';
+import { ArrowLeft, Shield, Heart, Zap, Sword, X, Activity, Settings, Moon, Trash2, User, ScrollText, Backpack, Plus, Flame, BookOpen, Sparkles, Star, Languages, Eye } from 'lucide-react';
 import { CLASSES, SKILLS, SPELLS } from '../data/srd';
 
 export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
@@ -26,16 +26,30 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const currentHP = hero.currentHP ?? maxHP;
   const armorClass = 10 + mods.dex; 
   const initiative = mods.dex >= 0 ? `+${mods.dex}` : mods.dex;
+  
+  // NUEVO: Inspiración y Percepción Pasiva
+  const inspiration = hero.inspiration || false;
+  // Pasiva = 10 + Mod Sabiduría + (Proficiency si tienes la skill Percepción, asumimos no por ahora en MVP)
+  const passivePerception = 10 + mods.wis; 
 
   const heroClassData = CLASSES.find(c => c.name === hero.class);
   const saveProficiencies = heroClassData ? heroClassData.saves : [];
+  // Recuperamos competencias de la clase (Armaduras/Armas) del SRD
+  const proficiencies = heroClassData ? heroClassData.proficiencies : [];
+  
+  // Idiomas básicos (Hardcoded por ahora según raza para MVP)
+  const languages = ["Common"];
+  if (hero.race === "Elf") languages.push("Elvish");
+  if (hero.race === "Dwarf") languages.push("Dwarvish");
+  if (hero.race === "Tiefling") languages.push("Infernal");
+  if (hero.race === "Human") languages.push("One extra choice");
 
-  // DATOS PERSISTENTES (Con valores por defecto para evitar errores)
+  // DATOS PERSISTENTES
   const weapons = hero.weapons || [{ id: 'def', name: 'Unarmed', type: 'melee', damage: '1', stat: 'str' }];
   const details = hero.details || { alignment: 'Unknown', background: 'Unknown' };
   const inventory = hero.inventory || []; 
   const money = hero.money || { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 };
-  const features = hero.features || []; // Rasgos de clase
+  const features = hero.features || [];
   
   // MAGIA
   const spellSlots = hero.spellSlots || { 1: { total: 2, used: 0 } }; 
@@ -45,12 +59,15 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
 
   // --- ACCIONES ---
   const handleLongRest = () => {
-    // Restaurar HP y Slots
     const resetSlots = { ...spellSlots };
     Object.keys(resetSlots).forEach(level => resetSlots[level].used = 0);
-    
+    // Recupera HP, Slots e Inspiración (opcional, algunas mesas lo hacen)
     onUpdateHero({ ...hero, currentHP: maxHP, spellSlots: resetSlots });
     setShowMenu(false);
+  };
+
+  const toggleInspiration = () => {
+    onUpdateHero({ ...hero, inspiration: !inspiration });
   };
 
   const handleDelete = () => {
@@ -120,7 +137,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         </div>
       )}
 
-      {/* TABS (5 PESTAÑAS) */}
+      {/* TABS */}
       <div className="flex px-4 border-b border-stone-800 mb-4 overflow-x-auto no-scrollbar">
         <button onClick={() => setActiveTab('combat')} className={`flex-1 min-w-[70px] pb-3 text-[10px] font-bold border-b-2 transition ${activeTab === 'combat' ? 'border-yellow-500 text-yellow-500' : 'border-transparent text-stone-500'}`}>COMBAT</button>
         <button onClick={() => setActiveTab('skills')} className={`flex-1 min-w-[70px] pb-3 text-[10px] font-bold border-b-2 transition ${activeTab === 'skills' ? 'border-yellow-500 text-yellow-500' : 'border-transparent text-stone-500'}`}>SKILLS</button>
@@ -135,17 +152,44 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         {/* === COMBAT === */}
         {activeTab === 'combat' && (
           <div className="space-y-6 animate-in slide-in-from-left duration-200">
-            {/* Stats */}
-            <div className="grid grid-cols-3 gap-3">
-              <div className="bg-stone-800 p-3 rounded-xl border border-stone-700 flex flex-col items-center justify-center"><Shield className="text-stone-600 mb-1 w-5 h-5" /><span className="text-xs text-stone-400 font-bold uppercase">AC</span><span className="text-2xl font-bold text-stone-100">{armorClass}</span></div>
-              <div className="bg-stone-800 p-3 rounded-xl border border-stone-700 flex flex-col items-center justify-center"><Zap className="text-yellow-600 mb-1 w-5 h-5" /><span className="text-xs text-stone-400 font-bold uppercase">Init</span><span className="text-2xl font-bold text-yellow-500">{initiative}</span></div>
-              <div className="bg-stone-800 p-3 rounded-xl border border-stone-700 flex flex-col items-center justify-center"><Heart className="text-red-500 mb-1 w-5 h-5" /><span className="text-xs text-stone-400 font-bold uppercase">HP</span><span className="text-xl font-bold text-stone-100">{currentHP}</span></div>
+            {/* Header Combate con Inspiración */}
+            <div className="flex gap-3 mb-2">
+               {/* Botón de Inspiración */}
+               <button 
+                onClick={toggleInspiration}
+                className={`flex-1 p-3 rounded-xl border flex flex-col items-center justify-center transition ${inspiration ? 'bg-yellow-500/20 border-yellow-500 text-yellow-500' : 'bg-stone-800 border-stone-700 text-stone-500 grayscale'}`}
+               >
+                 <Star size={20} fill={inspiration ? "currentColor" : "none"} />
+                 <span className="text-[10px] font-bold uppercase mt-1">Inspiration</span>
+               </button>
+               {/* Iniciativa (Ya existente) */}
+               <div className="bg-stone-800 p-3 rounded-xl border border-stone-700 flex flex-col items-center justify-center flex-1">
+                 <Zap className="text-yellow-600 mb-1 w-5 h-5" />
+                 <span className="text-xs text-stone-400 font-bold uppercase">Init</span>
+                 <span className="text-2xl font-bold text-yellow-500">{initiative}</span>
+               </div>
             </div>
+
+            {/* Stats Vitales */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-stone-800 p-3 rounded-xl border border-stone-700 flex flex-col items-center justify-center relative overflow-hidden">
+                <Shield className="text-stone-600 absolute opacity-20 -right-2 -bottom-2 w-16 h-16" />
+                <span className="text-xs text-stone-400 font-bold uppercase">Armor Class</span>
+                <span className="text-3xl font-bold text-stone-100">{armorClass}</span>
+              </div>
+              <div className="bg-stone-800 p-3 rounded-xl border border-stone-700 flex flex-col items-center justify-center">
+                <Heart className="text-red-500 mb-1 w-5 h-5" />
+                <span className="text-xs text-stone-400 font-bold uppercase">Hit Points</span>
+                <span className="text-xl font-bold text-stone-100">{currentHP} <span className="text-sm text-stone-500">/ {maxHP}</span></span>
+              </div>
+            </div>
+
             {/* HP Controls */}
             <div className="flex gap-2">
               <button onClick={() => changeHP(-1)} className="flex-1 py-3 bg-red-900/20 text-red-400 border border-red-900/50 rounded-lg font-bold hover:bg-red-900/40">- DMG</button>
               <button onClick={() => changeHP(1)} className="flex-1 py-3 bg-green-900/20 text-green-400 border border-green-900/50 rounded-lg font-bold hover:bg-green-900/40">+ HEAL</button>
             </div>
+
             {/* Attacks */}
             <div>
               <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider">Attacks</h3>
@@ -164,17 +208,13 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 })}
               </div>
             </div>
-            {/* FEATURES & TRAITS */}
+
+            {/* FEATURES */}
             <div>
-              <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
-                <Sparkles size={16} /> Features & Traits
-              </h3>
+              <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2"><Sparkles size={16} /> Features</h3>
               <div className="space-y-2">
                 {features.map((feat, idx) => (
-                  <div key={idx} className="bg-stone-800 p-3 rounded-xl border border-stone-700">
-                    <h4 className="font-bold text-stone-200 text-sm">{feat.name}</h4>
-                    <p className="text-xs text-stone-400 mt-1 leading-relaxed">{feat.desc}</p>
-                  </div>
+                  <div key={idx} className="bg-stone-800 p-3 rounded-xl border border-stone-700"><h4 className="font-bold text-stone-200 text-sm">{feat.name}</h4><p className="text-xs text-stone-400 mt-1 leading-relaxed">{feat.desc}</p></div>
                 ))}
                 {features.length === 0 && <p className="text-stone-600 text-xs italic">No features available.</p>}
               </div>
@@ -185,6 +225,16 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         {/* === SKILLS === */}
         {activeTab === 'skills' && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
+             
+             {/* Percepción Pasiva (NUEVO) */}
+             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Eye className="text-stone-400" />
+                  <span className="font-bold text-stone-200">Passive Perception</span>
+                </div>
+                <span className="text-xl font-bold text-stone-100">{passivePerception}</span>
+             </div>
+
              <div>
               <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2"><Shield size={16} /> Saving Throws</h3>
               <div className="grid grid-cols-2 gap-2">
@@ -201,6 +251,8 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 })}
               </div>
             </div>
+            
+            {/* Skills List */}
             <div>
               <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2"><Activity size={16} /> Skills</h3>
               <div className="bg-stone-800 rounded-xl border border-stone-700 divide-y divide-stone-700/50">
@@ -215,123 +267,78 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 })}
               </div>
             </div>
+
+            {/* Competencias e Idiomas (NUEVO) */}
+            <div>
+              <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2"><Languages size={16} /> Proficiencies & Languages</h3>
+              <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 space-y-4">
+                <div>
+                  <h4 className="text-xs font-bold text-stone-500 uppercase mb-2">Languages</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {languages.map(lang => (
+                      <span key={lang} className="text-xs px-2 py-1 bg-stone-900 rounded border border-stone-600 text-stone-300">{lang}</span>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-stone-500 uppercase mb-2">Proficiencies</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {proficiencies.map((prof, idx) => (
+                      <span key={idx} className="text-xs px-2 py-1 bg-stone-900 rounded border border-stone-600 text-stone-300">{prof}</span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
         {/* === SPELLS === */}
         {activeTab === 'spells' && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
-            
-            {/* Header Mágico */}
             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 grid grid-cols-2 gap-4">
-              <div className="flex flex-col items-center border-r border-stone-700">
-                <span className="text-[10px] uppercase font-bold text-stone-500">Spell Save DC</span>
-                <span className="text-2xl font-bold text-stone-100">{spellSaveDC}</span>
-                <span className="text-[10px] text-stone-600">8 + Prof + {spellCastingStat.toUpperCase()}</span>
-              </div>
-              <div className="flex flex-col items-center">
-                <span className="text-[10px] uppercase font-bold text-stone-500">Attack Bonus</span>
-                <span className="text-2xl font-bold text-yellow-500">+{spellAttackBonus}</span>
-                <span className="text-[10px] text-stone-600">Prof + {spellCastingStat.toUpperCase()}</span>
-              </div>
+              <div className="flex flex-col items-center border-r border-stone-700"><span className="text-[10px] uppercase font-bold text-stone-500">Spell Save DC</span><span className="text-2xl font-bold text-stone-100">{spellSaveDC}</span><span className="text-[10px] text-stone-600">8 + Prof + {spellCastingStat.toUpperCase()}</span></div>
+              <div className="flex flex-col items-center"><span className="text-[10px] uppercase font-bold text-stone-500">Attack Bonus</span><span className="text-2xl font-bold text-yellow-500">+{spellAttackBonus}</span><span className="text-[10px] text-stone-600">Prof + {spellCastingStat.toUpperCase()}</span></div>
             </div>
-
-            {/* Slots de Nivel 1 */}
             <div>
-              <div className="flex justify-between items-end mb-2">
-                <h3 className="text-stone-400 font-bold text-sm uppercase flex items-center gap-2"><Flame size={16} /> Level 1 Slots</h3>
-                <span className="text-xs text-stone-500">{spellSlots[1]?.used || 0} / {spellSlots[1]?.total || 0} Used</span>
-              </div>
+              <div className="flex justify-between items-end mb-2"><h3 className="text-stone-400 font-bold text-sm uppercase flex items-center gap-2"><Flame size={16} /> Level 1 Slots</h3><span className="text-xs text-stone-500">{spellSlots[1]?.used || 0} / {spellSlots[1]?.total || 0} Used</span></div>
               <div className="flex gap-2">
                 {Array.from({ length: spellSlots[1]?.total || 0 }).map((_, i) => (
-                  <button 
-                    key={i}
-                    onClick={() => toggleSlot(1, i)}
-                    className={`w-8 h-8 rounded-full border-2 transition ${i < (spellSlots[1]?.used || 0) ? 'bg-stone-900 border-stone-700' : 'bg-yellow-500 border-yellow-600 shadow-[0_0_10px_rgba(234,179,8,0.5)]'}`}
-                  ></button>
+                  <button key={i} onClick={() => toggleSlot(1, i)} className={`w-8 h-8 rounded-full border-2 transition ${i < (spellSlots[1]?.used || 0) ? 'bg-stone-900 border-stone-700' : 'bg-yellow-500 border-yellow-600 shadow-[0_0_10px_rgba(234,179,8,0.5)]'}`}></button>
                 ))}
               </div>
             </div>
-
-            {/* Lista de Conjuros */}
             <div className="space-y-4">
-               <div>
-                  <h3 className="text-stone-500 font-bold text-xs uppercase mb-2">Cantrips (0)</h3>
-                  <div className="space-y-2">
-                    {SPELLS.filter(s => s.level === 0).map(spell => (
-                      <div key={spell.id} className="bg-stone-800 p-3 rounded-lg border border-stone-700 flex justify-between items-center group cursor-pointer hover:border-yellow-500/50" onClick={() => rollDice(`${spell.name}`, spellAttackBonus)}>
-                        <div>
-                          <p className="font-bold text-stone-200 text-sm">{spell.name}</p>
-                          <p className="text-[10px] text-stone-500">{spell.school} • {spell.time}</p>
-                        </div>
-                        <BookOpen size={16} className="text-stone-600 group-hover:text-yellow-500" />
-                      </div>
-                    ))}
-                  </div>
-               </div>
-               <div>
-                  <h3 className="text-stone-500 font-bold text-xs uppercase mb-2">Level 1</h3>
-                  <div className="space-y-2">
-                    {SPELLS.filter(s => s.level === 1).map(spell => (
-                      <div key={spell.id} className="bg-stone-800 p-3 rounded-lg border border-stone-700 flex justify-between items-center group cursor-pointer hover:border-yellow-500/50" onClick={() => rollDice(`${spell.name}`, spellAttackBonus)}>
-                        <div>
-                          <p className="font-bold text-stone-200 text-sm">{spell.name}</p>
-                          <p className="text-[10px] text-stone-500">{spell.desc}</p>
-                        </div>
-                         {spell.desc.includes('damage') && <div className="bg-stone-900 px-2 py-1 rounded text-xs font-bold text-stone-400 group-hover:text-yellow-500">Roll</div>}
-                      </div>
-                    ))}
-                  </div>
-               </div>
+               <div><h3 className="text-stone-500 font-bold text-xs uppercase mb-2">Cantrips (0)</h3><div className="space-y-2">{SPELLS.filter(s => s.level === 0).map(spell => (<div key={spell.id} className="bg-stone-800 p-3 rounded-lg border border-stone-700 flex justify-between items-center group cursor-pointer hover:border-yellow-500/50" onClick={() => rollDice(`${spell.name}`, spellAttackBonus)}><div><p className="font-bold text-stone-200 text-sm">{spell.name}</p><p className="text-[10px] text-stone-500">{spell.school} • {spell.time}</p></div><BookOpen size={16} className="text-stone-600 group-hover:text-yellow-500" /></div>))}</div></div>
+               <div><h3 className="text-stone-500 font-bold text-xs uppercase mb-2">Level 1</h3><div className="space-y-2">{SPELLS.filter(s => s.level === 1).map(spell => (<div key={spell.id} className="bg-stone-800 p-3 rounded-lg border border-stone-700 flex justify-between items-center group cursor-pointer hover:border-yellow-500/50" onClick={() => rollDice(`${spell.name}`, spellAttackBonus)}><div><p className="font-bold text-stone-200 text-sm">{spell.name}</p><p className="text-[10px] text-stone-500">{spell.desc}</p></div>{spell.desc.includes('damage') && <div className="bg-stone-900 px-2 py-1 rounded text-xs font-bold text-stone-400 group-hover:text-yellow-500">Roll</div>}</div>))}</div></div>
             </div>
           </div>
         )}
 
-        {/* === INVENTORY === */}
+        {/* === INVENTORY & PROFILE (IGUAL QUE ANTES) === */}
         {activeTab === 'inventory' && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700">
               <h3 className="text-stone-400 font-bold text-xs uppercase mb-3 flex items-center gap-2"><span className="text-yellow-500">●</span> Currency</h3>
               <div className="grid grid-cols-5 gap-2">
                 {['cp', 'sp', 'ep', 'gp', 'pp'].map((coin) => (
-                  <div key={coin} className="flex flex-col items-center">
-                     <label className="text-[10px] uppercase font-bold text-stone-500 mb-1">{coin}</label>
-                     <input type="number" value={money[coin]} onChange={(e) => updateMoney(coin, e.target.value)} className="w-full bg-stone-900 border border-stone-600 rounded-lg p-1 text-center text-sm font-bold text-stone-200 focus:border-yellow-500 outline-none" />
-                  </div>
+                  <div key={coin} className="flex flex-col items-center"><label className="text-[10px] uppercase font-bold text-stone-500 mb-1">{coin}</label><input type="number" value={money[coin]} onChange={(e) => updateMoney(coin, e.target.value)} className="w-full bg-stone-900 border border-stone-600 rounded-lg p-1 text-center text-sm font-bold text-stone-200 focus:border-yellow-500 outline-none" /></div>
                 ))}
               </div>
             </div>
             <div>
               <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2"><Backpack size={16} /> Equipment</h3>
-              <div className="flex gap-2 mb-4">
-                <input type="text" placeholder="Add item..." value={newItemName} onChange={(e) => setNewItemName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addItem()} className="flex-1 bg-stone-800 border border-stone-700 rounded-xl px-4 py-3 text-stone-200 placeholder-stone-500 focus:border-yellow-500 outline-none" />
-                <button onClick={addItem} className="bg-stone-800 border border-stone-700 hover:bg-stone-700 text-stone-200 w-12 rounded-xl flex items-center justify-center transition"><Plus /></button>
-              </div>
-              <div className="space-y-2">
-                {inventory.map((item) => (
-                  <div key={item.id} className="group flex items-center justify-between p-3 bg-stone-800/50 rounded-xl border border-stone-700/50 hover:bg-stone-800 transition">
-                    <span className="text-stone-200">{item.name}</span>
-                    <button onClick={() => removeItem(item.id)} className="text-stone-600 hover:text-red-400 p-1"><X size={16} /></button>
-                  </div>
-                ))}
-                {inventory.length === 0 && <p className="text-center text-stone-600 text-sm py-4">Your backpack is empty.</p>}
-              </div>
+              <div className="flex gap-2 mb-4"><input type="text" placeholder="Add item..." value={newItemName} onChange={(e) => setNewItemName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addItem()} className="flex-1 bg-stone-800 border border-stone-700 rounded-xl px-4 py-3 text-stone-200 placeholder-stone-500 focus:border-yellow-500 outline-none" /><button onClick={addItem} className="bg-stone-800 border border-stone-700 hover:bg-stone-700 text-stone-200 w-12 rounded-xl flex items-center justify-center transition"><Plus /></button></div>
+              <div className="space-y-2">{inventory.map((item) => (<div key={item.id} className="group flex items-center justify-between p-3 bg-stone-800/50 rounded-xl border border-stone-700/50 hover:bg-stone-800 transition"><span className="text-stone-200">{item.name}</span><button onClick={() => removeItem(item.id)} className="text-stone-600 hover:text-red-400 p-1"><X size={16} /></button></div>))}{inventory.length === 0 && <p className="text-center text-stone-600 text-sm py-4">Your backpack is empty.</p>}</div>
             </div>
           </div>
         )}
 
-        {/* === PROFILE === */}
         {activeTab === 'profile' && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
             <div className="bg-stone-800 p-5 rounded-xl border border-stone-700">
-              <div className="flex items-center gap-4 mb-4 pb-4 border-b border-stone-700">
-                <div className="w-16 h-16 bg-stone-700 rounded-full flex items-center justify-center border-2 border-yellow-500/50"><User size={32} className="text-stone-400" /></div>
-                <div><h2 className="text-xl font-bold text-stone-100">{hero.name}</h2><p className="text-stone-400 text-sm">{details.alignment} {hero.race} {hero.class}</p></div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div><span className="text-xs text-stone-500 uppercase font-bold">Background</span><p className="text-stone-200">{details.background || 'Unknown'}</p></div>
-                <div><span className="text-xs text-stone-500 uppercase font-bold">Experience</span><p className="text-stone-200">0 XP</p></div>
-              </div>
+              <div className="flex items-center gap-4 mb-4 pb-4 border-b border-stone-700"><div className="w-16 h-16 bg-stone-700 rounded-full flex items-center justify-center border-2 border-yellow-500/50"><User size={32} className="text-stone-400" /></div><div><h2 className="text-xl font-bold text-stone-100">{hero.name}</h2><p className="text-stone-400 text-sm">{details.alignment} {hero.race} {hero.class}</p></div></div>
+              <div className="grid grid-cols-2 gap-4"><div><span className="text-xs text-stone-500 uppercase font-bold">Background</span><p className="text-stone-200">{details.background || 'Unknown'}</p></div><div><span className="text-xs text-stone-500 uppercase font-bold">Experience</span><p className="text-stone-200">0 XP</p></div></div>
             </div>
             <div>
               <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2"><Settings size={16} /> Appearance</h3>
@@ -344,15 +351,12 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 <div className="bg-stone-800 p-2 rounded-lg border border-stone-700"><span className="block text-[10px] text-stone-500 uppercase">Hair</span><span className="text-sm font-bold text-stone-200">{details.hair || '--'}</span></div>
               </div>
             </div>
-            <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 border-dashed">
-              <h3 className="text-stone-400 font-bold text-sm mb-2 uppercase flex items-center gap-2"><ScrollText size={16} /> Character Backstory</h3>
-              <p className="text-sm text-stone-500 italic leading-relaxed">{details.backstory || "No backstory written yet."}</p>
-            </div>
+            <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 border-dashed"><h3 className="text-stone-400 font-bold text-sm mb-2 uppercase flex items-center gap-2"><ScrollText size={16} /> Character Backstory</h3><p className="text-sm text-stone-500 italic leading-relaxed">{details.backstory || "No backstory written yet."}</p></div>
           </div>
         )}
       </div>
 
-      {/* MODAL RESULTADOS */}
+      {/* MODAL RESULTADOS (IGUAL) */}
       {rollResult && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-stone-900 border border-stone-700 p-6 rounded-2xl shadow-2xl w-full max-w-sm relative text-center">
