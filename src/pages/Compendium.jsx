@@ -6,13 +6,14 @@ import {
   AlertTriangle,
   ChevronRight,
   ChevronDown,
+  Sword,
 } from "lucide-react";
-import { RACES, CLASSES, CONDITIONS } from "../data/srd";
+import { RACES, CLASSES, CONDITIONS, COMBAT_ACTIONS } from "../data/srd";
 import { useLanguage } from "../context/LanguageContext";
 
 export function Compendium() {
   const { t } = useLanguage();
-  const [section, setSection] = useState("races"); // 'races', 'classes', 'conditions'
+  const [section, setSection] = useState("races"); // 'races', 'classes', 'conditions', 'actions'
   const [expandedId, setExpandedId] = useState(null);
 
   const toggleExpand = (id) => {
@@ -26,10 +27,10 @@ export function Compendium() {
       </h1>
 
       {/* Selector de Categoría */}
-      <div className="flex gap-2 mb-6 overflow-x-auto no-scrollbar">
+      <div className="flex gap-2 mb-6 overflow-x-auto no-scrollbar pb-2">
         <button
           onClick={() => setSection("races")}
-          className={`px-4 py-2 rounded-full border text-xs font-bold transition flex items-center gap-2 ${
+          className={`px-4 py-2 rounded-full border text-xs font-bold transition flex items-center gap-2 whitespace-nowrap ${
             section === "races"
               ? "bg-yellow-500 border-yellow-500 text-stone-900"
               : "bg-stone-800 border-stone-700 text-stone-400"
@@ -39,7 +40,7 @@ export function Compendium() {
         </button>
         <button
           onClick={() => setSection("classes")}
-          className={`px-4 py-2 rounded-full border text-xs font-bold transition flex items-center gap-2 ${
+          className={`px-4 py-2 rounded-full border text-xs font-bold transition flex items-center gap-2 whitespace-nowrap ${
             section === "classes"
               ? "bg-yellow-500 border-yellow-500 text-stone-900"
               : "bg-stone-800 border-stone-700 text-stone-400"
@@ -49,13 +50,23 @@ export function Compendium() {
         </button>
         <button
           onClick={() => setSection("conditions")}
-          className={`px-4 py-2 rounded-full border text-xs font-bold transition flex items-center gap-2 ${
+          className={`px-4 py-2 rounded-full border text-xs font-bold transition flex items-center gap-2 whitespace-nowrap ${
             section === "conditions"
               ? "bg-yellow-500 border-yellow-500 text-stone-900"
               : "bg-stone-800 border-stone-700 text-stone-400"
           }`}
         >
           <AlertTriangle size={14} /> {t("conditions")}
+        </button>
+        <button
+          onClick={() => setSection("actions")}
+          className={`px-4 py-2 rounded-full border text-xs font-bold transition flex items-center gap-2 whitespace-nowrap ${
+            section === "actions"
+              ? "bg-yellow-500 border-yellow-500 text-stone-900"
+              : "bg-stone-800 border-stone-700 text-stone-400"
+          }`}
+        >
+          <Sword size={14} /> Actions
         </button>
       </div>
 
@@ -81,6 +92,12 @@ export function Compendium() {
               {expandedId === race.id && (
                 <div className="p-4 pt-0 text-sm text-stone-400 border-t border-stone-700/50 bg-stone-900/30">
                   <p className="mb-2 italic">{race.description}</p>
+                  <div className="grid grid-cols-2 gap-2 text-xs mb-2">
+                    <span className="text-stone-500">
+                      Speed: {race.speed}ft
+                    </span>
+                    <span className="text-stone-500">Size: {race.size}</span>
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     {race.traits.map((tr) => (
                       <span
@@ -109,7 +126,7 @@ export function Compendium() {
                 <div className="flex items-center gap-3">
                   <span className="font-bold text-stone-200">{cls.name}</span>
                   <span className="text-[10px] bg-stone-900 px-2 py-1 rounded text-stone-500">
-                    HP: {cls.hitDie}
+                    Hit Die: {cls.hitDie}
                   </span>
                 </div>
                 {expandedId === cls.id ? (
@@ -120,13 +137,17 @@ export function Compendium() {
               </button>
               {expandedId === cls.id && (
                 <div className="p-4 pt-0 text-sm text-stone-400 border-t border-stone-700/50 bg-stone-900/30">
-                  <p className="mb-2">
+                  <p className="mb-1">
                     <strong className="text-stone-300">Primary:</strong>{" "}
                     {cls.primaryStat.toUpperCase()}
                   </p>
-                  <p className="mb-2">
+                  <p className="mb-1">
                     <strong className="text-stone-300">Saves:</strong>{" "}
                     {cls.saves.join(", ")}
+                  </p>
+                  <p className="mb-2">
+                    <strong className="text-stone-300">SRD Subclass:</strong>{" "}
+                    {cls.srdSubclass}
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {cls.proficiencies.map((prof) => (
@@ -153,6 +174,19 @@ export function Compendium() {
                 <AlertTriangle size={14} /> {cond.name}
               </h3>
               <p className="text-sm text-stone-400">{cond.desc}</p>
+            </div>
+          ))}
+
+        {section === "actions" &&
+          COMBAT_ACTIONS.map((act) => (
+            <div
+              key={act.id}
+              className="bg-stone-800 border border-stone-700 rounded-xl p-4"
+            >
+              <h3 className="font-bold text-yellow-500 mb-1 flex items-center gap-2">
+                <Sword size={14} /> {act.name}
+              </h3>
+              <p className="text-sm text-stone-400">{act.desc}</p>
             </div>
           ))}
       </div>
