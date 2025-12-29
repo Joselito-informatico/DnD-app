@@ -25,20 +25,21 @@ import {
   Quote,
   Users,
   Gem,
+  PenTool,
 } from "lucide-react";
 import { CLASSES, SKILLS, SPELLS as SRD_SPELLS } from "../data/srd";
 import { useLanguage } from "../context/LanguageContext";
-import { useToast } from "../context/ToastContext"; // <--- Importar Toasts
+import { useToast } from "../context/ToastContext";
 
 export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const { t } = useLanguage();
-  const { showToast } = useToast(); // <--- Usar Hook de Toasts
+  const { showToast } = useToast();
 
   const [activeTab, setActiveTab] = useState("combat");
   const [rollResult, setRollResult] = useState(null);
   const [showMenu, setShowMenu] = useState(false);
   const [newItemName, setNewItemName] = useState("");
-  const [editingStat, setEditingStat] = useState(null);
+  const [editingStat, setEditingStat] = useState(null); // 'level', 'xp', 'str', 'dex', etc.
 
   const [isAddingAttack, setIsAddingAttack] = useState(false);
   const [newAttack, setNewAttack] = useState({
@@ -155,7 +156,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
       desc: "",
       time: "1 Action",
     });
-    showToast("Spell scribed into book!", "success");
+    showToast("Spell scribed!", "success");
   };
 
   const removeSpell = (spellId, e) => {
@@ -170,19 +171,27 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     }
   };
 
-  const updateLevel = (newLevel) => {
-    const lvl = Math.max(1, Math.min(20, parseInt(newLevel) || 1));
+  // --- EDITORES DE STATS ---
+  const updateLevel = (val) => {
+    const lvl = Math.max(1, Math.min(20, parseInt(val) || 1));
     onUpdateHero({ ...hero, level: lvl });
     setEditingStat(null);
     showToast(`Level updated to ${lvl}`, "success");
   };
 
-  const updateXP = (newXP) => {
-    onUpdateHero({ ...hero, xp: parseInt(newXP) || 0 });
+  const updateXP = (val) => {
+    onUpdateHero({ ...hero, xp: parseInt(val) || 0 });
     setEditingStat(null);
   };
 
-  // --- RESTS (Con Toasts) ---
+  // NUEVO: Actualizar un atributo específico (STR, DEX...)
+  const updateAttribute = (statName, val) => {
+    const newVal = Math.max(1, Math.min(30, parseInt(val) || 10)); // D&D cap es 30
+    onUpdateHero({ ...hero, stats: { ...hero.stats, [statName]: newVal } });
+    setEditingStat(null);
+    showToast(`${statName.toUpperCase()} updated to ${newVal}`, "success");
+  };
+
   const handleLongRest = () => {
     const resetSlots = { ...spellSlots };
     Object.keys(resetSlots).forEach((level) => (resetSlots[level].used = 0));
@@ -196,13 +205,13 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
       deathSaves: { successes: 0, failures: 0 },
     });
     setShowMenu(false);
-    showToast("Long Rest: HP & Slots restored.", "success");
+    showToast("Long Rest completed", "success");
   };
 
   const handleShortRest = () => {
     setShowMenu(false);
     setActiveTab("combat");
-    showToast("Use Hit Dice (below HP) to heal.", "info");
+    showToast("Use Hit Dice to heal", "info");
   };
 
   const useHitDie = () => {
@@ -220,7 +229,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         isCrit: false,
         isFail: false,
       });
-      showToast(`Healed for ${healAmount} HP`, "success");
+      showToast(`Healed ${healAmount} HP`, "success");
     }
   };
 
@@ -234,18 +243,16 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const toggleInspiration = () => {
     const newState = !inspiration;
     onUpdateHero({ ...hero, inspiration: newState });
-    if (newState) showToast("You are Inspired!", "success");
+    if (newState) showToast("Inspired!", "success");
   };
 
   const handleDelete = () => {
     if (confirm(t("confirmDelete"))) onDeleteHero(hero.id);
   };
-
   const updateMoney = (currency, value) => {
     const newMoney = { ...money, [currency]: parseInt(value) || 0 };
     onUpdateHero({ ...hero, money: newMoney });
   };
-
   const addItem = () => {
     if (!newItemName.trim()) return;
     const newItem = { id: Date.now(), name: newItemName, qty: 1 };
@@ -253,7 +260,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     setNewItemName("");
     showToast("Item added", "success");
   };
-
   const removeItem = (itemId) => {
     onUpdateHero({
       ...hero,
@@ -284,8 +290,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
       isCrit: d20 === 20,
       isFail: d20 === 1,
     });
-
-    // Toast especial para críticos
     if (d20 === 20) showToast("CRITICAL HIT! 🔥", "success");
     if (d20 === 1) showToast("Critical Fail...", "error");
   };
@@ -299,7 +303,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
 
   return (
     <div className="flex flex-col h-screen bg-neutral-900 pb-20 relative">
-      {/* HEADER & MENU */}
+      {/* HEADER */}
       <header className="flex items-center justify-between p-6 pb-2 bg-neutral-900 z-10">
         <div className="flex items-center gap-4">
           <button
@@ -333,12 +337,12 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         </button>
       </header>
 
-      {/* MODAL EDICIÓN RÁPIDA */}
+      {/* MODAL EDICIÓN RÁPIDA (Universal para Nivel, XP y Stats) */}
       {editingStat && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-stone-900 border border-stone-700 p-6 rounded-2xl w-full max-w-xs">
-            <h3 className="text-stone-100 font-bold mb-4">
-              {t("edit")} {editingStat === "level" ? t("level") : t("xp")}
+          <div className="bg-stone-900 border border-stone-700 p-6 rounded-2xl w-full max-w-xs animate-in zoom-in duration-200">
+            <h3 className="text-stone-100 font-bold mb-4 capitalize">
+              {t("edit")} {t(editingStat) || editingStat}
             </h3>
             <input
               type="number"
@@ -347,9 +351,9 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               className="w-full bg-stone-950 border border-stone-600 rounded-lg p-3 text-stone-100 mb-4 focus:border-yellow-500 outline-none"
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
-                  editingStat === "level"
-                    ? updateLevel(e.target.value)
-                    : updateXP(e.target.value);
+                  if (editingStat === "level") updateLevel(e.target.value);
+                  else if (editingStat === "xp") updateXP(e.target.value);
+                  else updateAttribute(editingStat, e.target.value); // Caso Stats (str, dex...)
                 }
               }}
             />
@@ -613,13 +617,12 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                   {isAddingAttack ? "Cancel" : t("addWeapon")}
                 </button>
               </div>
-
               {isAddingAttack && (
                 <div className="bg-stone-800 p-3 rounded-xl border border-yellow-500/50 mb-3 animate-in fade-in zoom-in duration-200">
                   <div className="grid grid-cols-2 gap-2 mb-2">
                     <input
                       type="text"
-                      placeholder="Name (e.g. Magic Sword)"
+                      placeholder="Name"
                       value={newAttack.name}
                       onChange={(e) =>
                         setNewAttack({ ...newAttack, name: e.target.value })
@@ -628,7 +631,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                     />
                     <input
                       type="text"
-                      placeholder="Dmg (1d8)"
+                      placeholder="Dmg"
                       value={newAttack.damage}
                       onChange={(e) =>
                         setNewAttack({ ...newAttack, damage: e.target.value })
@@ -657,7 +660,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                   </button>
                 </div>
               )}
-
               <div className="space-y-2">
                 {weapons.map((w) => {
                   const mod = mods[w.stat] + proficiencyBonus;
@@ -694,7 +696,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 })}
               </div>
             </div>
-
             <div>
               <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
                 <Sparkles size={16} /> {t("features")}
@@ -907,7 +908,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 )}
               </div>
             </div>
-
             <div className="space-y-4">
               <div className="flex justify-end">
                 <button
@@ -918,7 +918,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                   {isAddingSpell ? "Cancel" : t("scribe")}
                 </button>
               </div>
-
               {isAddingSpell && (
                 <div className="bg-stone-800 p-3 rounded-xl border border-yellow-500/50 mb-3 animate-in fade-in zoom-in duration-200">
                   <div className="space-y-2 mb-2">
@@ -971,7 +970,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                   </button>
                 </div>
               )}
-
               <div>
                 <h3 className="text-stone-500 font-bold text-xs uppercase mb-2">
                   {t("cantrips")} (0)
@@ -1007,14 +1005,8 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                         </button>
                       </div>
                     ))}
-                  {mySpells.filter((s) => s.level === 0).length === 0 && (
-                    <p className="text-stone-600 text-xs italic">
-                      No cantrips known.
-                    </p>
-                  )}
                 </div>
               </div>
-
               {[1, 2, 3].map((lvl) => {
                 const spellsOfLevel = mySpells.filter((s) => s.level === lvl);
                 if (spellsOfLevel.length === 0 && lvl > 1) return null;
@@ -1053,11 +1045,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                           </button>
                         </div>
                       ))}
-                      {spellsOfLevel.length === 0 && (
-                        <p className="text-stone-600 text-xs italic">
-                          No spells learned.
-                        </p>
-                      )}
                     </div>
                   </div>
                 );
@@ -1134,7 +1121,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           </div>
         )}
 
-        {/* PROFILE */}
+        {/* PROFILE (ACTUALIZADO CON STATS EDITABLES) */}
         {activeTab === "profile" && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
             <div className="bg-stone-800 p-5 rounded-xl border border-stone-700">
@@ -1171,6 +1158,31 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 </div>
               </div>
             </div>
+
+            {/* NUEVA SECCIÓN DE STATS EDITABLES */}
+            <div className="bg-stone-800 p-4 rounded-xl border border-stone-700">
+              <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
+                <PenTool size={16} /> Core Attributes
+              </h3>
+              <div className="grid grid-cols-3 gap-3">
+                {Object.keys(stats).map((statName) => (
+                  <div
+                    key={statName}
+                    onClick={() => setEditingStat(statName)}
+                    className="bg-stone-900 p-2 rounded-lg border border-stone-600 hover:border-yellow-500 cursor-pointer flex flex-col items-center"
+                  >
+                    <span className="text-[10px] uppercase text-stone-500 font-bold">
+                      {t(statName).slice(0, 3)}
+                    </span>
+                    <span className="text-lg font-bold text-stone-100">
+                      {stats[statName]}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Apariencia */}
             <div>
               <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
                 <Settings size={16} /> {t("appearance")}
@@ -1226,6 +1238,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 </div>
               </div>
             </div>
+            {/* Resto del perfil (Rol, Aliados, etc.) igual */}
             <div className="grid grid-cols-1 gap-4">
               <div className="bg-stone-800 p-4 rounded-xl border border-stone-700">
                 <h3 className="text-stone-500 font-bold text-xs uppercase mb-1 flex items-center gap-2">
