@@ -77,6 +77,11 @@ export const dictionary = {
     cantrips: "Cantrips",
     level: "Level",
     scribe: "Scribe Spell",
+    searchSpell: "Search Spell online...",
+    searching: "Searching...",
+    noResults: "No results found.",
+    useSpell: "Use",
+    manualMode: "Manual Entry",
     
     // Inventory
     currency: "Currency",
@@ -174,6 +179,11 @@ export const dictionary = {
     cantrips: "Trucos",
     level: "Nivel",
     scribe: "Escribir Conjuro",
+    searchSpell: "Buscar hechizo online...",
+    searching: "Buscando...",
+    noResults: "Sin resultados.",
+    useSpell: "Usar",
+    manualMode: "Entrada Manual",
     
     // Inventory
     currency: "Monedas",

@@ -28,11 +28,14 @@ import {
   PenTool,
   AlertTriangle,
   Minus,
-  CircleDot,
+  Search,
+  Globe,
+  Download,
 } from "lucide-react";
 import { CLASSES, SKILLS, SPELLS as SRD_SPELLS, CONDITIONS } from "../data/srd";
 import { useLanguage } from "../context/LanguageContext";
 import { useToast } from "../context/ToastContext";
+import { searchSpells } from "../utils/dndApi"; // <--- IMPORTANTE
 
 export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const { t } = useLanguage();
@@ -44,7 +47,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const [newItemName, setNewItemName] = useState("");
   const [editingStat, setEditingStat] = useState(null);
 
-  // Modales y Formularios
   const [isAddingAttack, setIsAddingAttack] = useState(false);
   const [newAttack, setNewAttack] = useState({
     name: "",
@@ -53,6 +55,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     type: "melee",
   });
 
+  // ESTADOS DE HECHIZOS Y BÚSQUEDA
   const [isAddingSpell, setIsAddingSpell] = useState(false);
   const [newSpell, setNewSpell] = useState({
     name: "",
@@ -61,11 +64,12 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     desc: "",
     time: "1 Action",
   });
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   const [isAddingCondition, setIsAddingCondition] = useState(false);
   const [isEditingSlots, setIsEditingSlots] = useState(false);
-
-  // NUEVO: Formulario para añadir recurso
   const [isAddingResource, setIsAddingResource] = useState(false);
   const [newResource, setNewResource] = useState({ name: "", max: "3" });
 
@@ -94,10 +98,11 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const passivePerception =
     10 + mods.wis + (isPerceptionProf ? proficiencyBonus : 0);
 
-  const heroClassData = CLASSES.find((c) => c.name === hero.class);
-  const saveProficiencies = heroClassData ? heroClassData.saves : [];
-  const proficiencies = heroClassData ? heroClassData.proficiencies : [];
-  const hitDieType = heroClassData ? heroClassData.hitDie : "d8";
+  const saveProficiencies =
+    CLASSES.find((c) => c.name === hero.class)?.saves || [];
+  const proficiencies =
+    CLASSES.find((c) => c.name === hero.class)?.proficiencies || [];
+  const hitDieType = CLASSES.find((c) => c.name === hero.class)?.hitDie || "d8";
 
   const hitDiceUsed = hero.hitDiceUsed || 0;
   const hitDiceTotal = hero.level;
@@ -105,8 +110,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const xp = hero.xp || 0;
   const activeConditions = hero.conditions || [];
   const exhaustionLevel = hero.exhaustion || 0;
-
-  // NUEVO: Lista de recursos personalizados
   const resources = hero.resources || [];
 
   const languages = ["Common"];
@@ -125,8 +128,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const features = hero.features || [];
 
   const mySpells = hero.spells || SRD_SPELLS;
-  const defaultSlots = { 1: { total: 2, used: 0 } };
-  const spellSlots = hero.spellSlots || defaultSlots;
+  const spellSlots = hero.spellSlots || { 1: { total: 2, used: 0 } };
   const spellCastingStat =
     hero.class === "Wizard"
       ? "int"
@@ -140,7 +142,27 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
 
   // --- ACCIONES ---
 
-  // NUEVO: Gestión de Recursos
+  // Lógica de Búsqueda de Hechizos
+  const handleSpellSearch = async () => {
+    if (!searchQuery) return;
+    setIsSearching(true);
+    const results = await searchSpells(searchQuery);
+    setSearchResults(results);
+    setIsSearching(false);
+  };
+
+  const selectSpell = (apiSpell) => {
+    setNewSpell({
+      name: apiSpell.name,
+      level: apiSpell.level,
+      school: apiSpell.school,
+      desc: apiSpell.desc, // Descripción completa de la API
+      time: apiSpell.time,
+    });
+    setSearchResults([]); // Limpiar resultados para mostrar el formulario
+    setSearchQuery("");
+  };
+
   const addResource = () => {
     if (!newResource.name) return;
     const maxVal = parseInt(newResource.max) || 1;
@@ -149,7 +171,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
       name: newResource.name,
       max: maxVal,
       current: maxVal,
-    }; // Empieza lleno
+    };
     onUpdateHero({ ...hero, resources: [...resources, resourceToAdd] });
     setIsAddingResource(false);
     setNewResource({ name: "", max: "3" });
@@ -157,7 +179,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   };
 
   const removeResource = (resId, e) => {
-    e.stopPropagation(); // Importante para no activar otros clicks
+    e.stopPropagation();
     if (confirm("Delete this tracker?")) {
       onUpdateHero({
         ...hero,
@@ -188,14 +210,10 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
 
   const toggleCondition = (conditionId) => {
     const exists = activeConditions.includes(conditionId);
-    let newConditions;
-    if (exists) {
-      newConditions = activeConditions.filter((c) => c !== conditionId);
-      showToast("Condition removed", "info");
-    } else {
-      newConditions = [...activeConditions, conditionId];
-      showToast("Condition applied", "error");
-    }
+    let newConditions = exists
+      ? activeConditions.filter((c) => c !== conditionId)
+      : [...activeConditions, conditionId];
+    if (!exists) showToast("Condition applied", "error");
     onUpdateHero({ ...hero, conditions: newConditions });
     setIsAddingCondition(false);
   };
@@ -304,14 +322,10 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const handleLongRest = () => {
     const resetSlots = { ...spellSlots };
     Object.keys(resetSlots).forEach((level) => (resetSlots[level].used = 0));
-
     const regainedHitDice = Math.max(1, Math.floor(hitDiceTotal / 2));
     const newHitDiceUsed = Math.max(0, hitDiceUsed - regainedHitDice);
     const newExhaustion = Math.max(0, exhaustionLevel - 1);
-
-    // RECARGAR RECURSOS (Reset to Max)
     const resetResources = resources.map((r) => ({ ...r, current: r.max }));
-
     onUpdateHero({
       ...hero,
       currentHP: maxHP,
@@ -322,7 +336,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
       resources: resetResources,
     });
     setShowMenu(false);
-    showToast("Long Rest: All stats & resources restored", "success");
+    showToast("Long Rest: Stats & Resources restored", "success");
   };
 
   const handleShortRest = () => {
@@ -452,7 +466,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         </button>
       </header>
 
-      {/* MODAL EDICIÓN RAPIDA */}
+      {/* MODAL EDICIÓN RÁPIDA */}
       {editingStat && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-stone-900 border border-stone-700 p-6 rounded-2xl w-full max-w-xs animate-in zoom-in duration-200">
@@ -492,9 +506,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 <X className="text-stone-500 hover:text-white" />
               </button>
             </div>
-            <p className="text-xs text-stone-500 mb-4">
-              Set your maximum spell slots per level.
-            </p>
             <div className="space-y-3">
               {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((lvl) => {
                 const count = spellSlots[lvl]?.total || 0;
@@ -699,7 +710,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               </button>
             </div>
 
-            {/* NUEVA SECCIÓN: RECURSOS DE CLASE (RAGE, KI, ETC) */}
+            {/* RESOURCES */}
             <div>
               <div className="flex justify-between items-center mb-2">
                 <h3 className="text-stone-400 font-bold text-sm uppercase tracking-wider">
@@ -713,12 +724,11 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                   {t("addResource")}
                 </button>
               </div>
-
               {isAddingResource && (
                 <div className="bg-stone-800 p-2 rounded-xl border border-yellow-500/50 mb-3 grid grid-cols-3 gap-2 animate-in fade-in zoom-in duration-200">
                   <input
                     type="text"
-                    placeholder="Name (e.g. Rage)"
+                    placeholder="Name"
                     value={newResource.name}
                     onChange={(e) =>
                       setNewResource({ ...newResource, name: e.target.value })
@@ -738,11 +748,10 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                     onClick={addResource}
                     className="col-span-3 py-1 bg-yellow-600 text-stone-100 text-xs font-bold rounded hover:bg-yellow-500"
                   >
-                    Add Tracker
+                    Add
                   </button>
                 </div>
               )}
-
               <div className="space-y-2 mb-4">
                 {resources.map((res) => (
                   <div
@@ -772,7 +781,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                         <Plus size={14} />
                       </button>
                     </div>
-                    {/* Borrar Recurso */}
                     <button
                       onClick={(e) => removeResource(res.id, e)}
                       className="absolute -left-2 -top-2 bg-stone-800 text-stone-500 hover:text-red-500 rounded-full p-1 opacity-0 group-hover:opacity-100 transition shadow-lg border border-stone-700"
@@ -781,11 +789,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                     </button>
                   </div>
                 ))}
-                {resources.length === 0 && (
-                  <p className="text-[10px] text-stone-600 text-center italic py-1">
-                    No custom resources added.
-                  </p>
-                )}
               </div>
             </div>
 
@@ -1226,9 +1229,10 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           </div>
         )}
 
-        {/* SPELLS */}
+        {/* SPELLS (MEJORADO CON BUSCADOR API) */}
         {activeTab === "spells" && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
+            {/* ... (Header de slots y Botón Editar Slots igual) ... */}
             <div className="flex items-start gap-4">
               <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 grid grid-cols-2 gap-4 flex-1">
                 <div className="flex flex-col items-center border-r border-stone-700">
@@ -1262,6 +1266,8 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 <span className="text-[10px] font-bold uppercase">Slots</span>
               </button>
             </div>
+
+            {/* Listado de Slots */}
             <div className="space-y-3">
               {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((lvl) => {
                 const slotData = spellSlots[lvl];
@@ -1293,12 +1299,9 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                   </div>
                 );
               })}
-              {Object.values(spellSlots).every((s) => s.total === 0) && (
-                <p className="text-xs text-stone-600 text-center italic py-2">
-                  No spell slots available. Configure them above.
-                </p>
-              )}
             </div>
+
+            {/* NUEVO: MODAL CON BUSCADOR DE API */}
             <div className="space-y-4 pt-4 border-t border-stone-800">
               <div className="flex justify-end">
                 <button
@@ -1306,11 +1309,57 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                   className="text-xs bg-stone-800 border border-stone-600 px-2 py-1 rounded text-stone-300 hover:text-white hover:border-yellow-500 flex items-center gap-1"
                 >
                   {isAddingSpell ? <X size={12} /> : <Plus size={12} />}{" "}
-                  {isAddingSpell ? "Cancel" : t("scribe")}
+                  {t("scribe")}
                 </button>
               </div>
+
               {isAddingSpell && (
-                <div className="bg-stone-800 p-3 rounded-xl border border-yellow-500/50 mb-3 animate-in fade-in zoom-in duration-200">
+                <div className="bg-stone-800 p-3 rounded-xl border border-yellow-500/50 mb-3 animate-in fade-in zoom-in duration-200 relative">
+                  {/* BARRA DE BÚSQUEDA API */}
+                  <div className="mb-4 relative">
+                    <div className="flex items-center gap-2 bg-stone-900 border border-stone-600 rounded-lg p-2 focus-within:border-yellow-500">
+                      <Search size={16} className="text-stone-500" />
+                      <input
+                        type="text"
+                        placeholder={t("searchSpell")}
+                        className="bg-transparent w-full text-xs text-stone-100 outline-none"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onKeyDown={(e) =>
+                          e.key === "Enter" && handleSpellSearch()
+                        }
+                      />
+                      <button
+                        onClick={handleSpellSearch}
+                        className="text-xs font-bold text-yellow-600 hover:text-yellow-500 uppercase"
+                      >
+                        {isSearching ? t("searching") : "GO"}
+                      </button>
+                    </div>
+
+                    {/* RESULTADOS DE BÚSQUEDA */}
+                    {searchResults.length > 0 && (
+                      <div className="absolute top-full left-0 w-full bg-stone-800 border border-stone-600 rounded-b-lg shadow-xl z-20 max-h-48 overflow-y-auto">
+                        {searchResults.map((res, i) => (
+                          <button
+                            key={i}
+                            onClick={() => selectSpell(res)}
+                            className="w-full text-left p-2 text-xs text-stone-300 hover:bg-stone-700 border-b border-stone-700/50 last:border-0 flex justify-between"
+                          >
+                            <span>{res.name}</span>
+                            <span className="text-stone-500">
+                              {res.level === 0 ? "Cantrip" : `Lvl ${res.level}`}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="text-[10px] text-stone-500 uppercase font-bold mb-2 tracking-wider text-center">
+                    - {t("manualMode")} -
+                  </div>
+
                   <div className="space-y-2 mb-2">
                     <input
                       type="text"
@@ -1333,6 +1382,8 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                         <option value="1">Level 1</option>
                         <option value="2">Level 2</option>
                         <option value="3">Level 3</option>
+                        <option value="4">Level 4</option>
+                        <option value="5">Level 5</option>
                       </select>
                       <input
                         type="text"
@@ -1357,10 +1408,12 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                     onClick={addSpell}
                     className="w-full py-2 bg-yellow-600 text-stone-100 text-xs font-bold rounded hover:bg-yellow-500"
                   >
-                    Add
+                    Add to Spellbook
                   </button>
                 </div>
               )}
+
+              {/* LISTA DE HECHIZOS (Igual) */}
               <div>
                 <h3 className="text-stone-500 font-bold text-xs uppercase mb-2">
                   {t("cantrips")} (0)
@@ -1398,9 +1451,10 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                     ))}
                 </div>
               </div>
-              {[1, 2, 3].map((lvl) => {
+              {[1, 2, 3, 4, 5].map((lvl) => {
                 const spellsOfLevel = mySpells.filter((s) => s.level === lvl);
-                if (spellsOfLevel.length === 0 && lvl > 1) return null;
+                if (spellsOfLevel.length === 0 && !spellSlots[lvl]?.total)
+                  return null;
                 return (
                   <div key={lvl}>
                     <h3 className="text-stone-500 font-bold text-xs uppercase mb-2">
