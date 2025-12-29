@@ -35,7 +35,13 @@ import {
   Copy,
   Edit3,
 } from "lucide-react";
-import { CLASSES, SKILLS, SPELLS as SRD_SPELLS, CONDITIONS } from "../data/srd";
+import {
+  CLASSES,
+  SKILLS,
+  SPELLS as SRD_SPELLS,
+  CONDITIONS,
+  XP_TABLE,
+} from "../data/srd";
 import { useLanguage } from "../context/LanguageContext";
 import { useToast } from "../context/ToastContext";
 import { searchSpells, searchEquipment } from "../utils/dndApi";
@@ -48,7 +54,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const [rollResult, setRollResult] = useState(null);
   const [showMenu, setShowMenu] = useState(false);
   const [editingStat, setEditingStat] = useState(null); // 'level', 'xp', 'str', etc.
-  const [isEditingMaxHP, setIsEditingMaxHP] = useState(false); // NUEVO: Editor de HP
+  const [isEditingMaxHP, setIsEditingMaxHP] = useState(false);
 
   // Modales
   const [isAddingAttack, setIsAddingAttack] = useState(false);
@@ -76,7 +82,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const [isAddingResource, setIsAddingResource] = useState(false);
   const [newResource, setNewResource] = useState({ name: "", max: "3" });
 
-  const [isAddingFeature, setIsAddingFeature] = useState(false); // NUEVO: Modal Rasgos
+  const [isAddingFeature, setIsAddingFeature] = useState(false);
   const [newFeature, setNewFeature] = useState({ name: "", desc: "" });
 
   const [showDiceTray, setShowDiceTray] = useState(false);
@@ -100,7 +106,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     cha: getModifier(stats.cha),
   };
 
-  // CORRECCIÓN HP: Usar valor guardado o fallback a fórmula SRD
+  // HP Calculation (Manual override or SRD formula)
   const fallbackMaxHP = 10 + mods.con + (hero.level - 1) * 6;
   const maxHP = hero.maxHP || fallbackMaxHP;
   const currentHP = hero.currentHP ?? maxHP;
@@ -160,7 +166,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
 
   // --- ACCIONES ---
 
-  // Gestión de Rasgos (Features)
+  // Features Management
   const addFeature = () => {
     if (!newFeature.name) return;
     const feat = { id: Date.now(), ...newFeature };
@@ -190,7 +196,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     showToast(`Max HP set to ${val}`, "success");
   };
 
-  // ... (Resto de funciones: Exports, Rolls, Spells, Items, Resources - IGUAL QUE ANTES)
+  // Export & Copy
   const handleExportJSON = () => {
     const dataStr = JSON.stringify([hero], null, 2);
     const blob = new Blob([dataStr], { type: "application/json" });
@@ -204,12 +210,15 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     setShowMenu(false);
     showToast(t("successImport"), "success");
   };
+
   const handleCopySummary = () => {
     const summary = `**${hero.name}** | ${hero.race} ${hero.class} ${hero.level}\n❤️ HP: ${currentHP}/${maxHP} | 🛡️ AC: ${armorClass} | ⚡ Init: ${initiative}\n📝 PP: ${passivePerception} | DC: ${spellSaveDC}`;
     navigator.clipboard.writeText(summary);
     setShowMenu(false);
     showToast(t("copied"), "success");
   };
+
+  // Dice Tray
   const rollGeneric = (sides) => {
     const roll = Math.floor(Math.random() * sides) + 1;
     const total = roll + parseInt(diceMod || 0);
@@ -223,6 +232,8 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     });
     setShowDiceTray(false);
   };
+
+  // Spell Search (API)
   const handleSpellSearch = async () => {
     if (!searchQuery) return;
     setIsSearching(true);
@@ -230,6 +241,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     setSearchResults(results);
     setIsSearching(false);
   };
+
   const selectSpell = (apiSpell) => {
     setNewSpell({
       name: apiSpell.name,
@@ -241,6 +253,8 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     setSearchResults([]);
     setSearchQuery("");
   };
+
+  // Item Search (API) & Logic Fix
   const handleItemSearch = async () => {
     if (!itemQuery) return;
     setIsSearching(true);
@@ -248,7 +262,9 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     setItemResults(results);
     setIsSearching(false);
   };
+
   const selectItem = (item) => {
+    // 1. Prepare inventory update
     const newItem = {
       id: Date.now(),
       name: item.name,
@@ -257,11 +273,14 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     };
     let newInventoryList = [...inventory, newItem];
     let newWeaponsList = weapons;
+
+    // 2. If weapon, ask to add to attacks
     if (item.type === "weapon") {
       if (confirm(`Add ${item.name} to Attacks?`)) {
         const isFinesse =
           item.properties && item.properties.includes("Finesse");
         const attackStat = isFinesse ? "dex" : "str";
+
         const newWep = {
           id: Date.now() + 1,
           name: item.name,
@@ -277,14 +296,19 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     } else {
       showToast(`${item.name} added`, "success");
     }
+
+    // 3. Single Update
     onUpdateHero({
       ...hero,
       inventory: newInventoryList,
       weapons: newWeaponsList,
     });
+
     setItemResults([]);
     setItemQuery("");
   };
+
+  // General Actions
   const addResource = () => {
     if (!newResource.name) return;
     const maxVal = parseInt(newResource.max) || 1;
@@ -602,7 +626,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         </div>
       )}
 
-      {/* EDIT MODAL (STATS & XP & LVL) */}
+      {/* EDIT MODAL (STATS) */}
       {editingStat && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-stone-900 border border-stone-700 p-6 rounded-2xl w-full max-w-xs animate-in zoom-in duration-200">
@@ -632,7 +656,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         </div>
       )}
 
-      {/* EDIT MAX HP MODAL (NUEVO) */}
+      {/* EDIT MAX HP MODAL */}
       {isEditingMaxHP && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-stone-900 border border-stone-700 p-6 rounded-2xl w-full max-w-xs animate-in zoom-in duration-200">
@@ -713,7 +737,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         </div>
       )}
 
-      {/* BANDEJA DE DADOS */}
+      {/* BANDEJA DE DADOS FLOTANTE */}
       <div className="fixed bottom-24 right-6 z-40">
         <button
           onClick={() => setShowDiceTray(true)}
@@ -1244,7 +1268,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               </div>
             </div>
 
-            {/* CUSTOM FEATURES (MEJORADO) */}
+            {/* CUSTOM FEATURES */}
             <div>
               <div className="flex justify-between items-center mb-3">
                 <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
@@ -1258,7 +1282,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                   {t("addFeature")}
                 </button>
               </div>
-
               {isAddingFeature && (
                 <div className="bg-stone-800 p-3 rounded-xl border border-yellow-500/50 mb-3 animate-in fade-in zoom-in duration-200">
                   <input
@@ -1286,7 +1309,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                   </button>
                 </div>
               )}
-
               <div className="space-y-2">
                 {features.map((feat, idx) => (
                   <div
@@ -1312,7 +1334,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           </div>
         )}
 
-        {/* SKILLS (Igual) */}
+        {/* SKILLS */}
         {activeTab === "skills" && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 flex items-center justify-between">
@@ -1476,7 +1498,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           </div>
         )}
 
-        {/* SPELLS (Igual) */}
+        {/* SPELLS */}
         {activeTab === "spells" && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
             <div className="flex items-start gap-4">
@@ -1732,7 +1754,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           </div>
         )}
 
-        {/* INVENTORY (Igual) */}
+        {/* INVENTORY */}
         {activeTab === "inventory" && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700">
@@ -1856,7 +1878,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           </div>
         )}
 
-        {/* PROFILE (MEJORADO CON XP BAR) */}
+        {/* PROFILE */}
         {activeTab === "profile" && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
             <div className="bg-stone-800 p-5 rounded-xl border border-stone-700">
@@ -1882,16 +1904,17 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                     onClick={() => setEditingStat("xp")}
                     className="cursor-pointer hover:text-yellow-500"
                   >
-                    {xp} XP <Edit3 size={10} className="inline" />
+                    {xp} / {XP_TABLE[hero.level] || "MAX"} XP{" "}
+                    <Edit3 size={10} className="inline" />
                   </span>
                 </div>
                 <div className="h-2 bg-stone-950 rounded-full overflow-hidden border border-stone-700/50">
                   <div
-                    className="h-full bg-purple-600"
+                    className="h-full bg-purple-600 transition-all duration-500"
                     style={{
                       width: `${Math.min(
                         100,
-                        (xp / (hero.level * 300)) * 100
+                        (xp / (XP_TABLE[hero.level] || xp || 1)) * 100
                       )}%`,
                     }}
                   ></div>
