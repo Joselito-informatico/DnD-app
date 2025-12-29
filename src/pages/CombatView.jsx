@@ -33,6 +33,7 @@ import {
   Share2,
   Download,
   Copy,
+  Edit3,
 } from "lucide-react";
 import { CLASSES, SKILLS, SPELLS as SRD_SPELLS, CONDITIONS } from "../data/srd";
 import { useLanguage } from "../context/LanguageContext";
@@ -46,7 +47,8 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const [activeTab, setActiveTab] = useState("combat");
   const [rollResult, setRollResult] = useState(null);
   const [showMenu, setShowMenu] = useState(false);
-  const [editingStat, setEditingStat] = useState(null);
+  const [editingStat, setEditingStat] = useState(null); // 'level', 'xp', 'str', etc.
+  const [isEditingMaxHP, setIsEditingMaxHP] = useState(false); // NUEVO: Editor de HP
 
   // Modales
   const [isAddingAttack, setIsAddingAttack] = useState(false);
@@ -56,6 +58,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     stat: "str",
     type: "melee",
   });
+
   const [isAddingSpell, setIsAddingSpell] = useState(false);
   const [newSpell, setNewSpell] = useState({
     name: "",
@@ -69,20 +72,22 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
 
   const [isAddingCondition, setIsAddingCondition] = useState(false);
   const [isEditingSlots, setIsEditingSlots] = useState(false);
+
   const [isAddingResource, setIsAddingResource] = useState(false);
   const [newResource, setNewResource] = useState({ name: "", max: "3" });
 
-  // NUEVO: Bandeja de Dados
+  const [isAddingFeature, setIsAddingFeature] = useState(false); // NUEVO: Modal Rasgos
+  const [newFeature, setNewFeature] = useState({ name: "", desc: "" });
+
   const [showDiceTray, setShowDiceTray] = useState(false);
   const [diceMod, setDiceMod] = useState(0);
 
-  // Inventario
   const [newItemName, setNewItemName] = useState("");
   const [itemQuery, setItemQuery] = useState("");
   const [itemResults, setItemResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
 
-  // --- REGLAS ---
+  // --- REGLAS & CALCULOS ---
   const proficiencyBonus = Math.floor(2 + (hero.level - 1) / 4);
   const getModifier = (score) => Math.floor((score - 10) / 2);
   const stats = hero.stats;
@@ -95,9 +100,12 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     cha: getModifier(stats.cha),
   };
 
-  const maxHP = 10 + mods.con + (hero.level - 1) * 6;
+  // CORRECCIÓN HP: Usar valor guardado o fallback a fórmula SRD
+  const fallbackMaxHP = 10 + mods.con + (hero.level - 1) * 6;
+  const maxHP = hero.maxHP || fallbackMaxHP;
   const currentHP = hero.currentHP ?? maxHP;
-  const hpPercent = Math.min(100, Math.max(0, (currentHP / maxHP) * 100)); // Para la barra visual
+  const hpPercent = Math.min(100, Math.max(0, (currentHP / maxHP) * 100));
+
   const armorClass = 10 + mods.dex;
   const initiative = mods.dex >= 0 ? `+${mods.dex}` : mods.dex;
 
@@ -108,7 +116,8 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     10 + mods.wis + (isPerceptionProf ? proficiencyBonus : 0);
 
   const heroClassData = CLASSES.find((c) => c.name === hero.class);
-  const saveProficiencies = heroClassData ? heroClassData.saves : [];
+  const saveProficiencies =
+    hero.saveProficiencies || (heroClassData ? heroClassData.saves : []);
   const proficiencies = heroClassData ? heroClassData.proficiencies : [];
   const hitDieType = heroClassData ? heroClassData.hitDie : "d8";
 
@@ -119,6 +128,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const activeConditions = hero.conditions || [];
   const exhaustionLevel = hero.exhaustion || 0;
   const resources = hero.resources || [];
+  const features = hero.features || [];
 
   const languages = ["Common"];
   if (hero.race === "Elf") languages.push("Elvish");
@@ -133,7 +143,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   };
   const inventory = hero.inventory || [];
   const money = hero.money || { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 };
-  const features = hero.features || [];
+
   const mySpells = hero.spells || SRD_SPELLS;
   const defaultSlots = { 1: { total: 2, used: 0 } };
   const spellSlots = hero.spellSlots || defaultSlots;
@@ -150,9 +160,39 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
 
   // --- ACCIONES ---
 
-  // Exportar solo este héroe
+  // Gestión de Rasgos (Features)
+  const addFeature = () => {
+    if (!newFeature.name) return;
+    const feat = { id: Date.now(), ...newFeature };
+    onUpdateHero({ ...hero, features: [...features, feat] });
+    setIsAddingFeature(false);
+    setNewFeature({ name: "", desc: "" });
+    showToast("Feature added", "success");
+  };
+
+  const removeFeature = (featId) => {
+    if (confirm("Delete this feature?")) {
+      onUpdateHero({
+        ...hero,
+        features: features.filter((f) => f.id !== featId),
+      });
+    }
+  };
+
+  const updateMaxHP = (newVal) => {
+    const val = parseInt(newVal) || 1;
+    onUpdateHero({
+      ...hero,
+      maxHP: val,
+      currentHP: Math.min(hero.currentHP, val),
+    });
+    setIsEditingMaxHP(false);
+    showToast(`Max HP set to ${val}`, "success");
+  };
+
+  // ... (Resto de funciones: Exports, Rolls, Spells, Items, Resources - IGUAL QUE ANTES)
   const handleExportJSON = () => {
-    const dataStr = JSON.stringify([hero], null, 2); // Array de 1 elemento
+    const dataStr = JSON.stringify([hero], null, 2);
     const blob = new Blob([dataStr], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -164,16 +204,12 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     setShowMenu(false);
     showToast(t("successImport"), "success");
   };
-
-  // Copiar resumen texto
   const handleCopySummary = () => {
     const summary = `**${hero.name}** | ${hero.race} ${hero.class} ${hero.level}\n❤️ HP: ${currentHP}/${maxHP} | 🛡️ AC: ${armorClass} | ⚡ Init: ${initiative}\n📝 PP: ${passivePerception} | DC: ${spellSaveDC}`;
     navigator.clipboard.writeText(summary);
     setShowMenu(false);
     showToast(t("copied"), "success");
   };
-
-  // Lanzador genérico (Bandeja de Dados)
   const rollGeneric = (sides) => {
     const roll = Math.floor(Math.random() * sides) + 1;
     const total = roll + parseInt(diceMod || 0);
@@ -187,8 +223,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     });
     setShowDiceTray(false);
   };
-
-  // ... (Resto de funciones de API, inventario, spells, recursos igual que antes)
   const handleSpellSearch = async () => {
     if (!searchQuery) return;
     setIsSearching(true);
@@ -532,7 +566,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         </button>
       </header>
 
-      {/* MENÚ EXPANDIDO (NUEVO: SHARE & EXPORT) */}
+      {/* MENÚ EXPANDIDO */}
       {showMenu && (
         <div className="absolute top-20 right-6 z-20 w-56 bg-stone-800 border border-stone-700 rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in duration-200 origin-top-right">
           <button
@@ -547,8 +581,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           >
             <Moon size={16} className="text-blue-400" /> {t("longRest")}
           </button>
-
-          {/* NUEVOS BOTONES DE COMPARTIR */}
           <button
             onClick={handleCopySummary}
             className="w-full text-left px-4 py-3 text-stone-200 hover:bg-stone-700 flex items-center gap-3 border-b border-stone-700/50"
@@ -561,7 +593,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           >
             <Download size={16} className="text-purple-400" /> {t("exportJSON")}
           </button>
-
           <button
             onClick={handleDelete}
             className="w-full text-left px-4 py-3 text-red-400 hover:bg-red-900/20 flex items-center gap-3"
@@ -571,7 +602,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         </div>
       )}
 
-      {/* EDIT MODAL */}
+      {/* EDIT MODAL (STATS & XP & LVL) */}
       {editingStat && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-stone-900 border border-stone-700 p-6 rounded-2xl w-full max-w-xs animate-in zoom-in duration-200">
@@ -593,6 +624,35 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
             />
             <button
               onClick={() => setEditingStat(null)}
+              className="w-full py-2 bg-stone-800 text-stone-400 rounded-lg"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT MAX HP MODAL (NUEVO) */}
+      {isEditingMaxHP && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-stone-900 border border-stone-700 p-6 rounded-2xl w-full max-w-xs animate-in zoom-in duration-200">
+            <h3 className="text-stone-100 font-bold mb-4">{t("editMaxHP")}</h3>
+            <p className="text-xs text-stone-500 mb-2">
+              {t("currentMax")}: {maxHP}
+            </p>
+            <input
+              type="number"
+              autoFocus
+              placeholder={maxHP}
+              className="w-full bg-stone-950 border border-stone-600 rounded-lg p-3 text-stone-100 mb-4 focus:border-yellow-500 outline-none"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  updateMaxHP(e.target.value);
+                }
+              }}
+            />
+            <button
+              onClick={() => setIsEditingMaxHP(false)}
               className="w-full py-2 bg-stone-800 text-stone-400 rounded-lg"
             >
               Cancel
@@ -653,7 +713,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         </div>
       )}
 
-      {/* NUEVO: BANDEJA DE DADOS FLOTANTE (FAB + MODAL) */}
+      {/* BANDEJA DE DADOS */}
       <div className="fixed bottom-24 right-6 z-40">
         <button
           onClick={() => setShowDiceTray(true)}
@@ -662,7 +722,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           <Dices size={24} />
         </button>
       </div>
-
       {showDiceTray && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-stone-900 border border-stone-700 p-6 rounded-t-2xl sm:rounded-2xl w-full max-w-sm relative">
@@ -675,7 +734,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
             <h3 className="text-stone-100 font-bold mb-4 flex items-center gap-2">
               <Dices className="text-yellow-500" /> {t("diceTray")}
             </h3>
-
             <div className="grid grid-cols-3 gap-3 mb-4">
               {[4, 6, 8, 10, 12, 20].map((sides) => (
                 <button
@@ -690,7 +748,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 </button>
               ))}
             </div>
-
             <div className="flex items-center gap-3 bg-stone-950 p-3 rounded-xl border border-stone-700">
               <span className="text-xs font-bold text-stone-500 uppercase">
                 Modifier
@@ -813,9 +870,10 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 </span>
               </div>
 
-              {/* HP VISUAL BAR */}
+              {/* HP VISUAL BAR - CLICKABLE FOR EDIT */}
               <div
-                className={`p-3 rounded-xl border flex flex-col items-center justify-center transition duration-300 relative overflow-hidden ${
+                onClick={() => setIsEditingMaxHP(true)}
+                className={`p-3 rounded-xl border flex flex-col items-center justify-center transition duration-300 relative overflow-hidden cursor-pointer hover:border-yellow-500 ${
                   currentHP === 0
                     ? "bg-red-900/30 border-red-500 animate-pulse"
                     : "bg-stone-800 border-stone-700"
@@ -857,7 +915,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               </button>
             </div>
 
-            {/* RESOURCES & CONDITIONS & ATTACKS (Igual que antes) */}
+            {/* RESOURCES */}
             <div>
               <div className="flex justify-between items-center mb-2">
                 <h3 className="text-stone-400 font-bold text-sm uppercase tracking-wider">
@@ -939,7 +997,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               </div>
             </div>
 
-            {/* ... Resto de secciones (Conditions, Attacks, Features) igual ... */}
+            {/* CONDITIONS */}
             <div>
               <div className="flex justify-between items-center mb-2">
                 <h3 className="text-stone-400 font-bold text-sm uppercase tracking-wider">
@@ -1092,6 +1150,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               </div>
             )}
 
+            {/* ATTACKS */}
             <div>
               <div className="flex justify-between items-center mb-3">
                 <h3 className="text-stone-400 font-bold text-sm uppercase tracking-wider">
@@ -1184,15 +1243,55 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 })}
               </div>
             </div>
+
+            {/* CUSTOM FEATURES (MEJORADO) */}
             <div>
-              <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
-                <Sparkles size={16} /> {t("features")}
-              </h3>
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
+                  <Sparkles size={16} /> {t("features")}
+                </h3>
+                <button
+                  onClick={() => setIsAddingFeature(!isAddingFeature)}
+                  className="text-xs bg-stone-800 border border-stone-600 px-2 py-1 rounded text-stone-300 hover:text-white hover:border-yellow-500 flex items-center gap-1"
+                >
+                  {isAddingFeature ? <X size={12} /> : <Plus size={12} />}{" "}
+                  {t("addFeature")}
+                </button>
+              </div>
+
+              {isAddingFeature && (
+                <div className="bg-stone-800 p-3 rounded-xl border border-yellow-500/50 mb-3 animate-in fade-in zoom-in duration-200">
+                  <input
+                    type="text"
+                    placeholder={t("featureName")}
+                    value={newFeature.name}
+                    onChange={(e) =>
+                      setNewFeature({ ...newFeature, name: e.target.value })
+                    }
+                    className="w-full bg-stone-900 border border-stone-600 rounded p-2 text-xs text-white outline-none mb-2 focus:border-yellow-500"
+                  />
+                  <textarea
+                    placeholder={t("featureDesc")}
+                    value={newFeature.desc}
+                    onChange={(e) =>
+                      setNewFeature({ ...newFeature, desc: e.target.value })
+                    }
+                    className="w-full bg-stone-900 border border-stone-600 rounded p-2 text-xs text-white outline-none h-16 resize-none mb-2"
+                  />
+                  <button
+                    onClick={addFeature}
+                    className="w-full py-2 bg-yellow-600 text-stone-100 text-xs font-bold rounded hover:bg-yellow-500"
+                  >
+                    Add Feature
+                  </button>
+                </div>
+              )}
+
               <div className="space-y-2">
                 {features.map((feat, idx) => (
                   <div
                     key={idx}
-                    className="bg-stone-800 p-3 rounded-xl border border-stone-700"
+                    className="bg-stone-800 p-3 rounded-xl border border-stone-700 relative group"
                   >
                     <h4 className="font-bold text-stone-200 text-sm">
                       {feat.name}
@@ -1200,13 +1299,14 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                     <p className="text-xs text-stone-400 mt-1 leading-relaxed">
                       {feat.desc}
                     </p>
+                    <button
+                      onClick={() => removeFeature(feat.id)}
+                      className="absolute top-2 right-2 text-stone-600 hover:text-red-500 hover:bg-stone-900 rounded-full p-1 opacity-0 group-hover:opacity-100 transition"
+                    >
+                      <Trash2 size={14} />
+                    </button>
                   </div>
                 ))}
-                {features.length === 0 && (
-                  <p className="text-stone-600 text-xs italic">
-                    No features available.
-                  </p>
-                )}
               </div>
             </div>
           </div>
@@ -1379,7 +1479,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         {/* SPELLS (Igual) */}
         {activeTab === "spells" && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
-            {/* ... Header con Slots ... */}
             <div className="flex items-start gap-4">
               <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 grid grid-cols-2 gap-4 flex-1">
                 <div className="flex flex-col items-center border-r border-stone-700">
@@ -1445,8 +1544,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 );
               })}
             </div>
-
-            {/* Buscador API Spells */}
             <div className="space-y-4 pt-4 border-t border-stone-800">
               <div className="flex justify-end">
                 <button
@@ -1551,7 +1648,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                   </button>
                 </div>
               )}
-              {/* Listado de hechizos */}
               <div>
                 <h3 className="text-stone-500 font-bold text-xs uppercase mb-2">
                   {t("cantrips")} (0)
@@ -1659,7 +1755,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 ))}
               </div>
             </div>
-            {/* Buscador API Items */}
             <div>
               <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
                 <Backpack size={16} /> {t("equipment")}
@@ -1761,7 +1856,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           </div>
         )}
 
-        {/* PROFILE (Igual) */}
+        {/* PROFILE (MEJORADO CON XP BAR) */}
         {activeTab === "profile" && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
             <div className="bg-stone-800 p-5 rounded-xl border border-stone-700">
@@ -1778,6 +1873,31 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                   </p>
                 </div>
               </div>
+
+              {/* XP BAR VISUAL */}
+              <div className="mb-4">
+                <div className="flex justify-between text-xs text-stone-400 mb-1 font-bold">
+                  <span>LEVEL {hero.level}</span>
+                  <span
+                    onClick={() => setEditingStat("xp")}
+                    className="cursor-pointer hover:text-yellow-500"
+                  >
+                    {xp} XP <Edit3 size={10} className="inline" />
+                  </span>
+                </div>
+                <div className="h-2 bg-stone-950 rounded-full overflow-hidden border border-stone-700/50">
+                  <div
+                    className="h-full bg-purple-600"
+                    style={{
+                      width: `${Math.min(
+                        100,
+                        (xp / (hero.level * 300)) * 100
+                      )}%`,
+                    }}
+                  ></div>
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <span className="text-xs text-stone-500 uppercase font-bold">
@@ -1788,16 +1908,17 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                   </p>
                 </div>
                 <div
-                  onClick={() => setEditingStat("xp")}
+                  onClick={() => setEditingStat("level")}
                   className="cursor-pointer group"
                 >
                   <span className="text-xs text-stone-500 uppercase font-bold group-hover:text-yellow-500">
-                    {t("xp")} ({t("edit")})
+                    {t("level")} ({t("edit")})
                   </span>
-                  <p className="text-stone-200 font-mono">{xp} XP</p>
+                  <p className="text-stone-200 font-mono">{hero.level}</p>
                 </div>
               </div>
             </div>
+
             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700">
               <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
                 <PenTool size={16} /> Core Attributes
@@ -1819,6 +1940,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 ))}
               </div>
             </div>
+
             <div>
               <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
                 <Settings size={16} /> {t("appearance")}

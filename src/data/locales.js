@@ -119,6 +119,11 @@ export const dictionary = {
     races: "Races",
     classes: "Classes",
     conditions: "Conditions",
+    editMaxHP: "Edit Max HP",
+    currentMax: "Current Max",
+    addFeature: "Add Feature",
+    featureName: "Feature Name",
+    featureDesc: "Description",
   },
   es: {
     // General
@@ -240,5 +245,10 @@ export const dictionary = {
     races: "Razas",
     classes: "Clases",
     conditions: "Condiciones",
+    editMaxHP: "Editar Vida Máx",
+    currentMax: "Máximo Actual",
+    addFeature: "Añadir Rasgo",
+    featureName: "Nombre del Rasgo",
+    featureDesc: "Descripción",
   }
 };
