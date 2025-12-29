@@ -27,12 +27,13 @@ import {
   Gem,
 } from "lucide-react";
 import { CLASSES, SKILLS, SPELLS as SRD_SPELLS } from "../data/srd";
-import { useLanguage } from "../context/LanguageContext"; // <--- Importar Hook
-import { useToast } from "../context/ToastContext";
+import { useLanguage } from "../context/LanguageContext";
+import { useToast } from "../context/ToastContext"; // <--- Importar Toasts
 
 export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const { t } = useLanguage();
-  const { showToast } = useToast();
+  const { showToast } = useToast(); // <--- Usar Hook de Toasts
+
   const [activeTab, setActiveTab] = useState("combat");
   const [rollResult, setRollResult] = useState(null);
   const [showMenu, setShowMenu] = useState(false);
@@ -123,6 +124,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     onUpdateHero({ ...hero, weapons: [...weapons, attackToAdd] });
     setIsAddingAttack(false);
     setNewAttack({ name: "", damage: "1d6", stat: "str", type: "melee" });
+    showToast("Weapon added!", "success");
   };
 
   const removeAttack = (attackId, e) => {
@@ -132,6 +134,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         ...hero,
         weapons: weapons.filter((w) => w.id !== attackId),
       });
+      showToast("Weapon removed", "info");
     }
   };
 
@@ -152,16 +155,18 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
       desc: "",
       time: "1 Action",
     });
+    showToast("Spell scribed into book!", "success");
   };
 
   const removeSpell = (spellId, e) => {
     e.stopPropagation();
-    if (confirm("Remove this spell from your spellbook?")) {
+    if (confirm("Remove this spell?")) {
       const currentList = hero.spells ? hero.spells : SRD_SPELLS;
       onUpdateHero({
         ...hero,
         spells: currentList.filter((s) => s.id !== spellId),
       });
+      showToast("Spell removed", "info");
     }
   };
 
@@ -169,6 +174,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     const lvl = Math.max(1, Math.min(20, parseInt(newLevel) || 1));
     onUpdateHero({ ...hero, level: lvl });
     setEditingStat(null);
+    showToast(`Level updated to ${lvl}`, "success");
   };
 
   const updateXP = (newXP) => {
@@ -176,6 +182,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     setEditingStat(null);
   };
 
+  // --- RESTS (Con Toasts) ---
   const handleLongRest = () => {
     const resetSlots = { ...spellSlots };
     Object.keys(resetSlots).forEach((level) => (resetSlots[level].used = 0));
@@ -189,13 +196,13 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
       deathSaves: { successes: 0, failures: 0 },
     });
     setShowMenu(false);
-    showToast("Long Rest completed. HP & Slots restored.", "success"); // <--- TOAST
+    showToast("Long Rest: HP & Slots restored.", "success");
   };
 
   const handleShortRest = () => {
     setShowMenu(false);
     setActiveTab("combat");
-    showToast("Use the Hit Dice section below HP to heal.", "info"); // <--- TOAST REEMPLAZANDO ALERT
+    showToast("Use Hit Dice (below HP) to heal.", "info");
   };
 
   const useHitDie = () => {
@@ -213,6 +220,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         isCrit: false,
         isFail: false,
       });
+      showToast(`Healed for ${healAmount} HP`, "success");
     }
   };
 
@@ -224,21 +232,28 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   };
 
   const toggleInspiration = () => {
-    onUpdateHero({ ...hero, inspiration: !inspiration });
+    const newState = !inspiration;
+    onUpdateHero({ ...hero, inspiration: newState });
+    if (newState) showToast("You are Inspired!", "success");
   };
+
   const handleDelete = () => {
     if (confirm(t("confirmDelete"))) onDeleteHero(hero.id);
   };
+
   const updateMoney = (currency, value) => {
     const newMoney = { ...money, [currency]: parseInt(value) || 0 };
     onUpdateHero({ ...hero, money: newMoney });
   };
+
   const addItem = () => {
     if (!newItemName.trim()) return;
     const newItem = { id: Date.now(), name: newItemName, qty: 1 };
     onUpdateHero({ ...hero, inventory: [...inventory, newItem] });
     setNewItemName("");
+    showToast("Item added", "success");
   };
+
   const removeItem = (itemId) => {
     onUpdateHero({
       ...hero,
@@ -258,6 +273,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     };
     onUpdateHero({ ...hero, spellSlots: newSlots });
   };
+
   const rollDice = (name, modifier) => {
     const d20 = Math.floor(Math.random() * 20) + 1;
     setRollResult({
@@ -268,7 +284,12 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
       isCrit: d20 === 20,
       isFail: d20 === 1,
     });
+
+    // Toast especial para críticos
+    if (d20 === 20) showToast("CRITICAL HIT! 🔥", "success");
+    if (d20 === 1) showToast("Critical Fail...", "error");
   };
+
   const changeHP = (val) => {
     const newHP = Math.min(maxHP, Math.max(0, currentHP + val));
     const newSaves =
