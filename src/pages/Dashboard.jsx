@@ -1,16 +1,24 @@
-import { useState, useRef } from "react";
 import {
-  UserPlus,
+  Plus,
   Download,
   Upload,
+  Trash2,
   Sword,
   Shield,
   Zap,
-  FileJson,
+  Heart,
+  Skull,
+  Music,
+  Leaf,
+  Eye,
+  Flame,
+  Book,
+  Crosshair,
+  Crown,
+  Ghost,
   Dices,
 } from "lucide-react";
 import { useLanguage } from "../context/LanguageContext";
-import { useToast } from "../context/ToastContext";
 
 export function Dashboard({
   heroes,
@@ -20,171 +28,176 @@ export function Dashboard({
   onRandom,
 }) {
   const { t } = useLanguage();
-  const { showToast } = useToast();
-  const fileInputRef = useRef(null);
 
-  const handleExport = () => {
-    const dataStr = JSON.stringify(heroes, null, 2);
-    const blob = new Blob([dataStr], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `dnd_backup_${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    showToast("Backup downloaded!", "success");
+  // Mapa de Iconos por Clase
+  const getClassIcon = (className) => {
+    const c = className?.toLowerCase();
+    if (c?.includes("barbarian"))
+      return <Skull size={20} className="text-red-500" />;
+    if (c?.includes("bard"))
+      return <Music size={20} className="text-pink-500" />;
+    if (c?.includes("cleric"))
+      return <Heart size={20} className="text-stone-300" />;
+    if (c?.includes("druid"))
+      return <Leaf size={20} className="text-green-500" />;
+    if (c?.includes("fighter"))
+      return <Sword size={20} className="text-stone-400" />;
+    if (c?.includes("monk"))
+      return <Zap size={20} className="text-yellow-400" />;
+    if (c?.includes("paladin"))
+      return <Shield size={20} className="text-yellow-600" />;
+    if (c?.includes("ranger"))
+      return <Crosshair size={20} className="text-emerald-600" />;
+    if (c?.includes("rogue"))
+      return <Eye size={20} className="text-stone-500" />;
+    if (c?.includes("sorcerer"))
+      return <Flame size={20} className="text-orange-500" />;
+    if (c?.includes("warlock"))
+      return <Ghost size={20} className="text-purple-500" />;
+    if (c?.includes("wizard"))
+      return <Book size={20} className="text-blue-500" />;
+    return <Crown size={20} className="text-yellow-500" />; // Default
   };
 
-  const handleFileChange = (event) => {
+  // Manejador para importar archivo
+  const handleFileUpload = (event) => {
     const file = event.target.files[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        const importedHeroes = JSON.parse(e.target.result);
-        if (Array.isArray(importedHeroes)) {
-          onImport(importedHeroes);
-        } else {
-          showToast("Invalid JSON Format", "error");
-        }
+        const json = JSON.parse(e.target.result);
+        onImport(json);
       } catch (err) {
-        showToast("Error reading file", "error");
+        alert("Invalid JSON file");
       }
     };
     reader.readAsText(file);
-    event.target.value = null;
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-10">
-      <header className="flex flex-col gap-2 border-b border-stone-800 pb-6 pr-16">
-        <h1 className="text-3xl font-bold text-stone-100">{t("myHeroes")}</h1>
-        <p className="text-stone-400">{t("subTitle")}</p>
-        <div className="flex gap-3 mt-2">
-          <button
-            onClick={handleExport}
-            disabled={heroes.length === 0}
-            className="flex items-center gap-2 px-3 py-2 bg-stone-800 border border-stone-700 rounded-lg text-xs font-bold text-stone-300 hover:bg-stone-700 hover:text-white transition disabled:opacity-50"
-          >
-            <Download size={14} /> {t("backup")}
-          </button>
-          <button
-            onClick={() => fileInputRef.current.click()}
-            className="flex items-center gap-2 px-3 py-2 bg-stone-800 border border-stone-700 rounded-lg text-xs font-bold text-stone-300 hover:bg-stone-700 hover:text-white transition"
-          >
-            <Upload size={14} /> {t("restore")}
-          </button>
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileChange}
-            accept=".json"
-            className="hidden"
-          />
+    <div className="px-6 pt-8 pb-32 animate-in fade-in duration-300 min-h-screen flex flex-col">
+      {/* Header */}
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h1 className="text-3xl font-black text-stone-100 tracking-tight">
+            {t("myHeroes")}
+          </h1>
+          <p className="text-stone-500 text-sm">{t("subTitle")}</p>
         </div>
-      </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {/* Botones de Archivo (Backup) */}
+        <div className="flex gap-2">
+          <label className="p-2 bg-stone-800 rounded-full text-stone-400 hover:text-white cursor-pointer transition border border-stone-700">
+            <Upload size={18} />
+            <input
+              type="file"
+              className="hidden"
+              accept=".json"
+              onChange={handleFileUpload}
+            />
+          </label>
+          <button
+            onClick={() => {
+              const dataStr = JSON.stringify(heroes, null, 2);
+              const blob = new Blob([dataStr], { type: "application/json" });
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement("a");
+              link.href = url;
+              link.download = `dnd_backup_${new Date()
+                .toISOString()
+                .slice(0, 10)}.json`;
+              link.click();
+            }}
+            className="p-2 bg-stone-800 rounded-full text-stone-400 hover:text-white transition border border-stone-700"
+          >
+            <Download size={18} />
+          </button>
+        </div>
+      </div>
+
+      {/* Lista de Héroes */}
+      <div className="space-y-4 flex-1">
+        {heroes.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 opacity-50 border-2 border-dashed border-stone-800 rounded-2xl">
+            <Ghost size={48} className="mb-4 text-stone-600" />
+            <p className="text-stone-500 text-center px-6">{t("noHeroes")}</p>
+          </div>
+        ) : (
+          heroes.map((hero) => {
+            // Calcular porcentaje de vida para la barra mini
+            const hp = hero.currentHP ?? hero.maxHP;
+            const max = hero.maxHP || 1;
+            const hpPct = Math.min(100, Math.max(0, (hp / max) * 100));
+
+            return (
+              <div
+                key={hero.id}
+                onClick={() => onNavigate(hero.id)}
+                className="bg-stone-800 border border-stone-700 rounded-2xl p-4 flex items-center gap-4 cursor-pointer hover:border-yellow-500 hover:shadow-lg hover:shadow-yellow-500/10 transition-all group active:scale-95"
+              >
+                {/* Avatar / Icono */}
+                <div className="relative">
+                  <div className="w-14 h-14 rounded-xl bg-stone-900 border border-stone-600 flex items-center justify-center overflow-hidden shrink-0">
+                    {hero.details?.avatar ? (
+                      <img
+                        src={hero.details.avatar}
+                        alt="avatar"
+                        className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition"
+                      />
+                    ) : (
+                      getClassIcon(hero.class)
+                    )}
+                  </div>
+                  <div className="absolute -bottom-1 -right-1 bg-stone-950 text-stone-300 text-[10px] font-bold px-1.5 py-0.5 rounded border border-stone-700">
+                    Lvl {hero.level}
+                  </div>
+                </div>
+
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-lg font-bold text-stone-100 truncate group-hover:text-yellow-500 transition">
+                    {hero.name}
+                  </h3>
+                  <p className="text-xs text-stone-500 truncate">
+                    {hero.race} {hero.class}
+                  </p>
+
+                  {/* Mini Barra HP */}
+                  <div className="mt-2 h-1.5 w-full bg-stone-900 rounded-full overflow-hidden flex items-center">
+                    <div
+                      className={`h-full ${
+                        hp === 0 ? "bg-red-600" : "bg-green-600"
+                      }`}
+                      style={{ width: `${hpPct}%` }}
+                    ></div>
+                  </div>
+                </div>
+
+                <div className="text-stone-600 group-hover:text-yellow-500 transition">
+                  <Sword size={20} />
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Botones de Acción (Fab / Footer) */}
+      <div className="mt-6 space-y-3">
         <button
           onClick={onCreate}
-          className="group flex flex-col items-center justify-center gap-4 p-8 rounded-2xl border-2 border-dashed border-stone-700 hover:border-yellow-500 hover:bg-stone-800/50 transition h-48"
+          className="w-full py-4 bg-yellow-500 text-stone-900 font-bold rounded-xl shadow-lg hover:bg-yellow-400 transition flex items-center justify-center gap-2 active:scale-95"
         >
-          <div className="w-12 h-12 rounded-full bg-yellow-500/10 flex items-center justify-center text-yellow-500 group-hover:scale-110 transition">
-            <UserPlus size={24} />
-          </div>
-          <span className="font-bold text-stone-400 group-hover:text-yellow-500">
-            {t("createHero")}
-          </span>
+          <Plus size={20} /> {t("createHero")}
         </button>
 
         <button
           onClick={onRandom}
-          className="group flex flex-col items-center justify-center gap-4 p-8 rounded-2xl border-2 border-dashed border-stone-700 hover:border-purple-500 hover:bg-stone-800/50 transition h-48"
+          className="w-full py-3 bg-stone-800 text-stone-400 font-bold rounded-xl border border-stone-700 hover:text-white hover:bg-stone-700 transition flex items-center justify-center gap-2 text-sm active:scale-95"
         >
-          <div className="w-12 h-12 rounded-full bg-purple-500/10 flex items-center justify-center text-purple-500 group-hover:scale-110 group-hover:rotate-180 transition duration-500">
-            <Dices size={24} />
-          </div>
-          <span className="font-bold text-stone-400 group-hover:text-purple-500">
-            {t("randomHero")}
-          </span>
+          <Dices size={16} /> {t("randomHero")}
         </button>
-
-        {heroes.map((hero) => (
-          <div
-            key={hero.id}
-            onClick={() => onNavigate(hero.id)}
-            className="relative group bg-stone-800 rounded-2xl p-5 border border-stone-700 cursor-pointer hover:border-yellow-500 hover:shadow-xl hover:-translate-y-1 transition h-48 flex flex-col justify-between overflow-hidden"
-          >
-            {/* FONDO IMAGEN DE PERSONAJE (O ICONO SI NO HAY) */}
-            <div className="absolute inset-0 z-0">
-              {hero.details?.avatar ? (
-                <>
-                  <img
-                    src={hero.details.avatar}
-                    alt="bg"
-                    className="w-full h-full object-cover opacity-20 group-hover:opacity-40 transition group-hover:scale-105 duration-500"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-stone-900 via-stone-900/80 to-transparent"></div>
-                </>
-              ) : (
-                <div className="absolute -right-4 -top-4 opacity-5 rotate-12">
-                  {hero.class === "Fighter" && <Sword size={120} />}
-                  {hero.class === "Wizard" && <Zap size={120} />}
-                  {hero.class === "Rogue" && <Shield size={120} />}
-                </div>
-              )}
-            </div>
-
-            <div className="relative z-10">
-              <div className="flex justify-between items-start mb-2">
-                <h3 className="text-xl font-bold text-stone-100 group-hover:text-yellow-500 transition truncate pr-2 shadow-black drop-shadow-md">
-                  {hero.name}
-                </h3>
-                <span className="bg-stone-950/80 border border-stone-700 text-stone-300 text-xs px-2 py-1 rounded font-mono">
-                  Lvl {hero.level}
-                </span>
-              </div>
-              <p className="text-stone-400 text-sm font-medium shadow-black drop-shadow-sm">
-                {hero.race} {hero.class}
-              </p>
-            </div>
-
-            <div className="flex gap-2 mt-4 relative z-10">
-              <div className="flex-1 bg-stone-950/60 backdrop-blur-sm rounded-lg p-2 flex flex-col items-center border border-stone-700/50">
-                <span className="text-[10px] uppercase text-stone-500 font-bold">
-                  {t("str").slice(0, 3)}
-                </span>
-                <span className="text-sm font-bold text-stone-300">
-                  {hero.stats.str}
-                </span>
-              </div>
-              <div className="flex-1 bg-stone-950/60 backdrop-blur-sm rounded-lg p-2 flex flex-col items-center border border-stone-700/50">
-                <span className="text-[10px] uppercase text-stone-500 font-bold">
-                  {t("dex").slice(0, 3)}
-                </span>
-                <span className="text-sm font-bold text-stone-300">
-                  {hero.stats.dex}
-                </span>
-              </div>
-              <div className="flex-1 bg-stone-950/60 backdrop-blur-sm rounded-lg p-2 flex flex-col items-center border border-stone-700/50">
-                <span className="text-[10px] uppercase text-stone-500 font-bold">
-                  {t("int").slice(0, 3)}
-                </span>
-                <span className="text-sm font-bold text-stone-300">
-                  {hero.stats.int}
-                </span>
-              </div>
-            </div>
-          </div>
-        ))}
-
-        {heroes.length === 0 && (
-          <div className="col-span-full text-center py-10 opacity-50">
-            <FileJson size={48} className="mx-auto mb-4 text-stone-600" />
-            <p>{t("noHeroes")}</p>
-          </div>
-        )}
       </div>
     </div>
   );
