@@ -67,6 +67,9 @@ export const dictionary = {
     conditions: "Conditions",
     addCondition: "Add Condition",
     exhaustion: "Exhaustion",
+    resources: "Class Resources",
+    addResource: "Add Resource",
+    max: "Max",
     
     // Spells
     spellDC: "Spell Save DC",
@@ -161,6 +164,9 @@ export const dictionary = {
     conditions: "Condiciones",
     addCondition: "Añadir Condición",
     exhaustion: "Agotamiento",
+    resources: "Recursos de Clase",
+    addResource: "Añadir Recurso",
+    max: "Máx",
     
     // Spells
     spellDC: "CD Salvación",
