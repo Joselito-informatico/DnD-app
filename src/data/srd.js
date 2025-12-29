@@ -100,6 +100,12 @@ export const CLASSES = [
     saves: ["Strength", "Constitution"],
     proficiencies: ["Light/Medium Armor", "Shields", "Simple/Martial Weapons"],
     srdSubclass: "Path of the Berserker",
+    startingEquipment: [
+      { name: "Greataxe", type: "weapon", damage: "1d12", stat: "str", qty: 1 },
+      { name: "Handaxe", type: "weapon", damage: "1d6", stat: "str", qty: 2 },
+      { name: "Javelin", type: "weapon", damage: "1d6", stat: "str", qty: 4 },
+      { name: "Explorer's Pack", type: "item", qty: 1 },
+    ],
   },
   {
     id: "bard",
@@ -110,12 +116,19 @@ export const CLASSES = [
     proficiencies: [
       "Light Armor",
       "Simple Weapons",
-      "Hand Crossbows",
       "Longswords",
       "Rapiers",
       "Shortswords",
     ],
     srdSubclass: "College of Lore",
+    spellcasting: { stat: "cha", slots: { 1: { total: 2, used: 0 } } },
+    startingEquipment: [
+      { name: "Rapier", type: "weapon", damage: "1d8", stat: "dex", qty: 1 },
+      { name: "Dagger", type: "weapon", damage: "1d4", stat: "dex", qty: 1 },
+      { name: "Leather Armor", type: "armor", ac: 11, qty: 1 },
+      { name: "Entertainer's Pack", type: "item", qty: 1 },
+      { name: "Lute", type: "item", qty: 1 },
+    ],
   },
   {
     id: "cleric",
@@ -125,6 +138,20 @@ export const CLASSES = [
     saves: ["Wisdom", "Charisma"],
     proficiencies: ["Light/Medium Armor", "Shields", "Simple Weapons"],
     srdSubclass: "Life Domain",
+    spellcasting: { stat: "wis", slots: { 1: { total: 2, used: 0 } } },
+    startingEquipment: [
+      { name: "Mace", type: "weapon", damage: "1d6", stat: "str", qty: 1 },
+      { name: "Scale Mail", type: "armor", ac: 14, qty: 1 },
+      {
+        name: "Light Crossbow",
+        type: "weapon",
+        damage: "1d8",
+        stat: "dex",
+        qty: 1,
+      },
+      { name: "Priest's Pack", type: "item", qty: 1 },
+      { name: "Shield", type: "armor", ac: 2, qty: 1 },
+    ],
   },
   {
     id: "druid",
@@ -135,18 +162,17 @@ export const CLASSES = [
     proficiencies: [
       "Light/Medium Armor (Non-metal)",
       "Shields",
-      "Clubs",
-      "Daggers",
-      "Darts",
-      "Javelins",
-      "Maces",
-      "Quarterstaffs",
-      "Scimitars",
-      "Sickles",
-      "Slings",
-      "Spears",
+      "Simple Weapons",
     ],
     srdSubclass: "Circle of the Land",
+    spellcasting: { stat: "wis", slots: { 1: { total: 2, used: 0 } } },
+    startingEquipment: [
+      { name: "Scimitar", type: "weapon", damage: "1d6", stat: "dex", qty: 1 },
+      { name: "Leather Armor", type: "armor", ac: 11, qty: 1 },
+      { name: "Wooden Shield", type: "armor", ac: 2, qty: 1 },
+      { name: "Explorer's Pack", type: "item", qty: 1 },
+      { name: "Druidic Focus", type: "item", qty: 1 },
+    ],
   },
   {
     id: "fighter",
@@ -156,6 +182,19 @@ export const CLASSES = [
     saves: ["Strength", "Constitution"],
     proficiencies: ["All Armor", "Shields", "Simple/Martial Weapons"],
     srdSubclass: "Champion",
+    startingEquipment: [
+      { name: "Chain Mail", type: "armor", ac: 16, qty: 1 },
+      { name: "Longsword", type: "weapon", damage: "1d8", stat: "str", qty: 1 },
+      { name: "Shield", type: "armor", ac: 2, qty: 1 },
+      {
+        name: "Light Crossbow",
+        type: "weapon",
+        damage: "1d8",
+        stat: "dex",
+        qty: 1,
+      },
+      { name: "Dungeoneer's Pack", type: "item", qty: 1 },
+    ],
   },
   {
     id: "monk",
@@ -165,6 +204,17 @@ export const CLASSES = [
     saves: ["Strength", "Dexterity"],
     proficiencies: ["Simple Weapons", "Shortswords"],
     srdSubclass: "Way of the Open Hand",
+    startingEquipment: [
+      {
+        name: "Shortsword",
+        type: "weapon",
+        damage: "1d6",
+        stat: "dex",
+        qty: 1,
+      },
+      { name: "Darts", type: "weapon", damage: "1d4", stat: "dex", qty: 10 },
+      { name: "Explorer's Pack", type: "item", qty: 1 },
+    ],
   },
   {
     id: "paladin",
@@ -174,6 +224,13 @@ export const CLASSES = [
     saves: ["Wisdom", "Charisma"],
     proficiencies: ["All Armor", "Shields", "Simple/Martial Weapons"],
     srdSubclass: "Oath of Devotion",
+    startingEquipment: [
+      { name: "Longsword", type: "weapon", damage: "1d8", stat: "str", qty: 1 },
+      { name: "Chain Mail", type: "armor", ac: 16, qty: 1 },
+      { name: "Shield", type: "armor", ac: 2, qty: 1 },
+      { name: "Javelin", type: "weapon", damage: "1d6", stat: "str", qty: 5 },
+      { name: "Priest's Pack", type: "item", qty: 1 },
+    ],
   },
   {
     id: "ranger",
@@ -183,6 +240,19 @@ export const CLASSES = [
     saves: ["Strength", "Dexterity"],
     proficiencies: ["Light/Medium Armor", "Shields", "Simple/Martial Weapons"],
     srdSubclass: "Hunter",
+    startingEquipment: [
+      { name: "Scale Mail", type: "armor", ac: 14, qty: 1 },
+      {
+        name: "Shortsword",
+        type: "weapon",
+        damage: "1d6",
+        stat: "dex",
+        qty: 2,
+      },
+      { name: "Longbow", type: "weapon", damage: "1d8", stat: "dex", qty: 1 },
+      { name: "Arrows", type: "item", qty: 20 },
+      { name: "Explorer's Pack", type: "item", qty: 1 },
+    ],
   },
   {
     id: "rogue",
@@ -199,6 +269,15 @@ export const CLASSES = [
       "Shortswords",
     ],
     srdSubclass: "Thief",
+    startingEquipment: [
+      { name: "Rapier", type: "weapon", damage: "1d8", stat: "dex", qty: 1 },
+      { name: "Shortbow", type: "weapon", damage: "1d6", stat: "dex", qty: 1 },
+      { name: "Arrows", type: "item", qty: 20 },
+      { name: "Leather Armor", type: "armor", ac: 11, qty: 1 },
+      { name: "Dagger", type: "weapon", damage: "1d4", stat: "dex", qty: 2 },
+      { name: "Thieves' Tools", type: "item", qty: 1 },
+      { name: "Burglar's Pack", type: "item", qty: 1 },
+    ],
   },
   {
     id: "sorcerer",
@@ -214,6 +293,20 @@ export const CLASSES = [
       "Light Crossbows",
     ],
     srdSubclass: "Draconic Bloodline",
+    spellcasting: { stat: "cha", slots: { 1: { total: 2, used: 0 } } },
+    startingEquipment: [
+      {
+        name: "Light Crossbow",
+        type: "weapon",
+        damage: "1d8",
+        stat: "dex",
+        qty: 1,
+      },
+      { name: "Bolts", type: "item", qty: 20 },
+      { name: "Arcane Focus", type: "item", qty: 1 },
+      { name: "Dagger", type: "weapon", damage: "1d4", stat: "dex", qty: 2 },
+      { name: "Explorer's Pack", type: "item", qty: 1 },
+    ],
   },
   {
     id: "warlock",
@@ -223,6 +316,21 @@ export const CLASSES = [
     saves: ["Wisdom", "Charisma"],
     proficiencies: ["Light Armor", "Simple Weapons"],
     srdSubclass: "The Fiend",
+    spellcasting: { stat: "cha", slots: { 1: { total: 1, used: 0 } } }, // Warlocks start with 1 slot
+    startingEquipment: [
+      {
+        name: "Light Crossbow",
+        type: "weapon",
+        damage: "1d8",
+        stat: "dex",
+        qty: 1,
+      },
+      { name: "Bolts", type: "item", qty: 20 },
+      { name: "Arcane Focus", type: "item", qty: 1 },
+      { name: "Leather Armor", type: "armor", ac: 11, qty: 1 },
+      { name: "Dagger", type: "weapon", damage: "1d4", stat: "dex", qty: 2 },
+      { name: "Scholar's Pack", type: "item", qty: 1 },
+    ],
   },
   {
     id: "wizard",
@@ -238,6 +346,19 @@ export const CLASSES = [
       "Light Crossbows",
     ],
     srdSubclass: "School of Evocation",
+    spellcasting: { stat: "int", slots: { 1: { total: 2, used: 0 } } },
+    startingEquipment: [
+      {
+        name: "Quarterstaff",
+        type: "weapon",
+        damage: "1d6",
+        stat: "str",
+        qty: 1,
+      },
+      { name: "Arcane Focus", type: "item", qty: 1 },
+      { name: "Spellbook", type: "item", qty: 1 },
+      { name: "Scholar's Pack", type: "item", qty: 1 },
+    ],
   },
 ];
 

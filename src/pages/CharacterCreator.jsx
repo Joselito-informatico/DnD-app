@@ -46,7 +46,7 @@ export function CharacterCreator({ onBack, onSave }) {
     ideals: "",
     bonds: "",
     flaws: "",
-    avatar: "", // NUEVO CAMPO
+    avatar: "",
   });
 
   const getMod = (score) => {
@@ -75,62 +75,64 @@ export function CharacterCreator({ onBack, onSave }) {
     else if (step === 2 && selectedClass) setStep(3);
     else if (step === 3) setStep(4);
     else if (step === 4) {
+      // 1. CALCULAR HP INICIAL (Max Hit Die + CON Mod)
+      const hitDieMax = parseInt(selectedClass.hitDie.substring(1));
+      const conMod = getMod(stats.con);
+      const startHP = Math.max(1, hitDieMax + conMod); // Mínimo 1 HP
+
+      // 2. PROCESAR EQUIPO INICIAL DEL SRD
+      let starterInventory = [];
       let starterWeapons = [];
-      if (selectedClass.id === "fighter") {
-        starterWeapons.push({
-          id: "w1",
-          name: "Greatsword",
-          type: "melee",
-          damage: "2d6",
-          stat: "str",
-        });
-        starterWeapons.push({
-          id: "w2",
-          name: "Handaxe",
-          type: "thrown",
-          damage: "1d6",
-          stat: "str",
-        });
-      } else if (selectedClass.id === "rogue") {
-        starterWeapons.push({
-          id: "w1",
-          name: "Rapier",
-          type: "melee",
-          damage: "1d8",
-          stat: "dex",
-        });
-        starterWeapons.push({
-          id: "w2",
-          name: "Shortbow",
-          type: "ranged",
-          damage: "1d6",
-          stat: "dex",
-        });
-      } else if (selectedClass.id === "wizard") {
-        starterWeapons.push({
-          id: "w1",
-          name: "Quarterstaff",
-          type: "melee",
-          damage: "1d6",
-          stat: "str",
-        });
-        starterWeapons.push({
-          id: "s1",
-          name: "Firebolt",
-          type: "spell",
-          damage: "1d10",
-          stat: "int",
+
+      if (selectedClass.startingEquipment) {
+        selectedClass.startingEquipment.forEach((item, index) => {
+          // Añadir a inventario
+          starterInventory.push({
+            id: Date.now() + index,
+            name: item.name,
+            qty: item.qty || 1,
+            desc:
+              item.type === "armor"
+                ? `AC ${item.ac}`
+                : item.type === "weapon"
+                ? `${item.damage}`
+                : "",
+          });
+
+          // Si es arma, añadir a ataques también
+          if (item.type === "weapon") {
+            starterWeapons.push({
+              id: Date.now() + index + 100, // ID único
+              name: item.name,
+              type: "melee", // Asumimos melee por defecto, usuario puede cambiarlo
+              damage: item.damage,
+              stat: item.stat,
+            });
+          }
         });
       }
 
+      // 3. PROCESAR MAGIA (Si tiene)
+      const spellSlots = selectedClass.spellcasting
+        ? selectedClass.spellcasting.slots
+        : {};
+
+      // 4. CREAR OBJETO FINAL
       const newHero = {
         name:
           details.name.trim() || `${selectedRace.name} ${selectedClass.name}`,
         race: selectedRace.name,
         class: selectedClass.name,
+        level: 1, // Siempre nivel 1
+        xp: 0,
         stats: stats,
+        currentHP: startHP, // HP inicial calculado
+        maxHP: startHP, // Guardamos el max calculado
         weapons: starterWeapons,
-        features: selectedClass.features || [],
+        inventory: starterInventory,
+        spellSlots: spellSlots,
+        features: selectedClass.features || [], // Placeholder si añadimos features en el futuro
+        saveProficiencies: selectedClass.saves, // Guardamos en qué es proficiente
         details: {
           ...details,
           background: details.background || "Unknown",
@@ -157,7 +159,7 @@ export function CharacterCreator({ onBack, onSave }) {
   ];
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300 pb-24">
+    <div className="space-y-6 animate-in fade-in duration-300 pb-24 px-6 pt-6">
       <header className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
           <button
@@ -245,7 +247,7 @@ export function CharacterCreator({ onBack, onSave }) {
                 </p>
                 <p>
                   <span className="text-stone-500">Primary:</span>{" "}
-                  {cls.primaryStat}
+                  {cls.primaryStat.toUpperCase()}
                 </p>
               </div>
             </div>
@@ -307,7 +309,7 @@ export function CharacterCreator({ onBack, onSave }) {
               </button>
             </div>
 
-            {/* AVATAR INPUT (NUEVO) */}
+            {/* AVATAR INPUT */}
             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 space-y-3">
               <div className="flex items-center gap-4">
                 <div className="w-16 h-16 bg-stone-900 rounded-full flex-shrink-0 border-2 border-stone-600 overflow-hidden flex items-center justify-center">
