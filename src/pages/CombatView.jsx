@@ -53,7 +53,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const [activeTab, setActiveTab] = useState("combat");
   const [rollResult, setRollResult] = useState(null);
   const [showMenu, setShowMenu] = useState(false);
-  const [editingStat, setEditingStat] = useState(null); // 'level', 'xp', 'str', etc.
+  const [editingStat, setEditingStat] = useState(null);
   const [isEditingMaxHP, setIsEditingMaxHP] = useState(false);
 
   // Modales
@@ -64,7 +64,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     stat: "str",
     type: "melee",
   });
-
   const [isAddingSpell, setIsAddingSpell] = useState(false);
   const [newSpell, setNewSpell] = useState({
     name: "",
@@ -75,19 +74,14 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   });
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
-
   const [isAddingCondition, setIsAddingCondition] = useState(false);
   const [isEditingSlots, setIsEditingSlots] = useState(false);
-
   const [isAddingResource, setIsAddingResource] = useState(false);
   const [newResource, setNewResource] = useState({ name: "", max: "3" });
-
   const [isAddingFeature, setIsAddingFeature] = useState(false);
   const [newFeature, setNewFeature] = useState({ name: "", desc: "" });
-
   const [showDiceTray, setShowDiceTray] = useState(false);
   const [diceMod, setDiceMod] = useState(0);
-
   const [newItemName, setNewItemName] = useState("");
   const [itemQuery, setItemQuery] = useState("");
   const [itemResults, setItemResults] = useState([]);
@@ -106,7 +100,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     cha: getModifier(stats.cha),
   };
 
-  // HP Calculation (Manual override or SRD formula)
   const fallbackMaxHP = 10 + mods.con + (hero.level - 1) * 6;
   const maxHP = hero.maxHP || fallbackMaxHP;
   const currentHP = hero.currentHP ?? maxHP;
@@ -114,7 +107,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
 
   const armorClass = 10 + mods.dex;
   const initiative = mods.dex >= 0 ? `+${mods.dex}` : mods.dex;
-
   const inspiration = hero.inspiration || false;
   const skillProfs = hero.skillProfs || [];
   const isPerceptionProf = skillProfs.includes("Perception");
@@ -131,6 +123,16 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const hitDiceTotal = hero.level;
   const deathSaves = hero.deathSaves || { successes: 0, failures: 0 };
   const xp = hero.xp || 0;
+
+  // --- CÁLCULO DE BARRA DE XP (NUEVA LÓGICA) ---
+  const currentLevelBaseXP = XP_TABLE[hero.level] || 0;
+  const nextLevelBaseXP = XP_TABLE[hero.level + 1] || currentLevelBaseXP; // Si es lvl 20, no hay siguiente
+  const xpProgress =
+    nextLevelBaseXP > currentLevelBaseXP
+      ? ((xp - currentLevelBaseXP) / (nextLevelBaseXP - currentLevelBaseXP)) *
+        100
+      : 100;
+
   const activeConditions = hero.conditions || [];
   const exhaustionLevel = hero.exhaustion || 0;
   const resources = hero.resources || [];
@@ -149,7 +151,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   };
   const inventory = hero.inventory || [];
   const money = hero.money || { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 };
-
   const mySpells = hero.spells || SRD_SPELLS;
   const defaultSlots = { 1: { total: 2, used: 0 } };
   const spellSlots = hero.spellSlots || defaultSlots;
@@ -166,25 +167,46 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
 
   // --- ACCIONES ---
 
-  // Features Management
-  const addFeature = () => {
-    if (!newFeature.name) return;
-    const feat = { id: Date.now(), ...newFeature };
-    onUpdateHero({ ...hero, features: [...features, feat] });
-    setIsAddingFeature(false);
-    setNewFeature({ name: "", desc: "" });
-    showToast("Feature added", "success");
-  };
+  // NUEVO: ACTUALIZAR XP Y NIVEL AUTOMÁTICO
+  const updateXP = (val) => {
+    const newXP = Math.max(0, parseInt(val) || 0);
+    let newLevel = 1;
 
-  const removeFeature = (featId) => {
-    if (confirm("Delete this feature?")) {
-      onUpdateHero({
-        ...hero,
-        features: features.filter((f) => f.id !== featId),
-      });
+    // Buscar en qué nivel cae la nueva XP (Iteramos desde el 20 hacia abajo)
+    for (let lvl = 20; lvl >= 1; lvl--) {
+      if (newXP >= XP_TABLE[lvl]) {
+        newLevel = lvl;
+        break;
+      }
     }
+
+    // Si hubo cambio de nivel, notificamos
+    if (newLevel > hero.level) {
+      showToast(`🎉 Level Up! You reached level ${newLevel}`, "success");
+    } else if (newLevel < hero.level) {
+      showToast(`Level decreased to ${newLevel}`, "info");
+    }
+
+    onUpdateHero({ ...hero, xp: newXP, level: newLevel });
+    setEditingStat(null);
   };
 
+  // NUEVO: ACTUALIZAR NIVEL MANUAL (Y AJUSTAR XP BASE)
+  const updateLevel = (val) => {
+    const lvl = Math.max(1, Math.min(20, parseInt(val) || 1));
+    const baseXP = XP_TABLE[lvl] || 0; // Buscamos la XP mínima para ese nivel
+
+    onUpdateHero({ ...hero, level: lvl, xp: baseXP });
+    setEditingStat(null);
+    showToast(`Level set to ${lvl}. XP reset to ${baseXP}`, "info");
+  };
+
+  const updateAttribute = (statName, val) => {
+    const newVal = Math.max(1, Math.min(30, parseInt(val) || 10));
+    onUpdateHero({ ...hero, stats: { ...hero.stats, [statName]: newVal } });
+    setEditingStat(null);
+    showToast(`${statName.toUpperCase()} updated`, "success");
+  };
   const updateMaxHP = (newVal) => {
     const val = parseInt(newVal) || 1;
     onUpdateHero({
@@ -195,8 +217,22 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     setIsEditingMaxHP(false);
     showToast(`Max HP set to ${val}`, "success");
   };
-
-  // Export & Copy
+  const addFeature = () => {
+    if (!newFeature.name) return;
+    const feat = { id: Date.now(), ...newFeature };
+    onUpdateHero({ ...hero, features: [...features, feat] });
+    setIsAddingFeature(false);
+    setNewFeature({ name: "", desc: "" });
+    showToast("Feature added", "success");
+  };
+  const removeFeature = (featId) => {
+    if (confirm("Delete this feature?")) {
+      onUpdateHero({
+        ...hero,
+        features: features.filter((f) => f.id !== featId),
+      });
+    }
+  };
   const handleExportJSON = () => {
     const dataStr = JSON.stringify([hero], null, 2);
     const blob = new Blob([dataStr], { type: "application/json" });
@@ -210,15 +246,12 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     setShowMenu(false);
     showToast(t("successImport"), "success");
   };
-
   const handleCopySummary = () => {
     const summary = `**${hero.name}** | ${hero.race} ${hero.class} ${hero.level}\n❤️ HP: ${currentHP}/${maxHP} | 🛡️ AC: ${armorClass} | ⚡ Init: ${initiative}\n📝 PP: ${passivePerception} | DC: ${spellSaveDC}`;
     navigator.clipboard.writeText(summary);
     setShowMenu(false);
     showToast(t("copied"), "success");
   };
-
-  // Dice Tray
   const rollGeneric = (sides) => {
     const roll = Math.floor(Math.random() * sides) + 1;
     const total = roll + parseInt(diceMod || 0);
@@ -232,8 +265,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     });
     setShowDiceTray(false);
   };
-
-  // Spell Search (API)
   const handleSpellSearch = async () => {
     if (!searchQuery) return;
     setIsSearching(true);
@@ -241,7 +272,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     setSearchResults(results);
     setIsSearching(false);
   };
-
   const selectSpell = (apiSpell) => {
     setNewSpell({
       name: apiSpell.name,
@@ -253,8 +283,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     setSearchResults([]);
     setSearchQuery("");
   };
-
-  // Item Search (API) & Logic Fix
   const handleItemSearch = async () => {
     if (!itemQuery) return;
     setIsSearching(true);
@@ -262,9 +290,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     setItemResults(results);
     setIsSearching(false);
   };
-
   const selectItem = (item) => {
-    // 1. Prepare inventory update
     const newItem = {
       id: Date.now(),
       name: item.name,
@@ -273,14 +299,11 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     };
     let newInventoryList = [...inventory, newItem];
     let newWeaponsList = weapons;
-
-    // 2. If weapon, ask to add to attacks
     if (item.type === "weapon") {
       if (confirm(`Add ${item.name} to Attacks?`)) {
         const isFinesse =
           item.properties && item.properties.includes("Finesse");
         const attackStat = isFinesse ? "dex" : "str";
-
         const newWep = {
           id: Date.now() + 1,
           name: item.name,
@@ -296,19 +319,14 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     } else {
       showToast(`${item.name} added`, "success");
     }
-
-    // 3. Single Update
     onUpdateHero({
       ...hero,
       inventory: newInventoryList,
       weapons: newWeaponsList,
     });
-
     setItemResults([]);
     setItemQuery("");
   };
-
-  // General Actions
   const addResource = () => {
     if (!newResource.name) return;
     const maxVal = parseInt(newResource.max) || 1;
@@ -433,22 +451,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
       },
     };
     onUpdateHero({ ...hero, spellSlots: newSlots });
-  };
-  const updateLevel = (val) => {
-    const lvl = Math.max(1, Math.min(20, parseInt(val) || 1));
-    onUpdateHero({ ...hero, level: lvl });
-    setEditingStat(null);
-    showToast(`Level updated to ${lvl}`, "success");
-  };
-  const updateXP = (val) => {
-    onUpdateHero({ ...hero, xp: parseInt(val) || 0 });
-    setEditingStat(null);
-  };
-  const updateAttribute = (statName, val) => {
-    const newVal = Math.max(1, Math.min(30, parseInt(val) || 10));
-    onUpdateHero({ ...hero, stats: { ...hero.stats, [statName]: newVal } });
-    setEditingStat(null);
-    showToast(`${statName.toUpperCase()} updated`, "success");
   };
   const handleLongRest = () => {
     const resetSlots = { ...spellSlots };
@@ -626,13 +628,14 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         </div>
       )}
 
-      {/* EDIT MODAL (STATS) */}
+      {/* EDIT MODAL (STATS & XP & LVL) */}
       {editingStat && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-stone-900 border border-stone-700 p-6 rounded-2xl w-full max-w-xs animate-in zoom-in duration-200">
             <h3 className="text-stone-100 font-bold mb-4 capitalize">
               {t("edit")} {t(editingStat) || editingStat}
             </h3>
+            {/* LÓGICA DE INPUT CAMBIADA PARA USAR updateXP Y updateLevel */}
             <input
               type="number"
               autoFocus
@@ -939,7 +942,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               </button>
             </div>
 
-            {/* RESOURCES */}
+            {/* RESOURCES & CONDITIONS & ATTACKS (Resto igual) */}
             <div>
               <div className="flex justify-between items-center mb-2">
                 <h3 className="text-stone-400 font-bold text-sm uppercase tracking-wider">
@@ -1021,7 +1024,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               </div>
             </div>
 
-            {/* CONDITIONS */}
             <div>
               <div className="flex justify-between items-center mb-2">
                 <h3 className="text-stone-400 font-bold text-sm uppercase tracking-wider">
@@ -1174,7 +1176,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               </div>
             )}
 
-            {/* ATTACKS */}
             <div>
               <div className="flex justify-between items-center mb-3">
                 <h3 className="text-stone-400 font-bold text-sm uppercase tracking-wider">
@@ -1268,7 +1269,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               </div>
             </div>
 
-            {/* CUSTOM FEATURES */}
             <div>
               <div className="flex justify-between items-center mb-3">
                 <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
@@ -1498,7 +1498,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           </div>
         )}
 
-        {/* SPELLS */}
+        {/* SPELLS (Igual) */}
         {activeTab === "spells" && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
             <div className="flex items-start gap-4">
@@ -1754,7 +1754,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           </div>
         )}
 
-        {/* INVENTORY */}
+        {/* INVENTORY (Igual) */}
         {activeTab === "inventory" && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700">
@@ -1878,7 +1878,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           </div>
         )}
 
-        {/* PROFILE */}
+        {/* PROFILE (ACTUALIZADO CON BARRA XP) */}
         {activeTab === "profile" && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
             <div className="bg-stone-800 p-5 rounded-xl border border-stone-700">
@@ -1904,19 +1904,14 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                     onClick={() => setEditingStat("xp")}
                     className="cursor-pointer hover:text-yellow-500"
                   >
-                    {xp} / {XP_TABLE[hero.level] || "MAX"} XP{" "}
+                    {xp} / {nextLevelBaseXP} XP{" "}
                     <Edit3 size={10} className="inline" />
                   </span>
                 </div>
                 <div className="h-2 bg-stone-950 rounded-full overflow-hidden border border-stone-700/50">
                   <div
                     className="h-full bg-purple-600 transition-all duration-500"
-                    style={{
-                      width: `${Math.min(
-                        100,
-                        (xp / (XP_TABLE[hero.level] || xp || 1)) * 100
-                      )}%`,
-                    }}
+                    style={{ width: `${Math.min(100, xpProgress)}%` }}
                   ></div>
                 </div>
               </div>
