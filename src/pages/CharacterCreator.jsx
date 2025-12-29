@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+// AQUI ESTABA EL ERROR: Faltaba Trash2 en la lista de abajo
 import {
   ArrowLeft,
   Check,
@@ -13,13 +14,21 @@ import {
   ScrollText,
   Sparkles,
   Image as ImageIcon,
+  Search,
+  BookOpen,
+  X,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { RACES, CLASSES } from "../data/srd";
 import { getRandomDetails } from "../utils/randomizer";
 import { useLanguage } from "../context/LanguageContext";
+import { searchSpells } from "../utils/dndApi";
 
 export function CharacterCreator({ onBack, onSave }) {
   const { t } = useLanguage();
+
+  // Pasos: 1. Raza, 2. Clase, 3. Stats, 4. Hechizos (Opcional), 5. Detalles
   const [step, setStep] = useState(1);
   const [selectedRace, setSelectedRace] = useState(null);
   const [selectedClass, setSelectedClass] = useState(null);
@@ -31,6 +40,12 @@ export function CharacterCreator({ onBack, onSave }) {
     wis: 10,
     cha: 10,
   });
+
+  // Estado para hechizos iniciales
+  const [startingSpells, setStartingSpells] = useState([]);
+  const [spellQuery, setSpellQuery] = useState("");
+  const [spellResults, setSpellResults] = useState([]);
+  const [isSearchingSpell, setIsSearchingSpell] = useState(false);
 
   const [details, setDetails] = useState({
     name: "",
@@ -48,6 +63,9 @@ export function CharacterCreator({ onBack, onSave }) {
     flaws: "",
     avatar: "",
   });
+
+  // Detectar si la clase es mágica para habilitar el paso 4
+  const isCaster = selectedClass?.spellcasting !== undefined;
 
   const getMod = (score) => {
     const mod = Math.floor((score - 10) / 2);
@@ -70,77 +88,132 @@ export function CharacterCreator({ onBack, onSave }) {
     }));
   };
 
+  // --- LÓGICA DE BÚSQUEDA DE HECHIZOS ---
+  const handleSpellSearch = async () => {
+    if (!spellQuery) return;
+    setIsSearchingSpell(true);
+    const results = await searchSpells(spellQuery);
+    setSpellResults(results);
+    setIsSearchingSpell(false);
+  };
+
+  const addStarterSpell = (spell) => {
+    // Evitar duplicados
+    if (startingSpells.some((s) => s.name === spell.name)) return;
+
+    const newSpell = {
+      id: Date.now(),
+      name: spell.name,
+      level: spell.level,
+      school: spell.school,
+      desc: spell.desc,
+      time: spell.time,
+    };
+    setStartingSpells([...startingSpells, newSpell]);
+    setSpellResults([]);
+    setSpellQuery("");
+  };
+
+  const removeStarterSpell = (id) => {
+    setStartingSpells(startingSpells.filter((s) => s.id !== id));
+  };
+
   const handleNext = () => {
     if (step === 1 && selectedRace) setStep(2);
-    else if (step === 2 && selectedClass) setStep(3);
-    else if (step === 3) setStep(4);
-    else if (step === 4) {
-      // 1. CALCULAR HP INICIAL (Max Hit Die + CON Mod)
-      const hitDieMax = parseInt(selectedClass.hitDie.substring(1));
-      const conMod = getMod(stats.con);
-      const startHP = Math.max(1, hitDieMax + conMod); // Mínimo 1 HP
+    else if (step === 2 && selectedClass) {
+      setStep(3);
+    } else if (step === 3) {
+      // Si es mago, vamos al paso 4 (Hechizos), si no, al paso final (Detalles)
+      if (isCaster) setStep(4);
+      else setStep(5); // Saltamos el 4
+    } else if (step === 4 && isCaster) setStep(5);
+    else if (step === 5 || (!isCaster && step === 4)) {
+      finishCreation();
+    }
+  };
 
-      // 2. PROCESAR EQUIPO INICIAL DEL SRD
-      let starterInventory = [];
-      let starterWeapons = [];
+  const finishCreation = () => {
+    // 1. CALCULAR HP
+    const hitDieMax = parseInt(selectedClass.hitDie.substring(1));
+    const conMod = Math.floor((stats.con - 10) / 2);
+    const startHP = Math.max(1, hitDieMax + conMod);
 
-      if (selectedClass.startingEquipment) {
-        selectedClass.startingEquipment.forEach((item, index) => {
-          // Añadir a inventario
-          starterInventory.push({
-            id: Date.now() + index,
-            name: item.name,
-            qty: item.qty || 1,
-            desc:
-              item.type === "armor"
-                ? `AC ${item.ac}`
-                : item.type === "weapon"
-                ? `${item.damage}`
-                : "",
-          });
+    // 2. EQUIPO INICIAL
+    let starterInventory = [];
+    let starterWeapons = [];
 
-          // Si es arma, añadir a ataques también
-          if (item.type === "weapon") {
-            starterWeapons.push({
-              id: Date.now() + index + 100, // ID único
-              name: item.name,
-              type: "melee", // Asumimos melee por defecto, usuario puede cambiarlo
-              damage: item.damage,
-              stat: item.stat,
-            });
-          }
+    if (selectedClass.startingEquipment) {
+      selectedClass.startingEquipment.forEach((item, index) => {
+        starterInventory.push({
+          id: Date.now() + index,
+          name: item.name,
+          qty: item.qty || 1,
+          desc:
+            item.type === "armor"
+              ? `AC ${item.ac}`
+              : item.type === "weapon"
+              ? `${item.damage}`
+              : "",
         });
-      }
 
-      // 3. PROCESAR MAGIA (Si tiene)
-      const spellSlots = selectedClass.spellcasting
-        ? selectedClass.spellcasting.slots
-        : {};
+        if (item.type === "weapon") {
+          starterWeapons.push({
+            id: Date.now() + index + 100,
+            name: item.name,
+            type: "melee",
+            damage: item.damage,
+            stat: item.stat,
+          });
+        }
+      });
+    }
 
-      // 4. CREAR OBJETO FINAL
-      const newHero = {
-        name:
-          details.name.trim() || `${selectedRace.name} ${selectedClass.name}`,
-        race: selectedRace.name,
-        class: selectedClass.name,
-        level: 1, // Siempre nivel 1
-        xp: 0,
-        stats: stats,
-        currentHP: startHP, // HP inicial calculado
-        maxHP: startHP, // Guardamos el max calculado
-        weapons: starterWeapons,
-        inventory: starterInventory,
-        spellSlots: spellSlots,
-        features: selectedClass.features || [], // Placeholder si añadimos features en el futuro
-        saveProficiencies: selectedClass.saves, // Guardamos en qué es proficiente
-        details: {
-          ...details,
-          background: details.background || "Unknown",
-          alignment: details.alignment || "Neutral",
-        },
-      };
+    // 3. MAGIA
+    const spellSlots = selectedClass.spellcasting
+      ? selectedClass.spellcasting.slots
+      : {};
 
-      onSave(newHero);
+    // 4. OBJETO FINAL
+    const newHero = {
+      name: details.name.trim() || `${selectedRace.name} ${selectedClass.name}`,
+      race: selectedRace.name,
+      class: selectedClass.name,
+      level: 1,
+      xp: 0,
+      stats: stats,
+      currentHP: startHP,
+      maxHP: startHP,
+      weapons: starterWeapons,
+      inventory: starterInventory,
+      spellSlots: spellSlots,
+      spells: startingSpells, // <--- HECHIZOS ELEGIDOS
+      features: selectedClass.features || [],
+      saveProficiencies: selectedClass.saves,
+      details: {
+        ...details,
+        background: details.background || "Unknown",
+        alignment: details.alignment || "Neutral",
+      },
+    };
+
+    onSave(newHero);
+  };
+
+  // Títulos dinámicos de los pasos
+  const getStepTitle = () => {
+    switch (step) {
+      case 1:
+        return t("step1");
+      case 2:
+        return t("step2");
+      case 3:
+        return t("step3");
+      case 4:
+        return isCaster ? t("cantrips") + " & Spells" : "Error";
+      case 5:
+        return t("step4"); // Identity
+      default:
+        return "";
     }
   };
 
@@ -170,19 +243,18 @@ export function CharacterCreator({ onBack, onSave }) {
           </button>
           <div>
             <h1 className="text-xl font-bold text-stone-100">
-              {step === 1 && t("step1")}
-              {step === 2 && t("step2")}
-              {step === 3 && t("step3")}
-              {step === 4 && t("step4")}
+              {getStepTitle()}
             </h1>
             <p className="text-xs text-stone-500">
-              {t("level")} {step} / 4
+              {t("level")} {isCaster && step === 5 ? "4" : step} /{" "}
+              {isCaster ? 5 : 4}
             </p>
           </div>
         </div>
       </header>
 
       <div className="grid grid-cols-1 gap-4">
+        {/* PASO 1: RAZA */}
         {step === 1 &&
           RACES.map((race) => (
             <div
@@ -218,6 +290,7 @@ export function CharacterCreator({ onBack, onSave }) {
             </div>
           ))}
 
+        {/* PASO 2: CLASE */}
         {step === 2 &&
           CLASSES.map((cls) => (
             <div
@@ -253,6 +326,7 @@ export function CharacterCreator({ onBack, onSave }) {
             </div>
           ))}
 
+        {/* PASO 3: STATS */}
         {step === 3 && (
           <div className="space-y-3">
             <div className="bg-stone-800/50 p-4 rounded-xl border border-stone-700 mb-4 text-center">
@@ -298,7 +372,92 @@ export function CharacterCreator({ onBack, onSave }) {
           </div>
         )}
 
-        {step === 4 && (
+        {/* PASO 4: HECHIZOS (SOLO CASTERS) */}
+        {step === 4 && isCaster && (
+          <div className="space-y-4 animate-in slide-in-from-right duration-300">
+            <div className="bg-stone-800/50 p-4 rounded-xl border border-stone-700 mb-2 text-center">
+              <p className="text-stone-400 text-sm">
+                Search and add your starting Cantrips & Lvl 1 Spells.
+              </p>
+            </div>
+
+            {/* Buscador */}
+            <div className="relative">
+              <div className="flex items-center gap-2 bg-stone-800 border border-stone-600 rounded-lg p-3 focus-within:border-yellow-500">
+                <Search size={18} className="text-stone-500" />
+                <input
+                  type="text"
+                  placeholder="Fireball, Cure Wounds..."
+                  className="bg-transparent w-full text-sm text-stone-100 outline-none"
+                  value={spellQuery}
+                  onChange={(e) => setSpellQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSpellSearch()}
+                />
+                <button
+                  onClick={handleSpellSearch}
+                  className="text-xs font-bold text-yellow-600 hover:text-yellow-500 uppercase"
+                >
+                  {isSearchingSpell ? "..." : "SEARCH"}
+                </button>
+              </div>
+              {/* Resultados */}
+              {spellResults.length > 0 && (
+                <div className="absolute top-full left-0 w-full bg-stone-800 border border-stone-600 rounded-b-lg shadow-xl z-20 max-h-48 overflow-y-auto mt-1">
+                  {spellResults.map((res, i) => (
+                    <button
+                      key={i}
+                      onClick={() => addStarterSpell(res)}
+                      className="w-full text-left p-3 text-sm text-stone-300 hover:bg-stone-700 border-b border-stone-700/50 last:border-0 flex justify-between items-center"
+                    >
+                      <span>{res.name}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-stone-500 text-xs">
+                          {res.level === 0 ? "Cantrip" : `Lvl ${res.level}`}
+                        </span>
+                        <Plus size={14} className="text-yellow-500" />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Lista de Elegidos */}
+            <div className="space-y-2">
+              {startingSpells.map((spell) => (
+                <div
+                  key={spell.id}
+                  className="bg-stone-800 p-3 rounded-xl border border-stone-700 flex justify-between items-center group"
+                >
+                  <div>
+                    <p className="font-bold text-stone-200 text-sm">
+                      {spell.name}
+                    </p>
+                    <p className="text-xs text-stone-500">
+                      {spell.level === 0 ? "Cantrip" : `Level ${spell.level}`} •{" "}
+                      {spell.school}
+                    </p>
+                  </div>
+                  {/* AQUÍ ESTABA EL ERROR: Trash2 ahora está importado */}
+                  <button
+                    onClick={() => removeStarterSpell(spell.id)}
+                    className="p-2 text-stone-500 hover:text-red-500 bg-stone-900 rounded-lg transition"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              ))}
+              {startingSpells.length === 0 && (
+                <div className="text-center py-8 text-stone-600 italic border-2 border-dashed border-stone-800 rounded-xl">
+                  Spellbook is empty.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* PASO 5: DETALLES */}
+        {((isCaster && step === 5) || (!isCaster && step === 4)) && (
           <div className="space-y-4 animate-in slide-in-from-right duration-300">
             <div className="flex justify-end">
               <button
@@ -309,7 +468,6 @@ export function CharacterCreator({ onBack, onSave }) {
               </button>
             </div>
 
-            {/* AVATAR INPUT */}
             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 space-y-3">
               <div className="flex items-center gap-4">
                 <div className="w-16 h-16 bg-stone-900 rounded-full flex-shrink-0 border-2 border-stone-600 overflow-hidden flex items-center justify-center">
@@ -453,8 +611,12 @@ export function CharacterCreator({ onBack, onSave }) {
           disabled={step === 1 ? !selectedRace : !selectedClass}
           className="w-full py-4 bg-yellow-500 text-stone-900 font-bold rounded-xl shadow-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-yellow-400 transition flex items-center justify-center gap-2"
         >
-          {step === 4 ? t("complete") : t("next")}{" "}
-          {step !== 4 && <ArrowLeft className="rotate-180" size={20} />}
+          {(isCaster && step === 5) || (!isCaster && step === 4)
+            ? t("complete")
+            : t("next")}{" "}
+          {((isCaster && step !== 5) || (!isCaster && step !== 4)) && (
+            <ArrowLeft className="rotate-180" size={20} />
+          )}
         </button>
       </div>
     </div>
