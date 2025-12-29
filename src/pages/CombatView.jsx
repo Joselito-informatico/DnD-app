@@ -29,13 +29,12 @@ import {
   AlertTriangle,
   Minus,
   Search,
-  Globe,
-  Download,
+  CircleDot,
 } from "lucide-react";
 import { CLASSES, SKILLS, SPELLS as SRD_SPELLS, CONDITIONS } from "../data/srd";
 import { useLanguage } from "../context/LanguageContext";
 import { useToast } from "../context/ToastContext";
-import { searchSpells } from "../utils/dndApi"; // <--- IMPORTANTE
+import { searchSpells, searchEquipment } from "../utils/dndApi";
 
 export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const { t } = useLanguage();
@@ -44,9 +43,9 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const [activeTab, setActiveTab] = useState("combat");
   const [rollResult, setRollResult] = useState(null);
   const [showMenu, setShowMenu] = useState(false);
-  const [newItemName, setNewItemName] = useState("");
   const [editingStat, setEditingStat] = useState(null);
 
+  // Estados de Modales y Formularios
   const [isAddingAttack, setIsAddingAttack] = useState(false);
   const [newAttack, setNewAttack] = useState({
     name: "",
@@ -55,7 +54,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     type: "melee",
   });
 
-  // ESTADOS DE HECHIZOS Y BÚSQUEDA
   const [isAddingSpell, setIsAddingSpell] = useState(false);
   const [newSpell, setNewSpell] = useState({
     name: "",
@@ -66,12 +64,18 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   });
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
-  const [isSearching, setIsSearching] = useState(false);
 
   const [isAddingCondition, setIsAddingCondition] = useState(false);
   const [isEditingSlots, setIsEditingSlots] = useState(false);
+
   const [isAddingResource, setIsAddingResource] = useState(false);
   const [newResource, setNewResource] = useState({ name: "", max: "3" });
+
+  // Estados de Inventario (Búsqueda)
+  const [newItemName, setNewItemName] = useState("");
+  const [itemQuery, setItemQuery] = useState("");
+  const [itemResults, setItemResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   // --- REGLAS & CALCULOS ---
   const proficiencyBonus = Math.floor(2 + (hero.level - 1) / 4);
@@ -98,11 +102,10 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const passivePerception =
     10 + mods.wis + (isPerceptionProf ? proficiencyBonus : 0);
 
-  const saveProficiencies =
-    CLASSES.find((c) => c.name === hero.class)?.saves || [];
-  const proficiencies =
-    CLASSES.find((c) => c.name === hero.class)?.proficiencies || [];
-  const hitDieType = CLASSES.find((c) => c.name === hero.class)?.hitDie || "d8";
+  const heroClassData = CLASSES.find((c) => c.name === hero.class);
+  const saveProficiencies = heroClassData ? heroClassData.saves : [];
+  const proficiencies = heroClassData ? heroClassData.proficiencies : [];
+  const hitDieType = heroClassData ? heroClassData.hitDie : "d8";
 
   const hitDiceUsed = hero.hitDiceUsed || 0;
   const hitDiceTotal = hero.level;
@@ -128,7 +131,8 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const features = hero.features || [];
 
   const mySpells = hero.spells || SRD_SPELLS;
-  const spellSlots = hero.spellSlots || { 1: { total: 2, used: 0 } };
+  const defaultSlots = { 1: { total: 2, used: 0 } };
+  const spellSlots = hero.spellSlots || defaultSlots;
   const spellCastingStat =
     hero.class === "Wizard"
       ? "int"
@@ -142,7 +146,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
 
   // --- ACCIONES ---
 
-  // Lógica de Búsqueda de Hechizos
+  // Búsqueda de Hechizos
   const handleSpellSearch = async () => {
     if (!searchQuery) return;
     setIsSearching(true);
@@ -156,13 +160,64 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
       name: apiSpell.name,
       level: apiSpell.level,
       school: apiSpell.school,
-      desc: apiSpell.desc, // Descripción completa de la API
+      desc: apiSpell.desc,
       time: apiSpell.time,
     });
-    setSearchResults([]); // Limpiar resultados para mostrar el formulario
+    setSearchResults([]);
     setSearchQuery("");
   };
 
+  // Búsqueda de Equipo
+  const handleItemSearch = async () => {
+    if (!itemQuery) return;
+    setIsSearching(true);
+    const results = await searchEquipment(itemQuery);
+    setItemResults(results);
+    setIsSearching(false);
+  };
+
+  const selectItem = (item) => {
+    // 1. Preparamos el nuevo inventario
+    const newItem = { id: Date.now(), name: item.name, qty: 1, desc: item.properties || item.ac };
+    let newInventoryList = [...inventory, newItem];
+    let newWeaponsList = weapons; // Por defecto, las armas se quedan igual
+
+    // 2. Si es arma, preguntamos y preparamos la nueva lista de armas
+    if (item.type === 'weapon') {
+       if(confirm(`¿Añadir ${item.name} a tus Ataques también?`)) {
+          // Detectar si usa Fuerza o Destreza (Finesse)
+          const isFinesse = item.properties && item.properties.includes('Finesse');
+          const attackStat = isFinesse ? 'dex' : 'str'; 
+          
+          const newWep = { 
+            id: Date.now() + 1, // +1 para asegurar que el ID sea distinto al del item
+            name: item.name, 
+            damage: item.damage, 
+            stat: attackStat, 
+            type: 'melee' 
+          };
+          newWeaponsList = [...weapons, newWep];
+          showToast("Añadido a Inventario y Ataques", "success");
+       } else {
+          showToast("Añadido solo al Inventario", "success");
+       }
+    } else {
+       showToast(`${item.name} añadido`, "success");
+    }
+    
+    // 3. HACEMOS UNA ÚNICA ACTUALIZACIÓN GLOBAL
+    onUpdateHero({ 
+      ...hero, 
+      inventory: newInventoryList,
+      weapons: newWeaponsList
+    });
+    
+    // Limpieza
+    setItemResults([]);
+    setItemQuery("");
+  };
+
+  // Gestión de Recursos
   const addResource = () => {
     if (!newResource.name) return;
     const maxVal = parseInt(newResource.max) || 1;
@@ -175,7 +230,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     onUpdateHero({ ...hero, resources: [...resources, resourceToAdd] });
     setIsAddingResource(false);
     setNewResource({ name: "", max: "3" });
-    showToast("Resource tracker created", "success");
+    showToast("Tracker created", "success");
   };
 
   const removeResource = (resId, e) => {
@@ -466,7 +521,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         </button>
       </header>
 
-      {/* MODAL EDICIÓN RÁPIDA */}
+      {/* MODAL EDICIÓN RAPIDA */}
       {editingStat && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-stone-900 border border-stone-700 p-6 rounded-2xl w-full max-w-xs animate-in zoom-in duration-200">
@@ -1229,10 +1284,9 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           </div>
         )}
 
-        {/* SPELLS (MEJORADO CON BUSCADOR API) */}
+        {/* SPELLS */}
         {activeTab === "spells" && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
-            {/* ... (Header de slots y Botón Editar Slots igual) ... */}
             <div className="flex items-start gap-4">
               <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 grid grid-cols-2 gap-4 flex-1">
                 <div className="flex flex-col items-center border-r border-stone-700">
@@ -1266,8 +1320,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 <span className="text-[10px] font-bold uppercase">Slots</span>
               </button>
             </div>
-
-            {/* Listado de Slots */}
             <div className="space-y-3">
               {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((lvl) => {
                 const slotData = spellSlots[lvl];
@@ -1300,8 +1352,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 );
               })}
             </div>
-
-            {/* NUEVO: MODAL CON BUSCADOR DE API */}
             <div className="space-y-4 pt-4 border-t border-stone-800">
               <div className="flex justify-end">
                 <button
@@ -1315,7 +1365,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
 
               {isAddingSpell && (
                 <div className="bg-stone-800 p-3 rounded-xl border border-yellow-500/50 mb-3 animate-in fade-in zoom-in duration-200 relative">
-                  {/* BARRA DE BÚSQUEDA API */}
                   <div className="mb-4 relative">
                     <div className="flex items-center gap-2 bg-stone-900 border border-stone-600 rounded-lg p-2 focus-within:border-yellow-500">
                       <Search size={16} className="text-stone-500" />
@@ -1336,8 +1385,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                         {isSearching ? t("searching") : "GO"}
                       </button>
                     </div>
-
-                    {/* RESULTADOS DE BÚSQUEDA */}
                     {searchResults.length > 0 && (
                       <div className="absolute top-full left-0 w-full bg-stone-800 border border-stone-600 rounded-b-lg shadow-xl z-20 max-h-48 overflow-y-auto">
                         {searchResults.map((res, i) => (
@@ -1355,11 +1402,9 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                       </div>
                     )}
                   </div>
-
                   <div className="text-[10px] text-stone-500 uppercase font-bold mb-2 tracking-wider text-center">
                     - {t("manualMode")} -
                   </div>
-
                   <div className="space-y-2 mb-2">
                     <input
                       type="text"
@@ -1413,7 +1458,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 </div>
               )}
 
-              {/* LISTA DE HECHIZOS (Igual) */}
               <div>
                 <h3 className="text-stone-500 font-bold text-xs uppercase mb-2">
                   {t("cantrips")} (0)
@@ -1498,7 +1542,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           </div>
         )}
 
-        {/* INVENTORY (Igual) */}
+        {/* INVENTORY */}
         {activeTab === "inventory" && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700">
@@ -1521,10 +1565,62 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 ))}
               </div>
             </div>
+
+            {/* Equipment Search & List */}
             <div>
               <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
                 <Backpack size={16} /> {t("equipment")}
               </h3>
+
+              {/* BARRA DE BÚSQUEDA API */}
+              <div className="mb-4 relative">
+                <div className="flex items-center gap-2 bg-stone-900 border border-stone-600 rounded-lg p-2 focus-within:border-yellow-500">
+                  <Search size={16} className="text-stone-500" />
+                  <input
+                    type="text"
+                    placeholder={t("searchItem")}
+                    className="bg-transparent w-full text-xs text-stone-100 outline-none"
+                    value={itemQuery}
+                    onChange={(e) => setItemQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleItemSearch()}
+                  />
+                  <button
+                    onClick={handleItemSearch}
+                    className="text-xs font-bold text-yellow-600 hover:text-yellow-500 uppercase"
+                  >
+                    {isSearching ? "..." : "GO"}
+                  </button>
+                </div>
+                {itemResults.length > 0 && (
+                  <div className="absolute top-full left-0 w-full bg-stone-800 border border-stone-600 rounded-b-lg shadow-xl z-20 max-h-48 overflow-y-auto">
+                    {itemResults.map((res, i) => (
+                      <button
+                        key={i}
+                        onClick={() => selectItem(res)}
+                        className="w-full text-left p-2 text-xs text-stone-300 hover:bg-stone-700 border-b border-stone-700/50 last:border-0 flex justify-between items-center"
+                      >
+                        <div>
+                          <span className="font-bold block">{res.name}</span>
+                          <span className="text-[10px] text-stone-500">
+                            {res.category} • {res.cost}
+                          </span>
+                        </div>
+                        {res.damage && (
+                          <span className="text-yellow-500 font-mono">
+                            {res.damage}
+                          </span>
+                        )}
+                        {res.ac && (
+                          <span className="text-blue-400 font-mono">
+                            AC {res.ac}
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <div className="flex gap-2 mb-4">
                 <input
                   type="text"
@@ -1532,22 +1628,32 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                   value={newItemName}
                   onChange={(e) => setNewItemName(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && addItem()}
-                  className="flex-1 bg-stone-800 border border-stone-700 rounded-xl px-4 py-3 text-stone-200 placeholder-stone-500 focus:border-yellow-500 outline-none"
+                  className="flex-1 bg-stone-800/50 border border-stone-700 rounded-xl px-4 py-2 text-xs text-stone-200 placeholder-stone-600 focus:border-yellow-500 outline-none"
                 />
                 <button
                   onClick={addItem}
-                  className="bg-stone-800 border border-stone-700 hover:bg-stone-700 text-stone-200 w-12 rounded-xl flex items-center justify-center transition"
+                  className="bg-stone-800 border border-stone-700 hover:bg-stone-700 text-stone-200 w-10 rounded-xl flex items-center justify-center transition"
                 >
-                  <Plus />
+                  <Plus size={16} />
                 </button>
               </div>
+
               <div className="space-y-2">
                 {inventory.map((item) => (
                   <div
                     key={item.id}
                     className="group flex items-center justify-between p-3 bg-stone-800/50 rounded-xl border border-stone-700/50 hover:bg-stone-800 transition"
                   >
-                    <span className="text-stone-200">{item.name}</span>
+                    <div className="flex flex-col">
+                      <span className="text-stone-200 text-sm">
+                        {item.name}
+                      </span>
+                      {item.desc && (
+                        <span className="text-[10px] text-stone-500">
+                          {item.desc}
+                        </span>
+                      )}
+                    </div>
                     <button
                       onClick={() => removeItem(item.id)}
                       className="text-stone-600 hover:text-red-400 p-1"

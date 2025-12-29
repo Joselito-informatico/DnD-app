@@ -30,11 +30,13 @@ export const dictionary = {
     background: "Background",
     age: "Age",
     height: "Height",
-    weight: "Weight",
+    weight: "Weight", // Reutilizado para objetos
     eyes: "Eyes",
     skin: "Skin",
     hair: "Hair",
     roleplayTitle: "Roleplay Characteristics",
+    avatarLabel: "Character Image URL",
+    avatarPlaceholder: "Paste image link (https://...)",
     
     // Stats & Skills
     str: "Strength", dex: "Dexterity", con: "Constitution", 
@@ -83,10 +85,14 @@ export const dictionary = {
     useSpell: "Use",
     manualMode: "Manual Entry",
     
-    // Inventory
+    // Inventory & Items (NUEVO)
     currency: "Currency",
     equipment: "Equipment",
     addItem: "Add item...",
+    searchItem: "Search SRD Item...",
+    select: "Select",
+    cost: "Cost",
+    properties: "Properties",
     
     // Profile
     allies: "Allies & Organizations",
@@ -98,8 +104,6 @@ export const dictionary = {
     bonds: "Bonds",
     flaws: "Flaws",
     xp: "Experience",
-    avatarLabel: "Character Image URL",
-    avatarPlaceholder: "Paste image link (https://...)",
   },
   es: {
     // General
@@ -132,11 +136,13 @@ export const dictionary = {
     background: "Trasfondo",
     age: "Edad",
     height: "Altura",
-    weight: "Peso",
+    weight: "Peso", // Reutilizado para objetos
     eyes: "Ojos",
     skin: "Piel",
     hair: "Pelo",
     roleplayTitle: "Características de Rol",
+    avatarLabel: "URL Imagen del Personaje",
+    avatarPlaceholder: "Pega el link (https://...)",
     
     // Stats & Skills
     str: "Fuerza", dex: "Destreza", con: "Constitución", 
@@ -185,10 +191,14 @@ export const dictionary = {
     useSpell: "Usar",
     manualMode: "Entrada Manual",
     
-    // Inventory
+    // Inventory & Items (NUEVO)
     currency: "Monedas",
     equipment: "Equipo",
     addItem: "Añadir objeto...",
+    searchItem: "Buscar objeto SRD...",
+    select: "Seleccionar",
+    cost: "Coste",
+    properties: "Propiedades",
     
     // Profile
     allies: "Aliados y Organizaciones",
@@ -200,7 +210,5 @@ export const dictionary = {
     bonds: "Vínculos",
     flaws: "Defectos",
     xp: "Experiencia",
-    avatarLabel: "URL Imagen del Personaje",
-    avatarPlaceholder: "Pega el link (https://...)",
   }
 };
