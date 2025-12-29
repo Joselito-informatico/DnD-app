@@ -26,8 +26,10 @@ import {
   Users,
   Gem,
   PenTool,
+  AlertTriangle,
+  Droplets,
 } from "lucide-react";
-import { CLASSES, SKILLS, SPELLS as SRD_SPELLS } from "../data/srd";
+import { CLASSES, SKILLS, SPELLS as SRD_SPELLS, CONDITIONS } from "../data/srd";
 import { useLanguage } from "../context/LanguageContext";
 import { useToast } from "../context/ToastContext";
 
@@ -39,8 +41,9 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const [rollResult, setRollResult] = useState(null);
   const [showMenu, setShowMenu] = useState(false);
   const [newItemName, setNewItemName] = useState("");
-  const [editingStat, setEditingStat] = useState(null); // 'level', 'xp', 'str', 'dex', etc.
+  const [editingStat, setEditingStat] = useState(null);
 
+  // Modales
   const [isAddingAttack, setIsAddingAttack] = useState(false);
   const [newAttack, setNewAttack] = useState({
     name: "",
@@ -48,7 +51,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     stat: "str",
     type: "melee",
   });
-
   const [isAddingSpell, setIsAddingSpell] = useState(false);
   const [newSpell, setNewSpell] = useState({
     name: "",
@@ -57,6 +59,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     desc: "",
     time: "1 Action",
   });
+  const [isAddingCondition, setIsAddingCondition] = useState(false); // NUEVO
 
   // --- REGLAS & CALCULOS ---
   const proficiencyBonus = Math.floor(2 + (hero.level - 1) / 4);
@@ -89,6 +92,10 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const deathSaves = hero.deathSaves || { successes: 0, failures: 0 };
   const xp = hero.xp || 0;
 
+  // NUEVO: Condiciones y Agotamiento
+  const activeConditions = hero.conditions || [];
+  const exhaustionLevel = hero.exhaustion || 0;
+
   const languages = ["Common"];
   if (hero.race === "Elf") languages.push("Elvish");
   if (hero.race === "Dwarf") languages.push("Dwarvish");
@@ -118,6 +125,26 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const spellSaveDC = 8 + proficiencyBonus + mods[spellCastingStat];
 
   // --- ACCIONES ---
+
+  // Gestión de Condiciones
+  const toggleCondition = (conditionId) => {
+    const exists = activeConditions.includes(conditionId);
+    let newConditions;
+    if (exists) {
+      newConditions = activeConditions.filter((c) => c !== conditionId);
+      showToast("Condition removed", "info");
+    } else {
+      newConditions = [...activeConditions, conditionId];
+      showToast("Condition applied", "error"); // Es algo malo, usamos rojo
+    }
+    onUpdateHero({ ...hero, conditions: newConditions });
+    setIsAddingCondition(false);
+  };
+
+  const updateExhaustion = (val) => {
+    const newLevel = Math.max(0, Math.min(6, val));
+    onUpdateHero({ ...hero, exhaustion: newLevel });
+  };
 
   const addAttack = () => {
     if (!newAttack.name) return;
@@ -171,7 +198,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     }
   };
 
-  // --- EDITORES DE STATS ---
   const updateLevel = (val) => {
     const lvl = Math.max(1, Math.min(20, parseInt(val) || 1));
     onUpdateHero({ ...hero, level: lvl });
@@ -184,12 +210,11 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     setEditingStat(null);
   };
 
-  // NUEVO: Actualizar un atributo específico (STR, DEX...)
   const updateAttribute = (statName, val) => {
-    const newVal = Math.max(1, Math.min(30, parseInt(val) || 10)); // D&D cap es 30
+    const newVal = Math.max(1, Math.min(30, parseInt(val) || 10));
     onUpdateHero({ ...hero, stats: { ...hero.stats, [statName]: newVal } });
     setEditingStat(null);
-    showToast(`${statName.toUpperCase()} updated to ${newVal}`, "success");
+    showToast(`${statName.toUpperCase()} updated`, "success");
   };
 
   const handleLongRest = () => {
@@ -197,15 +222,19 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     Object.keys(resetSlots).forEach((level) => (resetSlots[level].used = 0));
     const regainedHitDice = Math.max(1, Math.floor(hitDiceTotal / 2));
     const newHitDiceUsed = Math.max(0, hitDiceUsed - regainedHitDice);
+    // Recuperar 1 nivel de agotamiento
+    const newExhaustion = Math.max(0, exhaustionLevel - 1);
+
     onUpdateHero({
       ...hero,
       currentHP: maxHP,
       spellSlots: resetSlots,
       hitDiceUsed: newHitDiceUsed,
       deathSaves: { successes: 0, failures: 0 },
+      exhaustion: newExhaustion,
     });
     setShowMenu(false);
-    showToast("Long Rest completed", "success");
+    showToast("Long Rest: HP, Slots & Exhaustion recovered", "success");
   };
 
   const handleShortRest = () => {
@@ -337,7 +366,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         </button>
       </header>
 
-      {/* MODAL EDICIÓN RÁPIDA (Universal para Nivel, XP y Stats) */}
+      {/* MODAL EDICIÓN RÁPIDA */}
       {editingStat && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-stone-900 border border-stone-700 p-6 rounded-2xl w-full max-w-xs animate-in zoom-in duration-200">
@@ -353,7 +382,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 if (e.key === "Enter") {
                   if (editingStat === "level") updateLevel(e.target.value);
                   else if (editingStat === "xp") updateXP(e.target.value);
-                  else updateAttribute(editingStat, e.target.value); // Caso Stats (str, dex...)
+                  else updateAttribute(editingStat, e.target.value);
                 }
               }}
             />
@@ -527,6 +556,95 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               >
                 + {t("heal")}
               </button>
+            </div>
+
+            {/* NUEVA SECCIÓN: CONDITIONS & EXHAUSTION */}
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="text-stone-400 font-bold text-sm uppercase tracking-wider">
+                  {t("conditions")}
+                </h3>
+                <button
+                  onClick={() => setIsAddingCondition(!isAddingCondition)}
+                  className="text-xs bg-stone-800 border border-stone-600 px-2 py-1 rounded text-stone-300 hover:text-white hover:border-yellow-500 flex items-center gap-1"
+                >
+                  {isAddingCondition ? <X size={12} /> : <Plus size={12} />}{" "}
+                  {t("addCondition")}
+                </button>
+              </div>
+
+              {/* Menú de selección de condición */}
+              {isAddingCondition && (
+                <div className="bg-stone-800 p-2 rounded-xl border border-yellow-500/50 mb-3 grid grid-cols-2 gap-2 animate-in fade-in zoom-in duration-200">
+                  {CONDITIONS.filter((c) => c.id !== "exhaustion").map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => toggleCondition(c.id)}
+                      className={`text-xs p-2 rounded border text-left truncate ${
+                        activeConditions.includes(c.id)
+                          ? "bg-red-900/30 border-red-500 text-red-200"
+                          : "bg-stone-900 border-stone-600 text-stone-300 hover:border-yellow-500"
+                      }`}
+                    >
+                      {c.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Lista de condiciones activas */}
+              <div className="flex flex-wrap gap-2 mb-4">
+                {/* Agotamiento (Siempre visible si > 0) */}
+                <div className="flex items-center gap-2 bg-stone-900 border border-stone-700 px-3 py-1 rounded-full">
+                  <span
+                    className={`text-xs font-bold ${
+                      exhaustionLevel > 0 ? "text-orange-500" : "text-stone-500"
+                    }`}
+                  >
+                    {t("exhaustion")}
+                  </span>
+                  <div className="flex gap-1">
+                    {[1, 2, 3, 4, 5, 6].map((lvl) => (
+                      <div
+                        key={lvl}
+                        onClick={() =>
+                          updateExhaustion(
+                            lvl === exhaustionLevel ? lvl - 1 : lvl
+                          )
+                        }
+                        className={`w-2 h-4 rounded-sm cursor-pointer transition ${
+                          lvl <= exhaustionLevel
+                            ? lvl >= 5
+                              ? "bg-red-600"
+                              : "bg-orange-500"
+                            : "bg-stone-800"
+                        }`}
+                      ></div>
+                    ))}
+                  </div>
+                </div>
+
+                {activeConditions.map((cId) => {
+                  const cond = CONDITIONS.find((c) => c.id === cId);
+                  return (
+                    <div
+                      key={cId}
+                      onClick={() => toggleCondition(cId)}
+                      className="flex items-center gap-1 bg-red-900/20 border border-red-500/50 px-3 py-1 rounded-full cursor-pointer hover:bg-red-900/40"
+                    >
+                      <AlertTriangle size={12} className="text-red-400" />
+                      <span className="text-xs text-red-200 font-bold">
+                        {cond?.name}
+                      </span>
+                    </div>
+                  );
+                })}
+                {activeConditions.length === 0 && exhaustionLevel === 0 && (
+                  <p className="text-[10px] text-stone-600 w-full text-center">
+                    Healthy. No active conditions.
+                  </p>
+                )}
+              </div>
             </div>
 
             {currentHP === 0 && (
@@ -856,7 +974,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           </div>
         )}
 
-        {/* SPELLS */}
+        {/* SPELLS (Igual) */}
         {activeTab === "spells" && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 grid grid-cols-2 gap-4">
@@ -1053,7 +1171,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           </div>
         )}
 
-        {/* INVENTORY */}
+        {/* INVENTORY (Igual) */}
         {activeTab === "inventory" && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700">
@@ -1121,7 +1239,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           </div>
         )}
 
-        {/* PROFILE (ACTUALIZADO CON STATS EDITABLES) */}
+        {/* PROFILE (Igual) */}
         {activeTab === "profile" && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
             <div className="bg-stone-800 p-5 rounded-xl border border-stone-700">
@@ -1158,8 +1276,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 </div>
               </div>
             </div>
-
-            {/* NUEVA SECCIÓN DE STATS EDITABLES */}
             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700">
               <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
                 <PenTool size={16} /> Core Attributes
@@ -1181,8 +1297,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 ))}
               </div>
             </div>
-
-            {/* Apariencia */}
             <div>
               <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
                 <Settings size={16} /> {t("appearance")}
@@ -1238,7 +1352,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 </div>
               </div>
             </div>
-            {/* Resto del perfil (Rol, Aliados, etc.) igual */}
             <div className="grid grid-cols-1 gap-4">
               <div className="bg-stone-800 p-4 rounded-xl border border-stone-700">
                 <h3 className="text-stone-500 font-bold text-xs uppercase mb-1 flex items-center gap-2">

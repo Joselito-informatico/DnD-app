@@ -26,7 +26,7 @@ export const RACES = [
     description: "To be greeted with stares and whispers. +2 Charisma.",
     traits: ["Darkvision", "Hellish Resistance", "Thaumaturgy"],
     speed: 30,
-  }
+  },
 ];
 
 export const CLASSES = [
@@ -36,12 +36,23 @@ export const CLASSES = [
     hitDie: "d10",
     primaryStat: "Strength or Dexterity",
     saves: ["Strength", "Constitution"],
-    proficiencies: ["All armor", "Shields", "Simple weapons", "Martial weapons"],
+    proficiencies: [
+      "All armor",
+      "Shields",
+      "Simple weapons",
+      "Martial weapons",
+    ],
     // NUEVO: Rasgos de nivel 1
     features: [
-      { name: "Second Wind", desc: "Bonus Action. Regain 1d10 + Level HP. Once per rest." },
-      { name: "Fighting Style (Defense)", desc: "+1 bonus to AC while wearing armor." }
-    ]
+      {
+        name: "Second Wind",
+        desc: "Bonus Action. Regain 1d10 + Level HP. Once per rest.",
+      },
+      {
+        name: "Fighting Style (Defense)",
+        desc: "+1 bonus to AC while wearing armor.",
+      },
+    ],
   },
   {
     id: "rogue",
@@ -49,11 +60,24 @@ export const CLASSES = [
     hitDie: "d8",
     primaryStat: "Dexterity",
     saves: ["Dexterity", "Intelligence"],
-    proficiencies: ["Light armor", "Simple weapons", "Hand crossbows", "Longswords", "Rapiers", "Shortswords"],
+    proficiencies: [
+      "Light armor",
+      "Simple weapons",
+      "Hand crossbows",
+      "Longswords",
+      "Rapiers",
+      "Shortswords",
+    ],
     features: [
-      { name: "Sneak Attack", desc: "Once per turn, deal extra 1d6 damage to adv/flanked target." },
-      { name: "Thieves' Cant", desc: "A secret mix of dialect, jargon, and code." }
-    ]
+      {
+        name: "Sneak Attack",
+        desc: "Once per turn, deal extra 1d6 damage to adv/flanked target.",
+      },
+      {
+        name: "Thieves' Cant",
+        desc: "A secret mix of dialect, jargon, and code.",
+      },
+    ],
   },
   {
     id: "wizard",
@@ -61,12 +85,24 @@ export const CLASSES = [
     hitDie: "d6",
     primaryStat: "Intelligence",
     saves: ["Intelligence", "Wisdom"],
-    proficiencies: ["Daggers", "Darts", "Slings", "Quarterstaffs", "Light crossbows"],
+    proficiencies: [
+      "Daggers",
+      "Darts",
+      "Slings",
+      "Quarterstaffs",
+      "Light crossbows",
+    ],
     features: [
-      { name: "Arcane Recovery", desc: "Recover spell slots (combined level = half wizard level) on Short Rest." },
-      { name: "Spellcasting", desc: "You have a spellbook containing spells that show on your spell list." }
-    ]
-  }
+      {
+        name: "Arcane Recovery",
+        desc: "Recover spell slots (combined level = half wizard level) on Short Rest.",
+      },
+      {
+        name: "Spellcasting",
+        desc: "You have a spellbook containing spells that show on your spell list.",
+      },
+    ],
+  },
 ];
 
 export const SKILLS = [
@@ -92,12 +128,122 @@ export const SKILLS = [
 
 export const SPELLS = [
   // Trucos (Nivel 0)
-  { id: 'firebolt', name: 'Fire Bolt', level: 0, school: 'Evocation', time: '1 Action', range: '120ft', desc: '1d10 Fire damage.' },
-  { id: 'magehand', name: 'Mage Hand', level: 0, school: 'Conjuration', time: '1 Action', range: '30ft', desc: 'Move object up to 10 lbs.' },
-  { id: 'light', name: 'Light', level: 0, school: 'Evocation', time: '1 Action', range: 'Touch', desc: 'Object shines like a torch.' },
-  
+  {
+    id: "firebolt",
+    name: "Fire Bolt",
+    level: 0,
+    school: "Evocation",
+    time: "1 Action",
+    range: "120ft",
+    desc: "1d10 Fire damage.",
+  },
+  {
+    id: "magehand",
+    name: "Mage Hand",
+    level: 0,
+    school: "Conjuration",
+    time: "1 Action",
+    range: "30ft",
+    desc: "Move object up to 10 lbs.",
+  },
+  {
+    id: "light",
+    name: "Light",
+    level: 0,
+    school: "Evocation",
+    time: "1 Action",
+    range: "Touch",
+    desc: "Object shines like a torch.",
+  },
+
   // Nivel 1
-  { id: 'magicmissile', name: 'Magic Missile', level: 1, school: 'Evocation', time: '1 Action', range: '120ft', desc: '3 darts, 1d4+1 force each. Auto-hit.' },
-  { id: 'shield', name: 'Shield', level: 1, school: 'Abjuration', time: '1 Reaction', range: 'Self', desc: '+5 AC until start of next turn.' },
-  { id: 'curewounds', name: 'Cure Wounds', level: 1, school: 'Evocation', time: '1 Action', range: 'Touch', desc: 'Heal 1d8 + Mod.' },
+  {
+    id: "magicmissile",
+    name: "Magic Missile",
+    level: 1,
+    school: "Evocation",
+    time: "1 Action",
+    range: "120ft",
+    desc: "3 darts, 1d4+1 force each. Auto-hit.",
+  },
+  {
+    id: "shield",
+    name: "Shield",
+    level: 1,
+    school: "Abjuration",
+    time: "1 Reaction",
+    range: "Self",
+    desc: "+5 AC until start of next turn.",
+  },
+  {
+    id: "curewounds",
+    name: "Cure Wounds",
+    level: 1,
+    school: "Evocation",
+    time: "1 Action",
+    range: "Touch",
+    desc: "Heal 1d8 + Mod.",
+  },
+];
+
+export const CONDITIONS = [
+  {
+    id: "blinded",
+    name: "Blinded",
+    desc: "Fail checks involving sight. Attacks vs you have adv.",
+  },
+  {
+    id: "charmed",
+    name: "Charmed",
+    desc: "Cannot harm charmer. Charmer has adv on social checks.",
+  },
+  { id: "deafened", name: "Deafened", desc: "Fail checks involving hearing." },
+  {
+    id: "frightened",
+    name: "Frightened",
+    desc: "Disadv on checks/attacks while source is visible.",
+  },
+  { id: "grappled", name: "Grappled", desc: "Speed 0." },
+  {
+    id: "incapacitated",
+    name: "Incapacitated",
+    desc: "No actions or reactions.",
+  },
+  {
+    id: "invisible",
+    name: "Invisible",
+    desc: "Adv on attacks. Attacks vs you have disadv.",
+  },
+  {
+    id: "paralyzed",
+    name: "Paralyzed",
+    desc: "Incapacitated. Auto-fail Str/Dex saves. Attacks vs you are crits.",
+  },
+  {
+    id: "petrified",
+    name: "Petrified",
+    desc: "Transformed to stone. Incapacitated. Resistance to all dmg.",
+  },
+  { id: "poisoned", name: "Poisoned", desc: "Disadv on attacks and checks." },
+  {
+    id: "prone",
+    name: "Prone",
+    desc: "Crawl only. Attacks vs you have adv (melee) or disadv (ranged).",
+  },
+  {
+    id: "restrained",
+    name: "Restrained",
+    desc: "Speed 0. Attacks vs you have adv. Your attacks have disadv.",
+  },
+  {
+    id: "stunned",
+    name: "Stunned",
+    desc: "Incapacitated. Fails Str/Dex saves. Attacks vs you have adv.",
+  },
+  {
+    id: "unconscious",
+    name: "Unconscious",
+    desc: "Incapacitated. Drop items. Auto-fail Str/Dex saves.",
+  },
+  { id: "exhaustion", name: "Exhaustion", desc: "Level 1-6. Death at 6." },
 ];

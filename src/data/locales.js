@@ -64,6 +64,9 @@ export const dictionary = {
     deleteHero: "Delete Hero",
     heal: "HEAL",
     dmg: "DMG",
+    conditions: "Conditions",
+    addCondition: "Add Condition",
+    exhaustion: "Exhaustion",
     
     // Spells
     spellDC: "Spell Save DC",
@@ -153,6 +156,9 @@ export const dictionary = {
     deleteHero: "Borrar Héroe",
     heal: "CURAR",
     dmg: "DAÑO",
+    conditions: "Condiciones",
+    addCondition: "Añadir Condición",
+    exhaustion: "Agotamiento",
     
     // Spells
     spellDC: "CD Salvación",
