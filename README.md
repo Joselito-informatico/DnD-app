@@ -4,7 +4,7 @@ Una aplicación web progresiva (PWA) diseñada para jugadores de Dungeons & Drag
 
 > 🚀 **Probar Demo en Vivo:** [https://dnd-app-one.vercel.app/](https://dnd-app-one.vercel.app/)
 
-> **Estado del Proyecto:** v1.5 (Feature Complete)
+> **Estado del Proyecto:** v1.7 (International & Mobile Ready)
 > **Arquitectura:** Single Page Application (SPA) sin backend (Client-side logic).
 
 ---
@@ -17,63 +17,61 @@ Este proyecto utiliza un stack moderno y ligero para facilitar el despliegue y m
 * **Estilos:** Tailwind CSS v3 (Diseño "Utility-first").
 * **Iconos:** Lucide React.
 * **Persistencia:** `localStorage` (Navegador) + Exportación JSON.
-* **Lenguaje:** JavaScript (ES6+).
-* **Control de Versiones:** Git + GitHub.
+* **Estado Global:** React Context API (Para Idiomas y Notificaciones).
+* **PWA:** Vite PWA Plugin (Instalable y Offline).
 
 ---
 
 ## ✨ Funcionalidades Principales
 
-### 1. Gestión y Seguridad
-* **Dashboard:** Visualización rápida de todos los personajes.
-* **Sistema de Backup:** Importar y Exportar todos tus personajes mediante archivos JSON (para compartir con amigos o mover de dispositivo).
-* **Persistencia Local:** Los datos se guardan automáticamente en el navegador.
+### 1. Gestión, Seguridad y Accesibilidad
+* **🌍 Bilingüe:** Soporte completo Español / Inglés con cambio instantáneo.
+* **📱 PWA Instalable:** Funciona como app nativa en Android/iOS y opera sin internet.
+* **🍞 Notificaciones Toast:** Sistema de alertas no intrusivas para confirmaciones y tiradas críticas.
+* **💾 Backup:** Importar y Exportar todos tus personajes mediante archivos JSON.
 
 ### 2. Creador de Personajes (Wizard)
-* **Flujo Guiado:** Selección visual de Raza, Clase, Atributos y Detalles de Rol.
-* **Datos SRD:** Reglas oficiales integradas para Razas y Clases.
-* **Auto-Equipamiento:** Asigna armas y rasgos de clase iniciales automáticamente.
+* **🎲 Generador Aleatorio:** Botón "Voy a tener suerte" para crear personajes completos al instante.
+* **🪄 Autocompletado:** Botón mágico para rellenar trasfondos y detalles de rol si te falta inspiración.
+* **🖼️ Avatares:** Soporte para URLs de imágenes personalizadas.
+* **Flujo Guiado:** Selección visual de Raza, Clase, Atributos y Detalles.
 
 ### 3. Hoja de Personaje Interactiva (5 Pestañas)
 
 #### ⚔️ Combat (Combate)
 * **Dashboard Táctico:** Vista clara de AC, Iniciativa, HP y Velocidad.
-* **Gestión de Salud:** Barra de vida dinámica, Death Saves (Salvaciones contra muerte) y Dados de Golpe (Hit Dice).
-* **Lanzador de Dados:** Al hacer click en un arma, lanza 1d20 + Modificadores y detecta Críticos.
-* **Gestión de Armas:** Crear armas personalizadas (Ej: "Espada +1") y borrarlas.
-* **Inspiración y Descansos:** Botones para Inspiración, Short Rest (Gasto de dados) y Long Rest (Recuperación total).
+* **Estados Alterados:** Panel visual para Condiciones (Cegado, Paralizado...) y Agotamiento.
+* **Recursos de Clase:** Contadores personalizados (Rage, Ki Points, Sorcery Points) que se recargan al descansar.
+* **Lanzador de Dados:** Al hacer click en un arma, lanza 1d20 + Modificadores con detección de Críticos.
 
 #### 🎲 Skills (Habilidades)
-* **Tiradas:** Lista completa de Skills y Saving Throws con cálculo automático de bonificadores.
-* **Percepción Pasiva:** Cálculo automático basado en Sabiduría.
-* **Competencias:** Visualización de idiomas y competencias de armadura/armas.
+* **Competencias (Proficiency):** Sistema de "estrellas" para marcar habilidades entrenadas.
+* **Percepción Pasiva:** Cálculo automático basado en Sabiduría y competencia.
 
 #### 🔥 Spells (Magia)
-* **Grimorio Interactivo:** Añadir y borrar hechizos personalizados (Nombre, Nivel, Escuela, Daño).
-* **Gestión de Slots:** Control de espacios de conjuro gastados/totales por nivel.
-* **Calculadora Mágica:** Cálculo automático de Spell Save DC y Spell Attack Bonus según la clase.
+* **Grimorio Interactivo:** Añadir y borrar hechizos personalizados.
+* **Gestor de Slots:** Configuración manual de espacios máximos (Nivel 1-9) y seguimiento de gastos.
 
 #### 🎒 Equip (Inventario)
 * **Monedero:** Gestión de divisas (CP, SP, EP, GP, PP).
 * **Mochila:** Añadir y eliminar objetos del inventario rápidamente.
 
 #### 📜 Profile (Perfil y Rol)
-* **Progresión:** Edición de Nivel y XP (El Bono de Competencia se recalcula al subir de nivel).
+* **Progresión:** Edición de Nivel, XP y Atributos Base (ASI).
 * **Identidad:** Rasgos de personalidad, Ideales, Vínculos, Defectos e Historia.
-* **Social:** Registro de Aliados, Organizaciones y Tesoros.
 
-#### 🗺 Roadmap (Próximos Pasos)
+#### 🗺 Roadmap (Completado)
 [x] Subida de Nivel: Edición dinámica de nivel y stats.
 
 [x] Gestor de Hechizos: Crear base de datos de spells y slots.
 
 [x] Exportar/Importar: Guardar personajes en archivos JSON.
 
-[ ] Multiclase: Soporte para tener niveles en varias clases.
+[x] PWA Manifest: Instalable en móviles y soporte Offline.
 
-[ ] PWA Manifest: Configurar iconos para instalación nativa en móviles.
+[x] Internacionalización: Soporte ES/EN.
 
-[ ] API Externa: Conectar con una API de D&D 5e para tener todos los hechizos del juego.
+[x] Recursos de Clase: Trackers para Ki, Furia, etc.
 
 ---
 
@@ -82,15 +80,16 @@ Este proyecto utiliza un stack moderno y ligero para facilitar el despliegue y m
 ```text
 dnd-app/
 ├── src/
+│   ├── context/          # Lógica global (Idiomas, Toasts)
 │   ├── data/
-│   │   └── srd.js        # Base de datos estática (Razas, Clases, Skills, Hechizos Base)
+│   │   ├── srd.js        # Base de datos estática (Reglas 5e)
+│   │   └── locales.js    # Diccionarios de traducción (ES/EN)
 │   ├── pages/
-│   │   ├── Dashboard.jsx        # Home: Lista de héroes + Import/Export
-│   │   ├── CharacterCreator.jsx # Wizard de creación paso a paso
-│   │   └── CombatView.jsx       # Hoja de personaje completa (Tabs logic)
-│   ├── App.jsx           # Controlador principal y Estado Global
-│   ├── main.jsx          # Punto de entrada Vite
-│   └── index.css         # Configuración Tailwind
-├── public/               # Assets estáticos
-├── index.html            # HTML raíz
-└── package.json          # Dependencias
+│   │   ├── Dashboard.jsx        # Home: Lista, Randomizer, Import/Export
+│   │   ├── CharacterCreator.jsx # Wizard de creación
+│   │   └── CombatView.jsx       # Hoja de personaje completa
+│   ├── utils/            # Funciones de aleatoriedad
+│   ├── App.jsx           # Enrutador principal
+│   └── main.jsx          # Punto de entrada (Providers)
+├── public/               # Iconos PWA y assets
+└── vite.config.js        # Configuración PWA
