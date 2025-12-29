@@ -27,6 +27,7 @@ import {
   Gem,
   PenTool,
   AlertTriangle,
+  Minus,
 } from "lucide-react";
 import { CLASSES, SKILLS, SPELLS as SRD_SPELLS, CONDITIONS } from "../data/srd";
 import { useLanguage } from "../context/LanguageContext";
@@ -58,6 +59,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     time: "1 Action",
   });
   const [isAddingCondition, setIsAddingCondition] = useState(false);
+  const [isEditingSlots, setIsEditingSlots] = useState(false); // NUEVO: Modal de Slots
 
   // --- REGLAS & CALCULOS ---
   const proficiencyBonus = Math.floor(2 + (hero.level - 1) / 4);
@@ -79,10 +81,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
 
   const inspiration = hero.inspiration || false;
 
-  // NUEVO: Lógica de Competencias en Habilidades
-  const skillProfs = hero.skillProfs || []; // Array de nombres de skills ["Stealth", "Athletics"]
-
-  // Percepción Pasiva ahora tiene en cuenta la competencia
+  const skillProfs = hero.skillProfs || [];
   const isPerceptionProf = skillProfs.includes("Perception");
   const passivePerception =
     10 + mods.wis + (isPerceptionProf ? proficiencyBonus : 0);
@@ -115,7 +114,12 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const features = hero.features || [];
 
   const mySpells = hero.spells || SRD_SPELLS;
-  const spellSlots = hero.spellSlots || { 1: { total: 2, used: 0 } };
+
+  // NUEVA LÓGICA DE SLOTS (Inicialización robusta)
+  // Aseguramos que existan niveles del 1 al 9
+  const defaultSlots = { 1: { total: 2, used: 0 } };
+  const spellSlots = hero.spellSlots || defaultSlots;
+
   const spellCastingStat =
     hero.class === "Wizard"
       ? "int"
@@ -129,16 +133,12 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
 
   // --- ACCIONES ---
 
-  // Toggle de Competencia (Estrellita)
   const toggleSkillProficiency = (e, skillName) => {
-    e.stopPropagation(); // Evita que se tire el dado al hacer click en la estrella
+    e.stopPropagation();
     const exists = skillProfs.includes(skillName);
-    let newProfs;
-    if (exists) {
-      newProfs = skillProfs.filter((s) => s !== skillName);
-    } else {
-      newProfs = [...skillProfs, skillName];
-    }
+    const newProfs = exists
+      ? skillProfs.filter((s) => s !== skillName)
+      : [...skillProfs, skillName];
     onUpdateHero({ ...hero, skillProfs: newProfs });
   };
 
@@ -213,6 +213,34 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     }
   };
 
+  // --- GESTIÓN DE SLOTS ---
+  const updateMaxSlots = (level, change) => {
+    const currentLevelData = spellSlots[level] || { total: 0, used: 0 };
+    const newTotal = Math.max(0, currentLevelData.total + change);
+    // Si bajamos el total por debajo de los usados, ajustamos los usados
+    const newUsed = Math.min(currentLevelData.used, newTotal);
+
+    const newSlots = {
+      ...spellSlots,
+      [level]: { total: newTotal, used: newUsed },
+    };
+    onUpdateHero({ ...hero, spellSlots: newSlots });
+  };
+
+  const toggleSlot = (level, slotIndex) => {
+    const currentLevel = spellSlots[level] || { total: 0, used: 0 };
+    const isUsed = slotIndex < currentLevel.used;
+    const newUsed = isUsed ? currentLevel.used - 1 : currentLevel.used + 1;
+    const newSlots = {
+      ...spellSlots,
+      [level]: {
+        ...currentLevel,
+        used: Math.max(0, Math.min(currentLevel.total, newUsed)),
+      },
+    };
+    onUpdateHero({ ...hero, spellSlots: newSlots });
+  };
+
   const updateLevel = (val) => {
     const lvl = Math.max(1, Math.min(20, parseInt(val) || 1));
     onUpdateHero({ ...hero, level: lvl });
@@ -234,7 +262,9 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
 
   const handleLongRest = () => {
     const resetSlots = { ...spellSlots };
+    // Reseteamos TODOS los niveles que existan
     Object.keys(resetSlots).forEach((level) => (resetSlots[level].used = 0));
+
     const regainedHitDice = Math.max(1, Math.floor(hitDiceTotal / 2));
     const newHitDiceUsed = Math.max(0, hitDiceUsed - regainedHitDice);
     const newExhaustion = Math.max(0, exhaustionLevel - 1);
@@ -309,19 +339,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
       inventory: inventory.filter((i) => i.id !== itemId),
     });
   };
-  const toggleSlot = (level, slotIndex) => {
-    const currentLevel = spellSlots[level] || { total: 0, used: 0 };
-    const isUsed = slotIndex < currentLevel.used;
-    const newUsed = isUsed ? currentLevel.used - 1 : currentLevel.used + 1;
-    const newSlots = {
-      ...spellSlots,
-      [level]: {
-        ...currentLevel,
-        used: Math.max(0, Math.min(currentLevel.total, newUsed)),
-      },
-    };
-    onUpdateHero({ ...hero, spellSlots: newSlots });
-  };
 
   const rollDice = (name, modifier) => {
     const d20 = Math.floor(Math.random() * 20) + 1;
@@ -391,7 +408,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         </button>
       </header>
 
-      {/* MODAL EDICIÓN */}
+      {/* MODAL EDICIÓN RAPIDA */}
       {editingStat && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-stone-900 border border-stone-700 p-6 rounded-2xl w-full max-w-xs animate-in zoom-in duration-200">
@@ -416,6 +433,62 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               className="w-full py-2 bg-stone-800 text-stone-400 rounded-lg"
             >
               Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL GESTIÓN DE SLOTS (NUEVO) */}
+      {isEditingSlots && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-stone-900 border border-stone-700 p-6 rounded-2xl w-full max-w-sm animate-in zoom-in duration-200 max-h-[80vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-stone-100 font-bold">Manage Spell Slots</h3>
+              <button onClick={() => setIsEditingSlots(false)}>
+                <X className="text-stone-500 hover:text-white" />
+              </button>
+            </div>
+            <p className="text-xs text-stone-500 mb-4">
+              Set your maximum spell slots per level.
+            </p>
+
+            <div className="space-y-3">
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((lvl) => {
+                const count = spellSlots[lvl]?.total || 0;
+                return (
+                  <div
+                    key={lvl}
+                    className="flex items-center justify-between bg-stone-800 p-2 rounded-lg border border-stone-700"
+                  >
+                    <span className="text-sm font-bold text-stone-300 w-20">
+                      Level {lvl}
+                    </span>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => updateMaxSlots(lvl, -1)}
+                        className="w-8 h-8 flex items-center justify-center bg-stone-900 rounded hover:bg-stone-700 text-stone-400"
+                      >
+                        <Minus size={16} />
+                      </button>
+                      <span className="font-mono text-xl w-6 text-center text-yellow-500">
+                        {count}
+                      </span>
+                      <button
+                        onClick={() => updateMaxSlots(lvl, 1)}
+                        className="w-8 h-8 flex items-center justify-center bg-stone-900 rounded hover:bg-stone-700 text-stone-400"
+                      >
+                        <Plus size={16} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <button
+              onClick={() => setIsEditingSlots(false)}
+              className="w-full mt-6 py-3 bg-yellow-600 hover:bg-yellow-500 text-stone-100 rounded-xl font-bold"
+            >
+              Done
             </button>
           </div>
         </div>
@@ -746,7 +819,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                   className="text-xs bg-stone-800 border border-stone-600 px-2 py-1 rounded text-stone-300 hover:text-white hover:border-yellow-500 flex items-center gap-1"
                 >
                   {isAddingAttack ? <X size={12} /> : <Plus size={12} />}{" "}
-                  {isAddingAttack ? "Cancel" : t("addWeapon")}
+                  {t("addWeapon")}
                 </button>
               </div>
               {isAddingAttack && (
@@ -856,15 +929,14 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           </div>
         )}
 
-        {/* SKILLS: AHORA CON TOGGLE DE COMPETENCIA */}
+        {/* SKILLS */}
         {activeTab === "skills" && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
-            {/* Passive Perception */}
             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Eye className="text-stone-400" />
-                <div>
-                  <span className="font-bold text-stone-200 block">
+                <div className="flex flex-col">
+                  <span className="font-bold text-stone-200">
                     {t("passivePerception")}
                   </span>
                   <span className="text-[10px] text-stone-500">
@@ -876,8 +948,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 {passivePerception}
               </span>
             </div>
-
-            {/* Saving Throws */}
             <div>
               <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
                 <Shield size={16} /> {t("savingThrows")}
@@ -926,8 +996,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 })}
               </div>
             </div>
-
-            {/* SKILLS LIST INTERACTIVA */}
             <div>
               <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
                 <Activity size={16} /> {t("skills")}
@@ -937,7 +1005,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                   const isProf = skillProfs.includes(skill.name);
                   const totalMod =
                     mods[skill.stat] + (isProf ? proficiencyBonus : 0);
-
                   return (
                     <div
                       key={skill.name}
@@ -945,7 +1012,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                       className="p-3 flex justify-between items-center cursor-pointer hover:bg-stone-700/50 transition group"
                     >
                       <div className="flex items-center gap-3">
-                        {/* Botón de Estrella para Toggle */}
                         <button
                           onClick={(e) => toggleSkillProficiency(e, skill.name)}
                           className="p-1 rounded hover:bg-stone-600 transition"
@@ -987,7 +1053,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 })}
               </div>
             </div>
-
             <div>
               <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
                 <Languages size={16} /> Proficiencies
@@ -1028,59 +1093,87 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           </div>
         )}
 
-        {/* SPELLS (Igual) */}
+        {/* SPELLS (MEJORADO CON EDITOR DE SLOTS) */}
         {activeTab === "spells" && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
-            <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 grid grid-cols-2 gap-4">
-              <div className="flex flex-col items-center border-r border-stone-700">
-                <span className="text-[10px] uppercase font-bold text-stone-500">
-                  {t("spellDC")}
-                </span>
-                <span className="text-2xl font-bold text-stone-100">
-                  {spellSaveDC}
-                </span>
-                <span className="text-[10px] text-stone-600">
-                  8 + Prof + {t(spellCastingStat).slice(0, 3)}
-                </span>
+            {/* Header de Magia con botón Editar Slots */}
+            <div className="flex items-start gap-4">
+              <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 grid grid-cols-2 gap-4 flex-1">
+                <div className="flex flex-col items-center border-r border-stone-700">
+                  <span className="text-[10px] uppercase font-bold text-stone-500">
+                    {t("spellDC")}
+                  </span>
+                  <span className="text-2xl font-bold text-stone-100">
+                    {spellSaveDC}
+                  </span>
+                  <span className="text-[10px] text-stone-600">
+                    8 + Prof + {t(spellCastingStat).slice(0, 3)}
+                  </span>
+                </div>
+                <div className="flex flex-col items-center">
+                  <span className="text-[10px] uppercase font-bold text-stone-500">
+                    {t("spellAtk")}
+                  </span>
+                  <span className="text-2xl font-bold text-yellow-500">
+                    +{spellAttackBonus}
+                  </span>
+                  <span className="text-[10px] text-stone-600">
+                    Prof + {t(spellCastingStat).slice(0, 3)}
+                  </span>
+                </div>
               </div>
-              <div className="flex flex-col items-center">
-                <span className="text-[10px] uppercase font-bold text-stone-500">
-                  {t("spellAtk")}
-                </span>
-                <span className="text-2xl font-bold text-yellow-500">
-                  +{spellAttackBonus}
-                </span>
-                <span className="text-[10px] text-stone-600">
-                  Prof + {t(spellCastingStat).slice(0, 3)}
-                </span>
-              </div>
+              <button
+                onClick={() => setIsEditingSlots(true)}
+                className="h-full px-3 bg-stone-800 border border-stone-700 rounded-xl flex flex-col items-center justify-center gap-1 hover:bg-stone-700 hover:text-yellow-500 transition text-stone-400"
+              >
+                <Settings size={20} />
+                <span className="text-[10px] font-bold uppercase">Slots</span>
+              </button>
             </div>
-            <div>
-              <div className="flex justify-between items-end mb-2">
-                <h3 className="text-stone-400 font-bold text-sm uppercase flex items-center gap-2">
-                  <Flame size={16} /> {t("level")} 1 Slots
-                </h3>
-                <span className="text-xs text-stone-500">
-                  {spellSlots[1]?.used || 0} / {spellSlots[1]?.total || 0}
-                </span>
-              </div>
-              <div className="flex gap-2">
-                {Array.from({ length: spellSlots[1]?.total || 0 }).map(
-                  (_, i) => (
-                    <button
-                      key={i}
-                      onClick={() => toggleSlot(1, i)}
-                      className={`w-8 h-8 rounded-full border-2 transition ${
-                        i < (spellSlots[1]?.used || 0)
-                          ? "bg-stone-900 border-stone-700"
-                          : "bg-yellow-500 border-yellow-600 shadow-[0_0_10px_rgba(234,179,8,0.5)]"
-                      }`}
-                    ></button>
-                  )
-                )}
-              </div>
+
+            {/* Listado de Slots (Renderiza solo los que tienen > 0 total) */}
+            <div className="space-y-3">
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((lvl) => {
+                const slotData = spellSlots[lvl];
+                if (!slotData || slotData.total === 0) return null;
+
+                return (
+                  <div key={lvl}>
+                    <div className="flex justify-between items-end mb-2">
+                      <h3 className="text-stone-400 font-bold text-sm uppercase flex items-center gap-2">
+                        <Flame size={14} className="text-yellow-600" />{" "}
+                        {t("level")} {lvl}
+                      </h3>
+                      <span className="text-xs text-stone-500">
+                        {slotData.used} / {slotData.total}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {Array.from({ length: slotData.total }).map((_, i) => (
+                        <button
+                          key={i}
+                          onClick={() => toggleSlot(lvl, i)}
+                          className={`w-8 h-8 rounded-full border-2 transition ${
+                            i < slotData.used
+                              ? "bg-stone-900 border-stone-700"
+                              : "bg-yellow-500 border-yellow-600 shadow-[0_0_10px_rgba(234,179,8,0.5)]"
+                          }`}
+                        ></button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+              {/* Mensaje si no hay slots configurados */}
+              {Object.values(spellSlots).every((s) => s.total === 0) && (
+                <p className="text-xs text-stone-600 text-center italic py-2">
+                  No spell slots available. Configure them above.
+                </p>
+              )}
             </div>
-            <div className="space-y-4">
+
+            {/* Gestión de Conjuros (Add/Remove) */}
+            <div className="space-y-4 pt-4 border-t border-stone-800">
               <div className="flex justify-end">
                 <button
                   onClick={() => setIsAddingSpell(!isAddingSpell)}
@@ -1179,9 +1272,12 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                     ))}
                 </div>
               </div>
-              {[1, 2, 3].map((lvl) => {
+
+              {/* Renderizado de conjuros por nivel (Solo si hay conjuros o slots de ese nivel) */}
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((lvl) => {
                 const spellsOfLevel = mySpells.filter((s) => s.level === lvl);
-                if (spellsOfLevel.length === 0 && lvl > 1) return null;
+                const hasSlots = spellSlots[lvl]?.total > 0;
+                if (spellsOfLevel.length === 0 && !hasSlots) return null;
                 return (
                   <div key={lvl}>
                     <h3 className="text-stone-500 font-bold text-xs uppercase mb-2">
