@@ -104,6 +104,14 @@ export const dictionary = {
     bonds: "Bonds",
     flaws: "Flaws",
     xp: "Experience",
+
+    // Dice Tray & Share
+    diceTray: "Dice Tray",
+    roll: "Roll",
+    exportJSON: "Export JSON",
+    copySummary: "Copy Summary",
+    copied: "Copied to clipboard!",
+    share: "Share",
   },
   es: {
     // General
@@ -210,5 +218,13 @@ export const dictionary = {
     bonds: "Vínculos",
     flaws: "Defectos",
     xp: "Experiencia",
+
+    // Dice Tray & Share
+    diceTray: "Bandeja de Dados",
+    roll: "Lanzar",
+    exportJSON: "Exportar JSON",
+    copySummary: "Copiar Resumen",
+    copied: "¡Copiado al portapapeles!",
+    share: "Compartir",
   }
 };
