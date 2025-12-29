@@ -27,7 +27,6 @@ import {
   Gem,
   PenTool,
   AlertTriangle,
-  Droplets,
 } from "lucide-react";
 import { CLASSES, SKILLS, SPELLS as SRD_SPELLS, CONDITIONS } from "../data/srd";
 import { useLanguage } from "../context/LanguageContext";
@@ -43,7 +42,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const [newItemName, setNewItemName] = useState("");
   const [editingStat, setEditingStat] = useState(null);
 
-  // Modales
   const [isAddingAttack, setIsAddingAttack] = useState(false);
   const [newAttack, setNewAttack] = useState({
     name: "",
@@ -59,7 +57,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     desc: "",
     time: "1 Action",
   });
-  const [isAddingCondition, setIsAddingCondition] = useState(false); // NUEVO
+  const [isAddingCondition, setIsAddingCondition] = useState(false);
 
   // --- REGLAS & CALCULOS ---
   const proficiencyBonus = Math.floor(2 + (hero.level - 1) / 4);
@@ -80,7 +78,14 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const initiative = mods.dex >= 0 ? `+${mods.dex}` : mods.dex;
 
   const inspiration = hero.inspiration || false;
-  const passivePerception = 10 + mods.wis;
+
+  // NUEVO: Lógica de Competencias en Habilidades
+  const skillProfs = hero.skillProfs || []; // Array de nombres de skills ["Stealth", "Athletics"]
+
+  // Percepción Pasiva ahora tiene en cuenta la competencia
+  const isPerceptionProf = skillProfs.includes("Perception");
+  const passivePerception =
+    10 + mods.wis + (isPerceptionProf ? proficiencyBonus : 0);
 
   const heroClassData = CLASSES.find((c) => c.name === hero.class);
   const saveProficiencies = heroClassData ? heroClassData.saves : [];
@@ -91,8 +96,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const hitDiceTotal = hero.level;
   const deathSaves = hero.deathSaves || { successes: 0, failures: 0 };
   const xp = hero.xp || 0;
-
-  // NUEVO: Condiciones y Agotamiento
   const activeConditions = hero.conditions || [];
   const exhaustionLevel = hero.exhaustion || 0;
 
@@ -126,7 +129,19 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
 
   // --- ACCIONES ---
 
-  // Gestión de Condiciones
+  // Toggle de Competencia (Estrellita)
+  const toggleSkillProficiency = (e, skillName) => {
+    e.stopPropagation(); // Evita que se tire el dado al hacer click en la estrella
+    const exists = skillProfs.includes(skillName);
+    let newProfs;
+    if (exists) {
+      newProfs = skillProfs.filter((s) => s !== skillName);
+    } else {
+      newProfs = [...skillProfs, skillName];
+    }
+    onUpdateHero({ ...hero, skillProfs: newProfs });
+  };
+
   const toggleCondition = (conditionId) => {
     const exists = activeConditions.includes(conditionId);
     let newConditions;
@@ -135,7 +150,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
       showToast("Condition removed", "info");
     } else {
       newConditions = [...activeConditions, conditionId];
-      showToast("Condition applied", "error"); // Es algo malo, usamos rojo
+      showToast("Condition applied", "error");
     }
     onUpdateHero({ ...hero, conditions: newConditions });
     setIsAddingCondition(false);
@@ -222,7 +237,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     Object.keys(resetSlots).forEach((level) => (resetSlots[level].used = 0));
     const regainedHitDice = Math.max(1, Math.floor(hitDiceTotal / 2));
     const newHitDiceUsed = Math.max(0, hitDiceUsed - regainedHitDice);
-    // Recuperar 1 nivel de agotamiento
     const newExhaustion = Math.max(0, exhaustionLevel - 1);
 
     onUpdateHero({
@@ -341,8 +355,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           >
             <ArrowLeft />
           </button>
-
-          {/* AVATAR + NOMBRE */}
           <div className="flex items-center gap-3">
             {details.avatar && (
               <div className="w-10 h-10 rounded-full bg-stone-800 border border-stone-600 overflow-hidden">
@@ -379,7 +391,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         </button>
       </header>
 
-      {/* MODAL EDICIÓN RÁPIDA */}
+      {/* MODAL EDICIÓN */}
       {editingStat && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-stone-900 border border-stone-700 p-6 rounded-2xl w-full max-w-xs animate-in zoom-in duration-200">
@@ -409,7 +421,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         </div>
       )}
 
-      {/* MENÚ OVERLAY */}
+      {/* MENÚ */}
       {showMenu && (
         <div className="absolute top-20 right-6 z-20 w-48 bg-stone-800 border border-stone-700 rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in duration-200 origin-top-right">
           <button
@@ -571,7 +583,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               </button>
             </div>
 
-            {/* NUEVA SECCIÓN: CONDITIONS & EXHAUSTION */}
+            {/* CONDITIONS */}
             <div>
               <div className="flex justify-between items-center mb-2">
                 <h3 className="text-stone-400 font-bold text-sm uppercase tracking-wider">
@@ -585,8 +597,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                   {t("addCondition")}
                 </button>
               </div>
-
-              {/* Menú de selección de condición */}
               {isAddingCondition && (
                 <div className="bg-stone-800 p-2 rounded-xl border border-yellow-500/50 mb-3 grid grid-cols-2 gap-2 animate-in fade-in zoom-in duration-200">
                   {CONDITIONS.filter((c) => c.id !== "exhaustion").map((c) => (
@@ -604,10 +614,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                   ))}
                 </div>
               )}
-
-              {/* Lista de condiciones activas */}
               <div className="flex flex-wrap gap-2 mb-4">
-                {/* Agotamiento (Siempre visible si > 0) */}
                 <div className="flex items-center gap-2 bg-stone-900 border border-stone-700 px-3 py-1 rounded-full">
                   <span
                     className={`text-xs font-bold ${
@@ -636,7 +643,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                     ))}
                   </div>
                 </div>
-
                 {activeConditions.map((cId) => {
                   const cond = CONDITIONS.find((c) => c.id === cId);
                   return (
@@ -652,11 +658,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                     </div>
                   );
                 })}
-                {activeConditions.length === 0 && exhaustionLevel === 0 && (
-                  <p className="text-[10px] text-stone-600 w-full text-center">
-                    Healthy. No active conditions.
-                  </p>
-                )}
               </div>
             </div>
 
@@ -855,20 +856,28 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           </div>
         )}
 
-        {/* SKILLS */}
+        {/* SKILLS: AHORA CON TOGGLE DE COMPETENCIA */}
         {activeTab === "skills" && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
+            {/* Passive Perception */}
             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Eye className="text-stone-400" />
-                <span className="font-bold text-stone-200">
-                  {t("passivePerception")}
-                </span>
+                <div>
+                  <span className="font-bold text-stone-200 block">
+                    {t("passivePerception")}
+                  </span>
+                  <span className="text-[10px] text-stone-500">
+                    10 + WIS{isPerceptionProf ? " + PROF" : ""}
+                  </span>
+                </div>
               </div>
               <span className="text-xl font-bold text-stone-100">
                 {passivePerception}
               </span>
             </div>
+
+            {/* Saving Throws */}
             <div>
               <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
                 <Shield size={16} /> {t("savingThrows")}
@@ -917,36 +926,68 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 })}
               </div>
             </div>
+
+            {/* SKILLS LIST INTERACTIVA */}
             <div>
               <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
                 <Activity size={16} /> {t("skills")}
               </h3>
               <div className="bg-stone-800 rounded-xl border border-stone-700 divide-y divide-stone-700/50">
                 {SKILLS.map((skill) => {
-                  const mod = mods[skill.stat];
+                  const isProf = skillProfs.includes(skill.name);
+                  const totalMod =
+                    mods[skill.stat] + (isProf ? proficiencyBonus : 0);
+
                   return (
                     <div
                       key={skill.name}
-                      onClick={() => rollDice(skill.name, mod)}
-                      className="p-3 flex justify-between items-center cursor-pointer hover:bg-stone-700/50 transition"
+                      onClick={() => rollDice(skill.name, totalMod)}
+                      className="p-3 flex justify-between items-center cursor-pointer hover:bg-stone-700/50 transition group"
                     >
                       <div className="flex items-center gap-3">
-                        <span className="text-stone-300 text-sm font-medium">
-                          {skill.name}
-                        </span>
-                        <span className="text-xs text-stone-600 uppercase">
-                          ({skill.stat})
-                        </span>
+                        {/* Botón de Estrella para Toggle */}
+                        <button
+                          onClick={(e) => toggleSkillProficiency(e, skill.name)}
+                          className="p-1 rounded hover:bg-stone-600 transition"
+                        >
+                          <Star
+                            size={16}
+                            className={
+                              isProf
+                                ? "text-yellow-500 fill-yellow-500"
+                                : "text-stone-600"
+                            }
+                          />
+                        </button>
+                        <div>
+                          <span
+                            className={`text-sm font-medium ${
+                              isProf ? "text-yellow-500" : "text-stone-300"
+                            }`}
+                          >
+                            {skill.name}
+                          </span>
+                          <span className="text-[10px] text-stone-600 uppercase ml-2">
+                            ({t(skill.stat).slice(0, 3)})
+                          </span>
+                        </div>
                       </div>
-                      <span className="text-stone-400 font-mono text-sm">
-                        {mod >= 0 ? "+" : ""}
-                        {mod}
+                      <span
+                        className={`font-mono text-sm ${
+                          isProf
+                            ? "text-yellow-500 font-bold"
+                            : "text-stone-400"
+                        }`}
+                      >
+                        {totalMod >= 0 ? "+" : ""}
+                        {totalMod}
                       </span>
                     </div>
                   );
                 })}
               </div>
             </div>
+
             <div>
               <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
                 <Languages size={16} /> Proficiencies
