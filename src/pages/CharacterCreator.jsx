@@ -12,13 +12,14 @@ import {
   User,
   ScrollText,
   Sparkles,
+  Image as ImageIcon,
 } from "lucide-react";
 import { RACES, CLASSES } from "../data/srd";
 import { getRandomDetails } from "../utils/randomizer";
-import { useLanguage } from "../context/LanguageContext"; // <--- Importar Hook
+import { useLanguage } from "../context/LanguageContext";
 
 export function CharacterCreator({ onBack, onSave }) {
-  const { t } = useLanguage(); // <--- Usar Hook
+  const { t } = useLanguage();
   const [step, setStep] = useState(1);
   const [selectedRace, setSelectedRace] = useState(null);
   const [selectedClass, setSelectedClass] = useState(null);
@@ -45,6 +46,7 @@ export function CharacterCreator({ onBack, onSave }) {
     ideals: "",
     bonds: "",
     flaws: "",
+    avatar: "", // NUEVO CAMPO
   });
 
   const getMod = (score) => {
@@ -61,7 +63,11 @@ export function CharacterCreator({ onBack, onSave }) {
 
   const handleAutoFill = () => {
     const random = getRandomDetails();
-    setDetails((prev) => ({ ...random, name: prev.name || random.name }));
+    setDetails((prev) => ({
+      ...random,
+      name: prev.name || random.name,
+      avatar: prev.avatar,
+    }));
   };
 
   const handleNext = () => {
@@ -136,7 +142,6 @@ export function CharacterCreator({ onBack, onSave }) {
     }
   };
 
-  // Configuración de stats dentro del componente para usar t()
   const statConfig = [
     { id: "str", label: t("str"), icon: Sword, color: "text-red-400" },
     { id: "dex", label: t("dex"), icon: Zap, color: "text-yellow-400" },
@@ -301,6 +306,39 @@ export function CharacterCreator({ onBack, onSave }) {
                 <Sparkles size={14} /> {t("autoFill")}
               </button>
             </div>
+
+            {/* AVATAR INPUT (NUEVO) */}
+            <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 space-y-3">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 bg-stone-900 rounded-full flex-shrink-0 border-2 border-stone-600 overflow-hidden flex items-center justify-center">
+                  {details.avatar ? (
+                    <img
+                      src={details.avatar}
+                      alt="Avatar"
+                      className="w-full h-full object-cover"
+                      onError={(e) => (e.target.style.display = "none")}
+                    />
+                  ) : (
+                    <ImageIcon className="text-stone-600" />
+                  )}
+                </div>
+                <div className="flex-1 space-y-1">
+                  <label className="text-xs font-bold text-stone-400 uppercase">
+                    {t("avatarLabel")}
+                  </label>
+                  <input
+                    type="text"
+                    placeholder={t("avatarPlaceholder")}
+                    value={details.avatar}
+                    onChange={(e) =>
+                      setDetails({ ...details, avatar: e.target.value })
+                    }
+                    className="w-full bg-stone-900 border border-stone-600 rounded-lg p-2 text-sm text-stone-100 outline-none focus:border-yellow-500"
+                  />
+                </div>
+              </div>
+            </div>
+
             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 space-y-2">
               <label className="text-sm font-bold text-stone-300 flex items-center gap-2">
                 <User size={16} /> {t("charName")}

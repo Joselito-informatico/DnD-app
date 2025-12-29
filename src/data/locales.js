@@ -89,7 +89,9 @@ export const dictionary = {
     ideals: "Ideals",
     bonds: "Bonds",
     flaws: "Flaws",
-    xp: "Experience"
+    xp: "Experience",
+    avatarLabel: "Character Image URL",
+    avatarPlaceholder: "Paste image link (https://...)",
   },
   es: {
     // General
@@ -181,6 +183,8 @@ export const dictionary = {
     ideals: "Ideales",
     bonds: "Vínculos",
     flaws: "Defectos",
-    xp: "Experiencia"
+    xp: "Experiencia",
+    avatarLabel: "URL Imagen del Personaje",
+    avatarPlaceholder: "Pega el link (https://...)",
   }
 };

@@ -341,17 +341,30 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           >
             <ArrowLeft />
           </button>
-          <div>
-            <h1 className="text-xl font-bold text-stone-100">{hero.name}</h1>
-            <p
-              onClick={() => setEditingStat("level")}
-              className="text-xs text-stone-500 cursor-pointer hover:text-yellow-500 hover:underline"
-            >
-              {t("level")} {hero.level} {hero.race} {hero.class}{" "}
-              <span className="text-[10px] bg-stone-800 px-1 rounded ml-1">
-                {t("edit")}
-              </span>
-            </p>
+
+          {/* AVATAR + NOMBRE */}
+          <div className="flex items-center gap-3">
+            {details.avatar && (
+              <div className="w-10 h-10 rounded-full bg-stone-800 border border-stone-600 overflow-hidden">
+                <img
+                  src={details.avatar}
+                  alt="avatar"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            )}
+            <div>
+              <h1 className="text-xl font-bold text-stone-100">{hero.name}</h1>
+              <p
+                onClick={() => setEditingStat("level")}
+                className="text-xs text-stone-500 cursor-pointer hover:text-yellow-500 hover:underline"
+              >
+                {t("level")} {hero.level} {hero.race} {hero.class}{" "}
+                <span className="text-[10px] bg-stone-800 px-1 rounded ml-1">
+                  {t("edit")}
+                </span>
+              </p>
+            </div>
           </div>
         </div>
         <button

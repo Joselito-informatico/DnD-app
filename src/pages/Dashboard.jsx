@@ -10,7 +10,7 @@ import {
   Dices,
 } from "lucide-react";
 import { useLanguage } from "../context/LanguageContext";
-import { useToast } from "../context/ToastContext"; // <--- Importar
+import { useToast } from "../context/ToastContext";
 
 export function Dashboard({
   heroes,
@@ -20,7 +20,7 @@ export function Dashboard({
   onRandom,
 }) {
   const { t } = useLanguage();
-  const { showToast } = useToast(); // <--- Usar Hook
+  const { showToast } = useToast();
   const fileInputRef = useRef(null);
 
   const handleExport = () => {
@@ -33,7 +33,7 @@ export function Dashboard({
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    showToast("Backup downloaded!", "success"); // <--- TOAST
+    showToast("Backup downloaded!", "success");
   };
 
   const handleFileChange = (event) => {
@@ -46,10 +46,10 @@ export function Dashboard({
         if (Array.isArray(importedHeroes)) {
           onImport(importedHeroes);
         } else {
-          showToast("Invalid JSON Format", "error"); // <--- TOAST ERROR
+          showToast("Invalid JSON Format", "error");
         }
       } catch (err) {
-        showToast("Error reading file", "error"); // <--- TOAST ERROR
+        showToast("Error reading file", "error");
       }
     };
     reader.readAsText(file);
@@ -97,6 +97,7 @@ export function Dashboard({
             {t("createHero")}
           </span>
         </button>
+
         <button
           onClick={onRandom}
           className="group flex flex-col items-center justify-center gap-4 p-8 rounded-2xl border-2 border-dashed border-stone-700 hover:border-purple-500 hover:bg-stone-800/50 transition h-48"
@@ -108,32 +109,49 @@ export function Dashboard({
             {t("randomHero")}
           </span>
         </button>
+
         {heroes.map((hero) => (
           <div
             key={hero.id}
             onClick={() => onNavigate(hero.id)}
             className="relative group bg-stone-800 rounded-2xl p-5 border border-stone-700 cursor-pointer hover:border-yellow-500 hover:shadow-xl hover:-translate-y-1 transition h-48 flex flex-col justify-between overflow-hidden"
           >
-            <div className="absolute -right-4 -top-4 opacity-5 rotate-12">
-              {hero.class === "Fighter" && <Sword size={120} />}
-              {hero.class === "Wizard" && <Zap size={120} />}
-              {hero.class === "Rogue" && <Shield size={120} />}
+            {/* FONDO IMAGEN DE PERSONAJE (O ICONO SI NO HAY) */}
+            <div className="absolute inset-0 z-0">
+              {hero.details?.avatar ? (
+                <>
+                  <img
+                    src={hero.details.avatar}
+                    alt="bg"
+                    className="w-full h-full object-cover opacity-20 group-hover:opacity-40 transition group-hover:scale-105 duration-500"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-stone-900 via-stone-900/80 to-transparent"></div>
+                </>
+              ) : (
+                <div className="absolute -right-4 -top-4 opacity-5 rotate-12">
+                  {hero.class === "Fighter" && <Sword size={120} />}
+                  {hero.class === "Wizard" && <Zap size={120} />}
+                  {hero.class === "Rogue" && <Shield size={120} />}
+                </div>
+              )}
             </div>
-            <div>
+
+            <div className="relative z-10">
               <div className="flex justify-between items-start mb-2">
-                <h3 className="text-xl font-bold text-stone-100 group-hover:text-yellow-500 transition truncate pr-2">
+                <h3 className="text-xl font-bold text-stone-100 group-hover:text-yellow-500 transition truncate pr-2 shadow-black drop-shadow-md">
                   {hero.name}
                 </h3>
-                <span className="bg-stone-900 text-stone-400 text-xs px-2 py-1 rounded font-mono">
+                <span className="bg-stone-950/80 border border-stone-700 text-stone-300 text-xs px-2 py-1 rounded font-mono">
                   Lvl {hero.level}
                 </span>
               </div>
-              <p className="text-stone-500 text-sm">
+              <p className="text-stone-400 text-sm font-medium shadow-black drop-shadow-sm">
                 {hero.race} {hero.class}
               </p>
             </div>
-            <div className="flex gap-2 mt-4">
-              <div className="flex-1 bg-stone-900/50 rounded-lg p-2 flex flex-col items-center border border-stone-700/50">
+
+            <div className="flex gap-2 mt-4 relative z-10">
+              <div className="flex-1 bg-stone-950/60 backdrop-blur-sm rounded-lg p-2 flex flex-col items-center border border-stone-700/50">
                 <span className="text-[10px] uppercase text-stone-500 font-bold">
                   {t("str").slice(0, 3)}
                 </span>
@@ -141,7 +159,7 @@ export function Dashboard({
                   {hero.stats.str}
                 </span>
               </div>
-              <div className="flex-1 bg-stone-900/50 rounded-lg p-2 flex flex-col items-center border border-stone-700/50">
+              <div className="flex-1 bg-stone-950/60 backdrop-blur-sm rounded-lg p-2 flex flex-col items-center border border-stone-700/50">
                 <span className="text-[10px] uppercase text-stone-500 font-bold">
                   {t("dex").slice(0, 3)}
                 </span>
@@ -149,7 +167,7 @@ export function Dashboard({
                   {hero.stats.dex}
                 </span>
               </div>
-              <div className="flex-1 bg-stone-900/50 rounded-lg p-2 flex flex-col items-center border border-stone-700/50">
+              <div className="flex-1 bg-stone-950/60 backdrop-blur-sm rounded-lg p-2 flex flex-col items-center border border-stone-700/50">
                 <span className="text-[10px] uppercase text-stone-500 font-bold">
                   {t("int").slice(0, 3)}
                 </span>
@@ -160,6 +178,7 @@ export function Dashboard({
             </div>
           </div>
         ))}
+
         {heroes.length === 0 && (
           <div className="col-span-full text-center py-10 opacity-50">
             <FileJson size={48} className="mx-auto mb-4 text-stone-600" />
