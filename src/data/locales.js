@@ -112,6 +112,13 @@ export const dictionary = {
     copySummary: "Copy Summary",
     copied: "Copied to clipboard!",
     share: "Share",
+
+    navHeroes: "Heroes",
+    navDice: "Dice Roller",
+    navCompendium: "Compendium",
+    races: "Races",
+    classes: "Classes",
+    conditions: "Conditions",
   },
   es: {
     // General
@@ -226,5 +233,12 @@ export const dictionary = {
     copySummary: "Copiar Resumen",
     copied: "¡Copiado al portapapeles!",
     share: "Compartir",
+
+    navHeroes: "Héroes",
+    navDice: "Dados",
+    navCompendium: "Compendio",
+    races: "Razas",
+    classes: "Clases",
+    conditions: "Condiciones",
   }
 };

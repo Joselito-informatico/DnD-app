@@ -2,18 +2,24 @@ import { useState, useEffect } from "react";
 import { Dashboard } from "./pages/Dashboard";
 import { CharacterCreator } from "./pages/CharacterCreator";
 import { CombatView } from "./pages/CombatView";
+import { DicePage } from "./pages/DicePage";
+import { Compendium } from "./pages/Compendium";
+import { BottomNav } from "./components/BottomNav"; // NUEVO COMPONENTE
 import { generateRandomHero } from "./utils/randomizer";
 import { useLanguage } from "./context/LanguageContext";
-import { useToast } from "./context/ToastContext"; // <--- Importar
+import { useToast } from "./context/ToastContext";
 import { Globe } from "lucide-react";
 
 function App() {
   const { t, language, toggleLanguage } = useLanguage();
-  const { showToast } = useToast(); // <--- Usar Hook
+  const { showToast } = useToast();
 
-  const [currentView, setCurrentView] = useState("dashboard");
+  // Estado de navegación global
+  const [currentView, setCurrentView] = useState("dashboard"); // 'dashboard', 'creator', 'combat'
+  const [mainTab, setMainTab] = useState("heroes"); // 'heroes', 'dice', 'compendium'
   const [selectedHeroId, setSelectedHeroId] = useState(null);
 
+  // Persistencia de Héroes
   const [heroes, setHeroes] = useState(() => {
     const saved = localStorage.getItem("dnd_heroes");
     return saved ? JSON.parse(saved) : [];
@@ -33,7 +39,8 @@ function App() {
     };
     setHeroes([...heroes, newHero]);
     setCurrentView("dashboard");
-    showToast(t("successImport"), "success"); // Reutilizamos mensaje de éxito o pon uno custom
+    setMainTab("heroes"); // Volver a la lista al terminar
+    showToast(t("successImport"), "success");
   };
 
   const handleUpdateHero = (updatedHero) => {
@@ -50,42 +57,61 @@ function App() {
   const handleImportHeroes = (importedHeroes) => {
     if (confirm(t("confirmImport"))) {
       setHeroes(importedHeroes);
-      showToast(t("successImport"), "success"); // <--- TOAST
+      showToast(t("successImport"), "success");
     }
   };
 
   const handleCreateRandom = () => {
     const randomHero = generateRandomHero();
     setHeroes([...heroes, randomHero]);
-    showToast(`${randomHero.name} joined the party!`, "success"); // <--- TOAST
+    showToast(`${randomHero.name} joined!`, "success");
   };
 
   const handleSelectHero = (heroId) => {
     setSelectedHeroId(heroId);
-    setCurrentView("combat");
+    setCurrentView("combat"); // Entra en modo "Pantalla completa"
   };
 
   const activeHero = heroes.find((h) => h.id === selectedHeroId);
 
-  return (
-    <div className="min-h-screen bg-neutral-900 text-stone-100 font-sans p-6">
-      <button
-        onClick={toggleLanguage}
-        className="fixed top-6 right-6 z-50 bg-stone-800 border border-stone-600 p-2 rounded-full hover:bg-yellow-600 hover:text-stone-900 transition flex items-center gap-2 text-xs font-bold shadow-lg"
-      >
-        <Globe size={16} /> {language.toUpperCase()}
-      </button>
+  // RENDERIZADO DE LA VISTA PRINCIPAL (TABS)
+  const renderMainContent = () => {
+    if (mainTab === "dice") return <DicePage />;
+    if (mainTab === "compendium") return <Compendium />;
+    return (
+      <Dashboard
+        heroes={heroes}
+        onNavigate={handleSelectHero}
+        onCreate={() => setCurrentView("creator")}
+        onImport={handleImportHeroes}
+        onRandom={handleCreateRandom}
+      />
+    );
+  };
 
+  return (
+    <div className="min-h-screen bg-neutral-900 text-stone-100 font-sans pb-safe">
+      {/* Botón de Idioma (Solo visible en Dashboard/Tabs) */}
       {currentView === "dashboard" && (
-        <Dashboard
-          heroes={heroes}
-          onNavigate={handleSelectHero}
-          onCreate={() => setCurrentView("creator")}
-          onImport={handleImportHeroes}
-          onRandom={handleCreateRandom}
-        />
+        <button
+          onClick={toggleLanguage}
+          className="fixed top-6 right-6 z-50 bg-stone-800 border border-stone-600 p-2 rounded-full hover:bg-yellow-600 hover:text-stone-900 transition flex items-center gap-2 text-xs font-bold shadow-lg"
+        >
+          <Globe size={16} /> {language.toUpperCase()}
+        </button>
       )}
 
+      {/* RUTAS */}
+
+      {/* 1. MODO DASHBOARD (Con Tabs) */}
+      {currentView === "dashboard" && (
+        <>
+          {renderMainContent()}
+          <BottomNav activeTab={mainTab} onChange={setMainTab} />
+        </>
+      )}
+
+      {/* 2. MODO CREADOR (Pantalla Completa) */}
       {currentView === "creator" && (
         <CharacterCreator
           onBack={() => setCurrentView("dashboard")}
@@ -93,6 +119,7 @@ function App() {
         />
       )}
 
+      {/* 3. MODO COMBATE (Pantalla Completa) */}
       {currentView === "combat" && activeHero && (
         <CombatView
           hero={activeHero}
