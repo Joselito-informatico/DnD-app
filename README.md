@@ -1,11 +1,54 @@
 # ⚔️ D&D 5e Character Manager
 
-Una aplicación web progresiva (PWA) diseñada para jugadores de Dungeons & Dragons 5e. Enfocada en la simplicidad, velocidad y uso offline. Permite crear personajes, gestionar la hoja completa (combate, hechizos, inventario, rol) y lanzar dados sin barreras de entrada.
+![React](https://img.shields.io/badge/React-18-blue?logo=react) ![Vite](https://img.shields.io/badge/Vite-Fast-yellow?logo=vite) ![PWA](https://img.shields.io/badge/PWA-Ready-purple?logo=pwa) ![Tailwind](https://img.shields.io/badge/Tailwind-CSS-cyan?logo=tailwindcss) ![License](https://img.shields.io/badge/License-MIT-green)
+
+Una aplicación web progresiva (PWA) diseñada para jugadores de **Dungeons & Dragons 5e**. Enfocada en la simplicidad, velocidad y uso **offline-first**. Permite crear personajes, gestionar la hoja completa (combate, hechizos, inventario, rol) y lanzar dados con físicas matemáticas reales sin barreras de entrada.
 
 > 🚀 **Probar Demo en Vivo:** [https://dnd-app-one.vercel.app/](https://dnd-app-one.vercel.app/)
 
-> **Estado del Proyecto:** v1.7 (International & Mobile Ready)
-> **Arquitectura:** Single Page Application (SPA) sin backend (Client-side logic).
+---
+
+## ✨ Funcionalidades Principales
+
+### 1. Gestión y Tecnología
+* **🌍 Bilingüe:** Soporte completo Español / Inglés con cambio instantáneo.
+* **📱 PWA Instalable:** Funciona como app nativa en Android/iOS, pantalla completa y opera 100% sin internet.
+* **☁️ API Open5e:** Integración para buscar hechizos y objetos oficiales del SRD automáticamente.
+* **💾 Persistencia Local:** Tus datos viven en tu dispositivo. Opción de **Exportar/Importar JSON** para backups.
+
+### 2. Creador de Personajes (Wizard)
+* **🎲 Rolled Stats:** Sistema interactivo de tirada de atributos (5d6, descartar los 2 peores) con asignación táctil.
+* **🪄 Quick Build:** Generador aleatorio para crear NPCs o personajes al instante.
+* **📚 SRD Integrado:** Carga automática de rasgos de clase, equipo inicial y espacios de conjuro según las reglas oficiales.
+
+### 3. Hoja de Personaje Interactiva
+
+#### ⚔️ Combat (Combate Avanzado)
+* **🛡️ AC Dinámica:** Cálculo automático de Clase de Armadura basado en el equipo actual (Armadura Ligera/Media/Pesada + Escudos).
+* **🎲 Motor de Dados:**
+    * Tiradas de Ataque y Daño con un clic.
+    * **Toggle Ventaja/Desventaja:** Tira dos d20 y selecciona el correcto automáticamente.
+    * **Críticos:** Detección de "Natural 20" y duplicación automática de dados de daño.
+* **🏥 Salud y Descanso:**
+    * Barra visual de HP interactiva.
+    * **Descanso Corto:** Interfaz para gastar Dados de Golpe y recuperar vida.
+    * **Descanso Largo:** Restaura espacios de conjuro y recursos automáticamente.
+
+#### 🔥 Spells (Magia)
+* **Buscador API:** Encuentra y añade hechizos del SRD con sus descripciones completas.
+* **Gestor de Slots:** Rastreo visual de espacios de conjuro gastados y disponibles.
+
+#### 🎒 Equip (Inventario)
+* **Equipamiento Inteligente:** Botón *Switch* para equipar/desequipar armaduras y armas, afectando las estadísticas en tiempo real.
+* **Buscador de Objetos:** Base de datos completa de armas y equipo de aventuras.
+
+#### 📜 Profile (Progresión)
+* **Barra de XP:** Visualización del progreso hacia el siguiente nivel.
+* **Auto-Level Up:** Detección automática de subida de nivel al modificar la experiencia.
+
+#### 🛠️ Herramientas Extra
+* **Bandeja de Dados Flotante:** Un botón siempre visible para lanzar d4, d6, d8, d10, d12 o d20 en cualquier momento.
+* **Compendio:** Consulta rápida de reglas (Razas, Clases, Condiciones y Acciones de Combate).
 
 ---
 
@@ -13,65 +56,11 @@ Una aplicación web progresiva (PWA) diseñada para jugadores de Dungeons & Drag
 
 Este proyecto utiliza un stack moderno y ligero para facilitar el despliegue y mantenimiento:
 
-* **Core:** React 18 + Vite (Velocidad de desarrollo).
+* **Core:** React 18 + Vite.
 * **Estilos:** Tailwind CSS v3 (Diseño "Utility-first").
 * **Iconos:** Lucide React.
-* **Persistencia:** `localStorage` (Navegador) + Exportación JSON.
-* **Estado Global:** React Context API (Para Idiomas y Notificaciones).
-* **PWA:** Vite PWA Plugin (Instalable y Offline).
-
----
-
-## ✨ Funcionalidades Principales
-
-### 1. Gestión, Seguridad y Accesibilidad
-* **🌍 Bilingüe:** Soporte completo Español / Inglés con cambio instantáneo.
-* **📱 PWA Instalable:** Funciona como app nativa en Android/iOS y opera sin internet.
-* **🍞 Notificaciones Toast:** Sistema de alertas no intrusivas para confirmaciones y tiradas críticas.
-* **💾 Backup:** Importar y Exportar todos tus personajes mediante archivos JSON.
-
-### 2. Creador de Personajes (Wizard)
-* **🎲 Generador Aleatorio:** Botón "Voy a tener suerte" para crear personajes completos al instante.
-* **🪄 Autocompletado:** Botón mágico para rellenar trasfondos y detalles de rol si te falta inspiración.
-* **🖼️ Avatares:** Soporte para URLs de imágenes personalizadas.
-* **Flujo Guiado:** Selección visual de Raza, Clase, Atributos y Detalles.
-
-### 3. Hoja de Personaje Interactiva (5 Pestañas)
-
-#### ⚔️ Combat (Combate)
-* **Dashboard Táctico:** Vista clara de AC, Iniciativa, HP y Velocidad.
-* **Estados Alterados:** Panel visual para Condiciones (Cegado, Paralizado...) y Agotamiento.
-* **Recursos de Clase:** Contadores personalizados (Rage, Ki Points, Sorcery Points) que se recargan al descansar.
-* **Lanzador de Dados:** Al hacer click en un arma, lanza 1d20 + Modificadores con detección de Críticos.
-
-#### 🎲 Skills (Habilidades)
-* **Competencias (Proficiency):** Sistema de "estrellas" para marcar habilidades entrenadas.
-* **Percepción Pasiva:** Cálculo automático basado en Sabiduría y competencia.
-
-#### 🔥 Spells (Magia)
-* **Grimorio Interactivo:** Añadir y borrar hechizos personalizados.
-* **Gestor de Slots:** Configuración manual de espacios máximos (Nivel 1-9) y seguimiento de gastos.
-
-#### 🎒 Equip (Inventario)
-* **Monedero:** Gestión de divisas (CP, SP, EP, GP, PP).
-* **Mochila:** Añadir y eliminar objetos del inventario rápidamente.
-
-#### 📜 Profile (Perfil y Rol)
-* **Progresión:** Edición de Nivel, XP y Atributos Base (ASI).
-* **Identidad:** Rasgos de personalidad, Ideales, Vínculos, Defectos e Historia.
-
-#### 🗺 Roadmap (Completado)
-[x] Subida de Nivel: Edición dinámica de nivel y stats.
-
-[x] Gestor de Hechizos: Crear base de datos de spells y slots.
-
-[x] Exportar/Importar: Guardar personajes en archivos JSON.
-
-[x] PWA Manifest: Instalable en móviles y soporte Offline.
-
-[x] Internacionalización: Soporte ES/EN.
-
-[x] Recursos de Clase: Trackers para Ki, Furia, etc.
+* **Datos:** Open5e API (para contenido) + SRD 5.1 local (para reglas).
+* **PWA:** Vite PWA Plugin (Manifiesto y Service Workers).
 
 ---
 
@@ -79,17 +68,24 @@ Este proyecto utiliza un stack moderno y ligero para facilitar el despliegue y m
 
 ```text
 dnd-app/
+├── public/               # Assets estáticos e iconos PWA
 ├── src/
-│   ├── context/          # Lógica global (Idiomas, Toasts)
+│   ├── components/       # Componentes UI reutilizables (BottomNav, etc.)
+│   ├── context/          # Estado global (LanguageContext, ToastContext)
 │   ├── data/
-│   │   ├── srd.js        # Base de datos estática (Reglas 5e)
+│   │   ├── srd.js        # Reglas estáticas (Razas, Clases, XP Table)
 │   │   └── locales.js    # Diccionarios de traducción (ES/EN)
 │   ├── pages/
-│   │   ├── Dashboard.jsx        # Home: Lista, Randomizer, Import/Export
-│   │   ├── CharacterCreator.jsx # Wizard de creación
-│   │   └── CombatView.jsx       # Hoja de personaje completa
-│   ├── utils/            # Funciones de aleatoriedad
-│   ├── App.jsx           # Enrutador principal
-│   └── main.jsx          # Punto de entrada (Providers)
-├── public/               # Iconos PWA y assets
-└── vite.config.js        # Configuración PWA
+│   │   ├── Dashboard.jsx        # Selección de personaje
+│   │   ├── CharacterCreator.jsx # Wizard de creación paso a paso
+│   │   ├── CombatView.jsx       # Hoja principal (Lógica pesada)
+│   │   ├── DicePage.jsx         # Lanzador de dados independiente
+│   │   └── Compendium.jsx       # Lector de reglas SRD
+│   ├── utils/
+│   │   ├── dice.js       # Motor matemático de dados (parsers de daño)
+│   │   ├── rules.js      # Reglas de D&D (Cálculo de AC)
+│   │   ├── dndApi.js     # Conexión con Open5e
+│   │   └── randomizer.js # Generador aleatorio
+│   ├── App.jsx           # Enrutador y Layout principal
+│   └── main.jsx          # Punto de entrada
+└── vite.config.js        # Configuración de Vite y PWA
