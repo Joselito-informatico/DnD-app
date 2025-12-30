@@ -1,77 +1,104 @@
-// Servicio para buscar en la API de Open5e (Solo contenido SRD Legal)
-const SPELLS_API = "https://api.open5e.com/spells/";
-const WEAPONS_API = "https://api.open5e.com/weapons/";
-const ARMOR_API = "https://api.open5e.com/armor/";
+import { SPELLS } from "../data/spells";
+import { WEAPONS, ARMOR, ADVENTURING_GEAR, MAGIC_ITEMS } from "../data/items";
 
-// --- BUSCADOR DE HECHIZOS ---
+// --- BUSCADOR DE HECHIZOS (LOCAL) ---
 export async function searchSpells(query) {
-  if (!query || query.length < 3) return [];
+  // Simulamos una promesa para no romper componentes que esperen 'await'
+  // aunque ya no sea estrictamente necesario.
+  return new Promise((resolve) => {
+    if (!query || query.length < 3) {
+      resolve([]);
+      return;
+    }
 
-  try {
-    const response = await fetch(`${SPELLS_API}?search=${query}&limit=5`);
-    const data = await response.json();
-    
-    return data.results.map(spell => ({
+    const lowerQuery = query.toLowerCase();
+
+    const results = SPELLS.filter((spell) =>
+      spell.name.toLowerCase().includes(lowerQuery)
+    ).map((spell) => ({
       name: spell.name,
-      level: spell.level_int,
+      level: spell.level,
       school: spell.school,
-      time: spell.casting_time,
+      time: spell.time,
       desc: spell.desc,
-      damage: detectDamage(spell.desc) 
+      damage: spell.damage || detectDamage(spell.desc), // Usa el predefinido o intenta detectarlo
+      components: spell.components,
+      range: spell.range,
+      duration: spell.duration,
     }));
-  } catch (error) {
-    console.error("Spell API Error:", error);
-    return [];
-  }
+
+    resolve(results);
+  });
 }
 
-// --- BUSCADOR DE EQUIPO (NUEVO) ---
+// --- BUSCADOR DE EQUIPO UNIFICADO (LOCAL) ---
 export async function searchEquipment(query) {
-  if (!query || query.length < 3) return [];
+  return new Promise((resolve) => {
+    if (!query || query.length < 3) {
+      resolve([]);
+      return;
+    }
 
-  try {
-    // Buscamos en armas y armaduras en paralelo
-    const [weaponsRes, armorRes] = await Promise.all([
-      fetch(`${WEAPONS_API}?search=${query}&limit=5`),
-      fetch(`${ARMOR_API}?search=${query}&limit=5`)
-    ]);
+    const lowerQuery = query.toLowerCase();
 
-    const weaponsData = await weaponsRes.json();
-    const armorData = await armorRes.json();
-
-    // Procesamos Armas
-    const weapons = weaponsData.results.map(w => ({
-      type: 'weapon',
+    // 1. Buscar Armas
+    const weapons = WEAPONS.filter((w) =>
+      w.name.toLowerCase().includes(lowerQuery)
+    ).map((w) => ({
+      type: "weapon",
       name: w.name,
-      category: w.category, // Simple, Martial
-      damage: w.damage_dice, // "1d8"
+      category: w.category,
+      damage: w.damage,
       cost: w.cost,
       weight: w.weight,
-      properties: w.properties ? w.properties.join(", ") : ""
+      properties: w.properties,
+      desc: `${w.damageType}. ${w.properties}`, // Formato para vista simple
     }));
 
-    // Procesamos Armaduras
-    const armors = armorData.results.map(a => ({
-      type: 'armor',
+    // 2. Buscar Armaduras
+    const armors = ARMOR.filter((a) =>
+      a.name.toLowerCase().includes(lowerQuery)
+    ).map((a) => ({
+      type: "armor",
       name: a.name,
-      category: a.category, // Light, Medium, Heavy, Shield
-      ac: a.ac_string, // "16"
+      category: a.category,
+      ac: a.ac,
       cost: a.cost,
-      weight: a.weight || "-",
-      strength: a.strength_requirement
+      weight: a.weight,
+      strength: a.strength,
+      desc: `CA: ${a.ac} | Sigilo: ${a.stealth}`,
     }));
 
-    // Combinamos resultados
-    return [...weapons, ...armors];
+    // 3. Buscar Equipo General
+    const gear = ADVENTURING_GEAR.filter((g) =>
+      g.name.toLowerCase().includes(lowerQuery)
+    ).map((g) => ({
+      type: "gear",
+      name: g.name,
+      cost: g.cost,
+      weight: g.weight,
+      desc: g.desc,
+    }));
 
-  } catch (error) {
-    console.error("Equipment API Error:", error);
-    return [];
-  }
+    // 4. Buscar Objetos Mágicos
+    const magic = MAGIC_ITEMS.filter((m) =>
+      m.name.toLowerCase().includes(lowerQuery)
+    ).map((m) => ({
+      type: "magic-item",
+      name: m.name,
+      rarity: m.rarity,
+      desc: m.desc,
+      requiresAttunement: m.attunement === "Sí",
+    }));
+
+    // Combinar todo
+    resolve([...weapons, ...armors, ...gear, ...magic]);
+  });
 }
 
+// Utilidad auxiliar por si algún hechizo no tiene campo 'damage' explícito
 function detectDamage(desc) {
-  const regex = /(\d+d\d+)/; 
+  const regex = /(\d+d\d+(\s?\+\s?\d+)?)/; // Mejorado para capturar modificadores simples (ej: 1d4 + 1)
   const match = desc.match(regex);
-  return match ? match[0] : ""; 
+  return match ? match[0] : "";
 }

@@ -1,0 +1,181 @@
+// --- ARMAS ---
+export const WEAPONS = [
+  {
+    name: "Daga",
+    category: "Simple",
+    type: "Melee",
+    damage: "1d4",
+    damageType: "Perforante",
+    cost: "2 po",
+    weight: "1 lb",
+    properties: "Sutil, Ligera, Arrojadiza (20/60)",
+  },
+  {
+    name: "Maza",
+    category: "Simple",
+    type: "Melee",
+    damage: "1d6",
+    damageType: "Contundente",
+    cost: "5 po",
+    weight: "4 lb",
+    properties: "-",
+  },
+  {
+    name: "Espada Corta",
+    category: "Marcial",
+    type: "Melee",
+    damage: "1d6",
+    damageType: "Perforante",
+    cost: "10 po",
+    weight: "2 lb",
+    properties: "Sutil, Ligera",
+  },
+  {
+    name: "Espada Larga",
+    category: "Marcial",
+    type: "Melee",
+    damage: "1d8",
+    damageType: "Cortante",
+    cost: "15 po",
+    weight: "3 lb",
+    properties: "Versátil (1d10)",
+  },
+  {
+    name: "Gran Hacha",
+    category: "Marcial",
+    type: "Melee",
+    damage: "1d12",
+    damageType: "Cortante",
+    cost: "30 po",
+    weight: "7 lb",
+    properties: "Pesada, Dos manos",
+  },
+  {
+    name: "Arco Corto",
+    category: "Simple",
+    type: "Rango",
+    damage: "1d6",
+    damageType: "Perforante",
+    cost: "25 po",
+    weight: "2 lb",
+    properties: "Munición (80/320), Dos manos",
+  },
+  {
+    name: "Arco Largo",
+    category: "Marcial",
+    type: "Rango",
+    damage: "1d8",
+    damageType: "Perforante",
+    cost: "50 po",
+    weight: "2 lb",
+    properties: "Munición (150/600), Pesada, Dos manos",
+  },
+];
+
+// --- ARMADURAS ---
+export const ARMOR = [
+  {
+    name: "Acolchada",
+    category: "Ligera",
+    ac: "11 + Des",
+    strength: "-",
+    stealth: "Desventaja",
+    cost: "5 po",
+    weight: "8 lb",
+  },
+  {
+    name: "Cuero",
+    category: "Ligera",
+    ac: "11 + Des",
+    strength: "-",
+    stealth: "-",
+    cost: "10 po",
+    weight: "10 lb",
+  },
+  {
+    name: "Cota de Malla",
+    category: "Pesada",
+    ac: "16",
+    strength: "Fue 13",
+    stealth: "Desventaja",
+    cost: "75 po",
+    weight: "55 lb",
+  },
+  {
+    name: "Placas",
+    category: "Pesada",
+    ac: "18",
+    strength: "Fue 15",
+    stealth: "Desventaja",
+    cost: "1500 po",
+    weight: "65 lb",
+  },
+  {
+    name: "Escudo",
+    category: "Escudo",
+    ac: "+2",
+    strength: "-",
+    stealth: "-",
+    cost: "10 po",
+    weight: "6 lb",
+  },
+];
+
+// --- EQUIPO DE AVENTURAS ---
+export const ADVENTURING_GEAR = [
+  {
+    name: "Mochila",
+    cost: "2 po",
+    weight: "5 lb",
+    desc: "Puede contener 1 pie cúbico/30 libras de equipo.",
+  },
+  {
+    name: "Cuerda de cáñamo (50 pies)",
+    cost: "1 po",
+    weight: "10 lb",
+    desc: "Tiene 2 puntos de golpe y se puede romper con una prueba de Fuerza CD 17.",
+  },
+  {
+    name: "Antorcha",
+    cost: "1 pc",
+    weight: "1 lb",
+    desc: "Arde por 1 hora. Iluminación brillante 20 pies, tenue 20 pies más.",
+  },
+  {
+    name: "Poción de Curación",
+    cost: "50 po",
+    weight: "0.5 lb",
+    desc: "Un personaje que bebe el fluido rojo mágico recupera 2d4 + 2 puntos de golpe.",
+  },
+  {
+    name: "Kit de Sanador",
+    cost: "5 po",
+    weight: "3 lb",
+    desc: "Tiene 10 usos. Como acción, gastas un uso para estabilizar a una criatura con 0 PG.",
+  },
+];
+
+// --- OBJETOS MÁGICOS ---
+export const MAGIC_ITEMS = [
+  {
+    name: "Bolsa de Contención",
+    rarity: "Infrecuente",
+    type: "Objeto Maravilloso",
+    attunement: "No",
+    desc: "Esta bolsa tiene un espacio interior considerablemente mayor que sus dimensiones exteriores. Puede contener hasta 500 libras.",
+  },
+  {
+    name: "Arma +1",
+    rarity: "Infrecuente",
+    type: "Arma",
+    attunement: "No",
+    desc: "Tienes un bonificador de +1 a las tiradas de ataque y daño hechas con esta arma mágica.",
+  },
+  {
+    name: "Botas de Elvenkind",
+    rarity: "Infrecuente",
+    type: "Objeto Maravilloso",
+    attunement: "No",
+    desc: "Mientras lleves estas botas, tus pasos no hacen sonido. Tienes Ventaja en pruebas de Sigilo.",
+  },
+];

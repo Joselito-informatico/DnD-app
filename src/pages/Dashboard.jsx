@@ -17,7 +17,7 @@ import {
   Crosshair,
   Ghost,
   Dices,
-  Info, // IMPORTAR NUEVO ICONO
+  Info, // Icono para el botón legal
   X,
   User,
 } from "lucide-react";
@@ -31,11 +31,12 @@ export function Dashboard({
   onRandom,
 }) {
   const { t } = useLanguage();
-  const [showAbout, setShowAbout] = useState(false); // ESTADO PARA EL MODAL
+  const [showAbout, setShowAbout] = useState(false); // Estado para el modal legal
 
-  // Mapa de Iconos por Clase (ESPAÑOL)
+  // Mapa de Iconos por Clase (Adaptado a Español SRD 5.2)
   const getClassIcon = (className) => {
     const c = className?.toLowerCase() || "";
+    // Buscamos tanto en español como en inglés por seguridad
     if (c.includes("bárbaro") || c.includes("barbarian"))
       return <Skull size={20} className="text-red-500" />;
     if (c.includes("bardo") || c.includes("bard"))
@@ -97,10 +98,11 @@ export function Dashboard({
           <p className="text-stone-500 text-sm mt-1">{t("subTitle")}</p>
         </div>
         <div className="flex gap-2">
-          {/* Botón About */}
+          {/* Botón About / Legal */}
           <button
             onClick={() => setShowAbout(true)}
             className="p-2 bg-stone-800 rounded-full text-stone-400 hover:text-yellow-500 transition"
+            title="Licencia y Créditos"
           >
             <Info size={20} />
           </button>
@@ -203,7 +205,7 @@ export function Dashboard({
         </button>
       </div>
 
-      {/* MODAL ABOUT / LEGAL */}
+      {/* MODAL ABOUT / LEGAL (SRD 5.2 Requirement) */}
       {showAbout && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-stone-900 border border-stone-700 p-6 rounded-2xl w-full max-w-sm relative shadow-2xl">
@@ -215,7 +217,8 @@ export function Dashboard({
             </button>
 
             <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-              <Book size={20} className="text-yellow-500" /> {t("aboutTitle")}
+              <Book size={20} className="text-yellow-500" />{" "}
+              {t("aboutTitle") || "Legal"}
             </h2>
 
             <div className="space-y-4 text-sm text-stone-400 max-h-[60vh] overflow-y-auto pr-2">
@@ -223,18 +226,16 @@ export function Dashboard({
                 <h3 className="font-bold text-stone-200 mb-1">
                   {t("appTitle")}
                 </h3>
-                <p>{t("version")} 1.7</p>
-                <p className="mt-1">
-                  {t("developedBy")} <strong>Tu Nombre/Proyecto</strong>
-                </p>
+                <p>v1.8 (SRD 5.2 Edition)</p>
               </div>
 
               <div className="p-3 bg-stone-950 rounded-xl border border-stone-800">
                 <h3 className="font-bold text-stone-200 mb-2 text-xs uppercase tracking-wider">
-                  {t("legalNotice")}
+                  Licencia OGL / CC-BY
                 </h3>
                 <p className="text-xs leading-relaxed italic opacity-80">
-                  {t("licenseText")}
+                  {t("licenseText") ||
+                    "This work includes material taken from the System Reference Document 5.1 (“SRD 5.1”) by Wizards of the Coast LLC and available at https://dnd.wizards.com/resources/systems-reference-document. The SRD 5.1 is licensed under the Creative Commons Attribution 4.0 International License available at https://creativecommons.org/licenses/by/4.0/legalcode."}
                 </p>
               </div>
 
