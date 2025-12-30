@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   ArrowLeft,
   Check,
@@ -14,12 +14,11 @@ import {
   Sparkles,
   Image as ImageIcon,
   Search,
-  BookOpen,
-  X,
   Plus,
   Trash2,
   Dices,
   RotateCcw,
+  X,
 } from "lucide-react";
 import { RACES, CLASSES } from "../data/srd";
 import { getRandomDetails } from "../utils/randomizer";
@@ -33,27 +32,33 @@ export function CharacterCreator({ onBack, onSave }) {
   const [selectedRace, setSelectedRace] = useState(null);
   const [selectedClass, setSelectedClass] = useState(null);
 
-  // STATS: Guardamos la BASE (sin bonos raciales)
+  // STATS
   const [baseStats, setBaseStats] = useState({
-    str: 10,
-    dex: 10,
-    con: 10,
-    int: 10,
-    wis: 10,
-    cha: 10,
+    str: 0,
+    dex: 0,
+    con: 0,
+    int: 0,
+    wis: 0,
+    cha: 0,
   });
-  const [rolledPool, setRolledPool] = useState([]); // Almacena los resultados de los dados
 
-  // Estado para hechizos iniciales
+  // LOGICA DADOS MEJORADA
+  // rolledPool será un array de objetos: { id: 1, value: 16, assignedTo: 'str' | null }
+  const [rolledPool, setRolledPool] = useState([]);
+  const [selectedRollId, setSelectedRollId] = useState(null); // ID del dado seleccionado actualmente
+
+  // HECHIZOS
   const [startingSpells, setStartingSpells] = useState([]);
   const [spellQuery, setSpellQuery] = useState("");
   const [spellResults, setSpellResults] = useState([]);
   const [isSearchingSpell, setIsSearchingSpell] = useState(false);
 
+  // DETALLES
   const [details, setDetails] = useState({
     name: "",
     alignment: "",
     background: "",
+    avatar: "",
     age: "",
     height: "",
     weight: "",
@@ -64,61 +69,84 @@ export function CharacterCreator({ onBack, onSave }) {
     ideals: "",
     bonds: "",
     flaws: "",
-    avatar: "",
   });
 
   const isCaster = selectedClass?.spellcasting !== undefined;
 
-  // --- LÓGICA DE DADOS (5d6 drop lowest 2) ---
+  // --- LÓGICA DE DADOS INTERACTIVA ---
   const rollAttributePool = () => {
-    const newPool = Array.from({ length: 6 }, () => {
-      // Tirar 5 dados de 6 caras
+    const newPool = Array.from({ length: 6 }, (_, i) => {
       const rolls = Array.from(
         { length: 5 },
         () => Math.floor(Math.random() * 6) + 1
       );
-      // Ordenar descendente (Mayores primero)
       rolls.sort((a, b) => b - a);
-      // Tomar los 3 mejores y sumar
-      return rolls.slice(0, 3).reduce((a, b) => a + b, 0);
+      const total = rolls.slice(0, 3).reduce((a, b) => a + b, 0);
+      return { id: i, value: total, assignedTo: null };
     });
     setRolledPool(newPool);
-    // Resetear stats a 0 para obligar a asignar
     setBaseStats({ str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 });
+    setSelectedRollId(null);
   };
 
-  const assignFromPool = (value, statKey) => {
-    // Asignar valor al stat
-    setBaseStats((prev) => ({ ...prev, [statKey]: value }));
-    // Eliminar ese valor del pool (visualmente lo marcaremos como usado)
-    const index = rolledPool.indexOf(value);
-    if (index > -1) {
-      const newPool = [...rolledPool];
-      newPool.splice(index, 1); // Lo quitamos del pool disponible
+  const clearPool = () => {
+    setRolledPool([]);
+    setBaseStats({ str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 });
+    setSelectedRollId(null);
+  };
+
+  // Seleccionar un número de la bandeja
+  const handleSelectRoll = (id) => {
+    if (selectedRollId === id) setSelectedRollId(null); // Deseleccionar
+    else setSelectedRollId(id);
+  };
+
+  // Asignar el número seleccionado a un atributo
+  const handleAssignStat = (statKey) => {
+    // 1. Si hay un número seleccionado en la bandeja
+    if (selectedRollId !== null) {
+      const roll = rolledPool.find((r) => r.id === selectedRollId);
+      if (!roll) return;
+
+      // Si este stat ya tenía un número asignado, liberarlo
+      const prevRoll = rolledPool.find((r) => r.assignedTo === statKey);
+
+      const newPool = rolledPool.map((r) => {
+        // Liberar el anterior si existía
+        if (r.assignedTo === statKey) return { ...r, assignedTo: null };
+        // Asignar el nuevo
+        if (r.id === selectedRollId) return { ...r, assignedTo: statKey };
+        return r;
+      });
+
       setRolledPool(newPool);
+      setBaseStats((prev) => ({ ...prev, [statKey]: roll.value }));
+      setSelectedRollId(null); // Limpiar selección
+    }
+    // 2. Si NO hay selección y toco un stat lleno -> Limpiarlo (Devolver a la bandeja)
+    else if (rolledPool.length > 0 && baseStats[statKey] > 0) {
+      const newPool = rolledPool.map((r) => {
+        if (r.assignedTo === statKey) return { ...r, assignedTo: null };
+        return r;
+      });
+      setRolledPool(newPool);
+      setBaseStats((prev) => ({ ...prev, [statKey]: 0 }));
     }
   };
 
-  const updateBaseStat = (key, value) => {
-    // Edición manual (Límite 18 por reglas de dados)
-    const newVal = parseInt(value) || 0;
+  // Edición Manual (Fallback)
+  const manualUpdateStat = (key, value) => {
+    if (rolledPool.length > 0) return; // Bloqueado si hay dados rodados
+    const val = parseInt(value) || 0;
     setBaseStats((prev) => ({
       ...prev,
-      [key]: Math.max(0, Math.min(18, newVal)),
+      [key]: Math.max(0, Math.min(20, val)),
     }));
   };
 
-  // Obtener el bono racial para una stat específica
-  const getRaceBonus = (statKey) => {
-    if (!selectedRace || !selectedRace.bonuses) return 0;
-    return selectedRace.bonuses[statKey] || 0;
-  };
-
-  // Calcular el total final (Base + Raza)
-  const getTotalStat = (statKey) => {
-    return baseStats[statKey] + getRaceBonus(statKey);
-  };
-
+  // --- RESTO DE FUNCIONES (Igual que antes) ---
+  const getRaceBonus = (statKey) => selectedRace?.bonuses?.[statKey] || 0;
+  const getTotalStat = (statKey) => baseStats[statKey] + getRaceBonus(statKey);
   const getMod = (score) => {
     const mod = Math.floor((score - 10) / 2);
     return mod > 0 ? `+${mod}` : mod;
@@ -132,8 +160,6 @@ export function CharacterCreator({ onBack, onSave }) {
       avatar: prev.avatar,
     }));
   };
-
-  // --- LÓGICA HECHIZOS ---
   const handleSpellSearch = async () => {
     if (!spellQuery) return;
     setIsSearchingSpell(true);
@@ -141,22 +167,12 @@ export function CharacterCreator({ onBack, onSave }) {
     setSpellResults(results);
     setIsSearchingSpell(false);
   };
-
   const addStarterSpell = (spell) => {
     if (startingSpells.some((s) => s.name === spell.name)) return;
-    const newSpell = {
-      id: Date.now(),
-      name: spell.name,
-      level: spell.level,
-      school: spell.school,
-      desc: spell.desc,
-      time: spell.time,
-    };
-    setStartingSpells([...startingSpells, newSpell]);
+    setStartingSpells([...startingSpells, { id: Date.now(), ...spell }]);
     setSpellResults([]);
     setSpellQuery("");
   };
-
   const removeStarterSpell = (id) => {
     setStartingSpells(startingSpells.filter((s) => s.id !== id));
   };
@@ -165,20 +181,15 @@ export function CharacterCreator({ onBack, onSave }) {
     if (step === 1 && selectedRace) setStep(2);
     else if (step === 2 && selectedClass) setStep(3);
     else if (step === 3) {
-      // Validar que no haya stats en 0
-      if (Object.values(baseStats).some((val) => val === 0)) {
-        if (!confirm("Some stats are 0. Continue anyway?")) return;
+      if (Object.values(baseStats).some((v) => v === 0)) {
+        if (!confirm("Some stats are 0. Continue?")) return;
       }
-      if (isCaster) setStep(4);
-      else setStep(5);
-    } else if (step === 4 && isCaster) setStep(5);
-    else if (step === 5 || (!isCaster && step === 4)) {
-      finishCreation();
-    }
+      setStep(isCaster ? 4 : 5);
+    } else if (step === 4) setStep(5);
+    else finishCreation();
   };
 
   const finishCreation = () => {
-    // Calcular stats finales
     const finalStats = {
       str: getTotalStat("str"),
       dex: getTotalStat("dex"),
@@ -187,14 +198,14 @@ export function CharacterCreator({ onBack, onSave }) {
       wis: getTotalStat("wis"),
       cha: getTotalStat("cha"),
     };
-
     const hitDieMax = parseInt(selectedClass.hitDie.substring(1));
-    const conMod = Math.floor((finalStats.con - 10) / 2);
-    const startHP = Math.max(1, hitDieMax + conMod);
+    const startHP = Math.max(
+      1,
+      hitDieMax + Math.floor((finalStats.con - 10) / 2)
+    );
 
     let starterInventory = [];
     let starterWeapons = [];
-
     if (selectedClass.startingEquipment) {
       selectedClass.startingEquipment.forEach((item, index) => {
         starterInventory.push({
@@ -208,8 +219,7 @@ export function CharacterCreator({ onBack, onSave }) {
               ? `${item.damage}`
               : "",
         });
-
-        if (item.type === "weapon") {
+        if (item.type === "weapon")
           starterWeapons.push({
             id: Date.now() + index + 100,
             name: item.name,
@@ -217,13 +227,8 @@ export function CharacterCreator({ onBack, onSave }) {
             damage: item.damage,
             stat: item.stat,
           });
-        }
       });
     }
-
-    const spellSlots = selectedClass.spellcasting
-      ? selectedClass.spellcasting.slots
-      : {};
 
     const newHero = {
       name: details.name.trim() || `${selectedRace.name} ${selectedClass.name}`,
@@ -231,40 +236,29 @@ export function CharacterCreator({ onBack, onSave }) {
       class: selectedClass.name,
       level: 1,
       xp: 0,
-      stats: finalStats, // Guardamos YA sumado
+      stats: finalStats,
       currentHP: startHP,
       maxHP: startHP,
       weapons: starterWeapons,
       inventory: starterInventory,
-      spellSlots: spellSlots,
+      spellSlots: selectedClass.spellcasting?.slots || {},
       spells: startingSpells,
       features: selectedClass.features || [],
-      saveProficiencies: selectedClass.saves,
       details: {
         ...details,
         background: details.background || "Unknown",
         alignment: details.alignment || "Neutral",
       },
     };
-
     onSave(newHero);
   };
 
   const getStepTitle = () => {
-    switch (step) {
-      case 1:
-        return t("step1");
-      case 2:
-        return t("step2");
-      case 3:
-        return "Assign Attributes";
-      case 4:
-        return isCaster ? t("cantrips") + " & Spells" : "Error";
-      case 5:
-        return t("step4");
-      default:
-        return "";
-    }
+    if (step === 1) return t("step1");
+    if (step === 2) return t("step2");
+    if (step === 3) return "Assign Stats";
+    if (step === 4) return t("cantrips");
+    return t("step4");
   };
 
   const statConfig = [
@@ -304,7 +298,6 @@ export function CharacterCreator({ onBack, onSave }) {
       </header>
 
       <div className="grid grid-cols-1 gap-4">
-        {/* PASO 1: RAZA */}
         {step === 1 &&
           RACES.map((race) => (
             <div
@@ -340,7 +333,6 @@ export function CharacterCreator({ onBack, onSave }) {
             </div>
           ))}
 
-        {/* PASO 2: CLASE */}
         {step === 2 &&
           CLASSES.map((cls) => (
             <div
@@ -376,16 +368,16 @@ export function CharacterCreator({ onBack, onSave }) {
             </div>
           ))}
 
-        {/* PASO 3: STATS & DADOS */}
+        {/* PASO 3: STATS MEJORADO */}
         {step === 3 && (
           <div className="space-y-4">
-            {/* BANDEJA DE DADOS PARA TIRAR */}
-            <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 text-center">
+            {/* BANDEJA DE DADOS */}
+            <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 text-center relative overflow-hidden">
               {rolledPool.length === 0 ? (
                 <div className="py-4">
                   <Dices size={48} className="mx-auto text-stone-600 mb-2" />
                   <p className="text-stone-400 text-sm mb-4">
-                    Roll 5d6 (keep 3) for your stats pool.
+                    Roll 5d6 (keep 3) six times.
                   </p>
                   <button
                     onClick={rollAttributePool}
@@ -397,45 +389,86 @@ export function CharacterCreator({ onBack, onSave }) {
               ) : (
                 <div>
                   <div className="flex justify-between items-center mb-3">
-                    <span className="text-xs font-bold text-stone-500 uppercase">
-                      Available Scores
+                    <span className="text-xs font-bold text-stone-500 uppercase tracking-widest">
+                      Pool
                     </span>
                     <button
-                      onClick={rollAttributePool}
-                      className="text-xs text-yellow-500 flex items-center gap-1 hover:underline"
+                      onClick={clearPool}
+                      className="text-xs text-red-400 flex items-center gap-1 hover:underline"
                     >
-                      <RotateCcw size={12} /> Reroll
+                      <Trash2 size={12} /> Reset
                     </button>
                   </div>
                   <div className="flex flex-wrap gap-2 justify-center">
-                    {rolledPool.map((val, i) => (
-                      <div
-                        key={i}
-                        className="w-10 h-10 bg-yellow-500/10 border border-yellow-500 text-yellow-500 rounded-lg flex items-center justify-center font-bold text-lg animate-in zoom-in duration-300"
-                      >
-                        {val}
-                      </div>
-                    ))}
+                    {rolledPool.map((roll) => {
+                      const isSelected = selectedRollId === roll.id;
+                      const isUsed = roll.assignedTo !== null;
+                      return (
+                        <button
+                          key={roll.id}
+                          onClick={() => !isUsed && handleSelectRoll(roll.id)}
+                          disabled={isUsed}
+                          className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold text-lg transition-all duration-200 border-2
+                                            ${
+                                              isUsed
+                                                ? "bg-stone-900 border-stone-800 text-stone-700 opacity-50 scale-90"
+                                                : isSelected
+                                                ? "bg-yellow-500 border-yellow-300 text-stone-900 scale-110 shadow-lg shadow-yellow-500/20"
+                                                : "bg-stone-700 border-stone-600 text-stone-300 hover:border-yellow-500"
+                                            }
+                                        `}
+                        >
+                          {roll.value}
+                        </button>
+                      );
+                    })}
                   </div>
-                  <p className="text-[10px] text-stone-500 mt-2">
-                    Type these numbers below manually.
+                  <p className="text-[10px] text-stone-500 mt-3 animate-pulse">
+                    {selectedRollId !== null
+                      ? "Now tap an attribute below to assign."
+                      : "Tap a number to select it."}
                   </p>
                 </div>
               )}
             </div>
 
-            {/* INPUTS DE ATRIBUTOS */}
+            {/* LISTA DE ATRIBUTOS */}
             <div className="space-y-3">
               {statConfig.map((stat) => {
                 const raceBonus = getRaceBonus(stat.id);
+                const baseVal = baseStats[stat.id];
                 const total = getTotalStat(stat.id);
+
+                // Modo "Asignación activa" (si hay dados rodados y este stat no está lleno o hay selección)
+                const isAssignMode = rolledPool.length > 0;
+                const isFilled = baseVal > 0;
+
                 return (
                   <div
                     key={stat.id}
-                    className="flex items-center justify-between bg-stone-800 p-3 rounded-xl border border-stone-700"
+                    onClick={() => isAssignMode && handleAssignStat(stat.id)}
+                    className={`flex items-center justify-between bg-stone-800 p-3 rounded-xl border-2 transition relative overflow-hidden group
+                                ${isAssignMode ? "cursor-pointer" : ""}
+                                ${
+                                  isAssignMode &&
+                                  selectedRollId !== null &&
+                                  !isFilled
+                                    ? "border-yellow-500/50 bg-stone-800/80 animate-pulse"
+                                    : "border-stone-700"
+                                }
+                                ${
+                                  isAssignMode && isFilled
+                                    ? "border-stone-700"
+                                    : ""
+                                }
+                            `}
                   >
-                    {/* Icono y Nombre */}
-                    <div className="flex items-center gap-3 w-1/3">
+                    {/* Fondo de progreso visual si está lleno */}
+                    {isFilled && (
+                      <div className="absolute inset-0 bg-yellow-500/5 z-0"></div>
+                    )}
+
+                    <div className="flex items-center gap-3 w-1/3 z-10">
                       <div
                         className={`p-2 rounded-lg bg-stone-900 ${stat.color}`}
                       >
@@ -449,41 +482,54 @@ export function CharacterCreator({ onBack, onSave }) {
                       </div>
                     </div>
 
-                    {/* Controles */}
-                    <div className="flex items-center gap-2 flex-1 justify-end">
-                      {/* Input Base */}
+                    <div className="flex items-center gap-4 flex-1 justify-end z-10">
+                      {/* Base Value (Input o Caja) */}
                       <div className="flex flex-col items-center">
-                        <input
-                          type="number"
-                          value={
-                            baseStats[stat.id] === 0 ? "" : baseStats[stat.id]
-                          }
-                          onChange={(e) =>
-                            updateBaseStat(stat.id, e.target.value)
-                          }
-                          placeholder="0"
-                          className="w-12 h-10 bg-stone-900 border border-stone-600 rounded text-center text-stone-100 outline-none focus:border-yellow-500 font-bold"
-                        />
+                        {isAssignMode ? (
+                          <div
+                            className={`w-12 h-10 rounded flex items-center justify-center font-bold border-2 transition-all
+                                        ${
+                                          isFilled
+                                            ? "bg-stone-700 border-stone-600 text-white"
+                                            : "bg-stone-900 border-dashed border-stone-600 text-stone-500"
+                                        }
+                                     `}
+                          >
+                            {baseVal || "-"}
+                          </div>
+                        ) : (
+                          <input
+                            type="number"
+                            value={baseVal === 0 ? "" : baseVal}
+                            onChange={(e) =>
+                              manualUpdateStat(stat.id, e.target.value)
+                            }
+                            placeholder="10"
+                            className="w-12 h-10 bg-stone-900 border border-stone-600 rounded text-center text-stone-100 outline-none focus:border-yellow-500 font-bold"
+                          />
+                        )}
                         <span className="text-[9px] text-stone-500 uppercase mt-1">
                           Base
                         </span>
                       </div>
 
+                      <Plus size={12} className="text-stone-600" />
+
                       {/* Race Bonus */}
-                      {raceBonus > 0 && (
-                        <div className="flex flex-col items-center text-yellow-500">
-                          <span className="h-10 flex items-center font-bold">
-                            + {raceBonus}
-                          </span>
-                          <span className="text-[9px] text-stone-500 uppercase mt-1">
-                            Race
-                          </span>
+                      <div className="flex flex-col items-center">
+                        <div className="w-8 h-10 flex items-center justify-center font-bold text-stone-400">
+                          {raceBonus}
                         </div>
-                      )}
+                        <span className="text-[9px] text-stone-500 uppercase mt-1">
+                          Race
+                        </span>
+                      </div>
+
+                      <div className="h-8 w-px bg-stone-700 mx-1"></div>
 
                       {/* Total */}
-                      <div className="flex flex-col items-center ml-2">
-                        <div className="w-10 h-10 flex items-center justify-center bg-stone-700 rounded font-bold text-stone-100 text-lg border border-stone-600">
+                      <div className="flex flex-col items-center">
+                        <div className="w-10 h-10 flex items-center justify-center bg-stone-900 rounded font-bold text-yellow-500 text-lg border border-stone-600">
                           {total}
                         </div>
                         <span className="text-[9px] text-stone-500 uppercase mt-1">
@@ -498,7 +544,6 @@ export function CharacterCreator({ onBack, onSave }) {
           </div>
         )}
 
-        {/* PASO 4: HECHIZOS (SOLO CASTERS) */}
         {step === 4 && isCaster && (
           <div className="space-y-4 animate-in slide-in-from-right duration-300">
             <div className="bg-stone-800/50 p-4 rounded-xl border border-stone-700 mb-2 text-center">
@@ -576,7 +621,6 @@ export function CharacterCreator({ onBack, onSave }) {
           </div>
         )}
 
-        {/* PASO 5: DETALLES */}
         {((isCaster && step === 5) || (!isCaster && step === 4)) && (
           <div className="space-y-4 animate-in slide-in-from-right duration-300">
             <div className="flex justify-end">
