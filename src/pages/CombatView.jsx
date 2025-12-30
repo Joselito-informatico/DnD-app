@@ -37,6 +37,9 @@ import {
   Hammer,
   ToggleLeft,
   ToggleRight,
+  ChevronsUp,
+  ChevronsDown,
+  MinusCircle,
 } from "lucide-react";
 import {
   CLASSES,
@@ -60,8 +63,12 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const [editingStat, setEditingStat] = useState(null);
   const [isEditingMaxHP, setIsEditingMaxHP] = useState(false);
 
+  // ESTADOS DE JUEGO
+  const [rollMode, setRollMode] = useState("normal"); // 'normal', 'adv', 'dis'
   const [rollResult, setRollResult] = useState(null);
+  const [showShortRest, setShowShortRest] = useState(false); // Nuevo Modal
 
+  // Modales de Creación
   const [isAddingAttack, setIsAddingAttack] = useState(false);
   const [newAttack, setNewAttack] = useState({
     name: "",
@@ -69,7 +76,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     stat: "str",
     type: "melee",
   });
-
   const [isAddingSpell, setIsAddingSpell] = useState(false);
   const [newSpell, setNewSpell] = useState({
     name: "",
@@ -78,23 +84,24 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     desc: "",
     time: "1 Action",
   });
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState([]);
-
   const [isAddingCondition, setIsAddingCondition] = useState(false);
   const [isEditingSlots, setIsEditingSlots] = useState(false);
   const [isAddingResource, setIsAddingResource] = useState(false);
   const [newResource, setNewResource] = useState({ name: "", max: "3" });
   const [isAddingFeature, setIsAddingFeature] = useState(false);
   const [newFeature, setNewFeature] = useState({ name: "", desc: "" });
+
+  // Utilidades UI
   const [showDiceTray, setShowDiceTray] = useState(false);
   const [diceMod, setDiceMod] = useState(0);
   const [newItemName, setNewItemName] = useState("");
   const [itemQuery, setItemQuery] = useState("");
   const [itemResults, setItemResults] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
 
-  // --- STATS ---
+  // --- REGLAS & CALCULOS ---
   const proficiencyBonus = Math.floor(2 + (hero.level - 1) / 4);
   const getModifier = (score) => Math.floor((score - 10) / 2);
   const stats = hero.stats;
@@ -112,10 +119,8 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const currentHP = hero.currentHP ?? maxHP;
   const hpPercent = Math.min(100, Math.max(0, (currentHP / maxHP) * 100));
 
-  // CALCULO DE AC DINÁMICO
+  // AC Calculation
   let calculatedAC = calculateAC(hero.inventory || [], mods.dex, hero.features);
-
-  // Caso especial: Defensa sin armadura (si no lleva armadura equipada)
   const hasArmor = (hero.inventory || []).some(
     (i) => i.isEquipped && i.type === "armor" && i.armorType !== "shield"
   );
@@ -129,14 +134,12 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   if (!hasArmor) {
     if (hasBarbarianDefense) calculatedAC = 10 + mods.dex + mods.con;
     if (hasMonkDefense) calculatedAC = 10 + mods.dex + mods.wis;
-    // Añadir escudo si está equipado (Bárbaros sí, Monjes no)
     const equippedShield = (hero.inventory || []).find(
       (i) => i.isEquipped && (i.type === "shield" || i.armorType === "shield")
     );
     if (equippedShield && hasBarbarianDefense)
       calculatedAC += parseInt(equippedShield.ac) || 2;
   }
-
   const armorClass = calculatedAC;
   const initiative = mods.dex >= 0 ? `+${mods.dex}` : mods.dex;
 
@@ -145,6 +148,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const isPerceptionProf = skillProfs.includes("Perception");
   const passivePerception =
     10 + mods.wis + (isPerceptionProf ? proficiencyBonus : 0);
+
   const heroClassData = CLASSES.find((c) => c.name === hero.class);
   const saveProficiencies =
     hero.saveProficiencies || (heroClassData ? heroClassData.saves : []);
@@ -154,6 +158,15 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const hitDiceTotal = hero.level;
   const deathSaves = hero.deathSaves || { successes: 0, failures: 0 };
   const xp = hero.xp || 0;
+
+  const currentLevelBaseXP = XP_TABLE[hero.level] || 0;
+  const nextLevelBaseXP = XP_TABLE[hero.level + 1] || currentLevelBaseXP;
+  const xpProgress =
+    nextLevelBaseXP > currentLevelBaseXP
+      ? ((xp - currentLevelBaseXP) / (nextLevelBaseXP - currentLevelBaseXP)) *
+        100
+      : 100;
+
   const resources = hero.resources || [];
   const features = hero.features || [];
   const activeConditions = hero.conditions || [];
@@ -186,61 +199,65 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
 
   // --- ACTIONS ---
 
-  const toggleEquip = (itemId) => {
-    const updatedInventory = inventory.map((item) => {
-      if (item.id === itemId) {
-        return { ...item, isEquipped: !item.isEquipped };
-      }
-      // Desequipar otras armaduras (solo 1 armadura de cuerpo a la vez)
-      const currentItem = inventory.find((i) => i.id === itemId);
-      if (
-        currentItem &&
-        currentItem.type === "armor" &&
-        currentItem.armorType !== "shield"
-      ) {
-        if (
-          item.type === "armor" &&
-          item.armorType !== "shield" &&
-          item.id !== itemId
-        ) {
-          return { ...item, isEquipped: false };
-        }
-      }
-      return item;
-    });
-    onUpdateHero({ ...hero, inventory: updatedInventory });
+  // 1. Core Logic for d20 with Adv/Dis
+  const getD20Roll = () => {
+    const r1 = Math.floor(Math.random() * 20) + 1;
+    const r2 = Math.floor(Math.random() * 20) + 1;
+
+    let result = r1;
+    let dropped = null;
+    let type = "normal";
+
+    if (rollMode === "adv") {
+      result = Math.max(r1, r2);
+      dropped = Math.min(r1, r2);
+      type = "adv";
+    } else if (rollMode === "dis") {
+      result = Math.min(r1, r2);
+      dropped = Math.max(r1, r2);
+      type = "dis";
+    }
+
+    // Reset mode after roll (optional, usually preferred in apps)
+    setRollMode("normal");
+
+    return { result, dropped, type };
   };
 
   const rollCheck = (name, modifier) => {
-    const d20 = Math.floor(Math.random() * 20) + 1;
+    const { result, dropped, type } = getD20Roll();
     setRollResult({
       type: "check",
       title: name,
-      roll: d20,
+      roll: result,
+      droppedRoll: dropped, // For visual
+      rollType: type, // 'normal', 'adv', 'dis'
       mod: modifier,
-      total: d20 + modifier,
-      isCrit: d20 === 20,
-      isFail: d20 === 1,
+      total: result + modifier,
+      isCrit: result === 20,
+      isFail: result === 1,
     });
-    if (d20 === 20) showToast("Natural 20!", "success");
-    if (d20 === 1) showToast("Critical Fail...", "error");
+    if (result === 20) showToast("Natural 20!", "success");
+    if (result === 1) showToast("Critical Fail...", "error");
   };
 
   const rollAttack = (name, modifier, damageDice, damageStat) => {
-    const d20 = Math.floor(Math.random() * 20) + 1;
+    const { result, dropped, type } = getD20Roll();
     const dmgMod = damageStat ? mods[damageStat] : 0;
     setRollResult({
       type: "attack",
       title: `${name} Attack`,
-      roll: d20,
+      roll: result,
+      droppedRoll: dropped,
+      rollType: type,
       mod: modifier,
-      total: d20 + modifier,
-      isCrit: d20 === 20,
-      isFail: d20 === 1,
+      total: result + modifier,
+      isCrit: result === 20,
+      isFail: result === 1,
       damageDice: damageDice,
       damageMod: dmgMod,
     });
-    if (d20 === 20) showToast("CRITICAL HIT!", "success");
+    if (result === 20) showToast("CRITICAL HIT!", "success");
   };
 
   const handleDamageRoll = () => {
@@ -260,6 +277,41 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     });
   };
 
+  const toggleEquip = (itemId) => {
+    const updatedInventory = inventory.map((item) => {
+      if (item.id === itemId) return { ...item, isEquipped: !item.isEquipped };
+      const currentItem = inventory.find((i) => i.id === itemId);
+      if (
+        currentItem &&
+        currentItem.type === "armor" &&
+        currentItem.armorType !== "shield"
+      ) {
+        if (
+          item.type === "armor" &&
+          item.armorType !== "shield" &&
+          item.id !== itemId
+        )
+          return { ...item, isEquipped: false };
+      }
+      return item;
+    });
+    onUpdateHero({ ...hero, inventory: updatedInventory });
+  };
+
+  // RESTING
+  const handleShortRestClick = () => {
+    setShowMenu(false);
+    setShowShortRest(true);
+  };
+
+  const handleApplyHeal = (amount, diceCost) => {
+    const newHP = Math.min(maxHP, currentHP + amount);
+    const newHitDiceUsed = hitDiceUsed + diceCost;
+    onUpdateHero({ ...hero, currentHP: newHP, hitDiceUsed: newHitDiceUsed });
+    showToast(`Healed ${amount} HP`, "success");
+  };
+
+  // ... Standard Updaters ...
   const updateXP = (val) => {
     const newXP = Math.max(0, parseInt(val) || 0);
     let newLevel = 1;
@@ -291,6 +343,27 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     setIsEditingMaxHP(false);
     showToast(`Max HP set to ${val}`, "success");
   };
+  const handleLongRest = () => {
+    const resetSlots = { ...spellSlots };
+    Object.keys(resetSlots).forEach((level) => (resetSlots[level].used = 0));
+    const regainedHitDice = Math.max(1, Math.floor(hitDiceTotal / 2));
+    const newHitDiceUsed = Math.max(0, hitDiceUsed - regainedHitDice);
+    const newExhaustion = Math.max(0, exhaustionLevel - 1);
+    const resetResources = resources.map((r) => ({ ...r, current: r.max }));
+    onUpdateHero({
+      ...hero,
+      currentHP: maxHP,
+      spellSlots: resetSlots,
+      hitDiceUsed: newHitDiceUsed,
+      deathSaves: { successes: 0, failures: 0 },
+      exhaustion: newExhaustion,
+      resources: resetResources,
+    });
+    setShowMenu(false);
+    showToast("Long Rest: Stats & Resources restored", "success");
+  };
+
+  // ... Others ...
   const addFeature = () => {
     if (!newFeature.name) return;
     const feat = { id: Date.now(), ...newFeature };
@@ -371,7 +444,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     setItemResults(results);
     setIsSearching(false);
   };
-
   const selectItem = (item) => {
     const newItem = {
       id: Date.now(),
@@ -394,7 +466,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     };
     let newInventoryList = [...inventory, newItem];
     let newWeaponsList = weapons;
-
     if (newItem.type === "weapon") {
       if (confirm(`Add ${item.name} to Attacks?`)) {
         const isFinesse =
@@ -423,7 +494,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     setItemResults([]);
     setItemQuery("");
   };
-
   const addResource = () => {
     if (!newResource.name) return;
     const maxVal = parseInt(newResource.max) || 1;
@@ -549,30 +619,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     };
     onUpdateHero({ ...hero, spellSlots: newSlots });
   };
-  const handleLongRest = () => {
-    const resetSlots = { ...spellSlots };
-    Object.keys(resetSlots).forEach((level) => (resetSlots[level].used = 0));
-    const regainedHitDice = Math.max(1, Math.floor(hitDiceTotal / 2));
-    const newHitDiceUsed = Math.max(0, hitDiceUsed - regainedHitDice);
-    const newExhaustion = Math.max(0, exhaustionLevel - 1);
-    const resetResources = resources.map((r) => ({ ...r, current: r.max }));
-    onUpdateHero({
-      ...hero,
-      currentHP: maxHP,
-      spellSlots: resetSlots,
-      hitDiceUsed: newHitDiceUsed,
-      deathSaves: { successes: 0, failures: 0 },
-      exhaustion: newExhaustion,
-      resources: resetResources,
-    });
-    setShowMenu(false);
-    showToast("Long Rest: Stats & Resources restored", "success");
-  };
-  const handleShortRest = () => {
-    setShowMenu(false);
-    setActiveTab("combat");
-    showToast("Use Hit Dice to heal", "info");
-  };
   const useHitDie = () => {
     if (hitDiceUsed < hitDiceTotal) {
       const dieMax = parseInt(hitDieType.substring(1));
@@ -676,10 +722,12 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         </button>
       </header>
 
+      {/* MENÚ EXPANDIDO */}
       {showMenu && (
         <div className="absolute top-20 right-6 z-20 w-56 bg-stone-800 border border-stone-700 rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in duration-200 origin-top-right">
+          {/* BOTÓN SHORT REST ACTUALIZADO */}
           <button
-            onClick={handleShortRest}
+            onClick={handleShortRestClick}
             className="w-full text-left px-4 py-3 text-stone-200 hover:bg-stone-700 flex items-center gap-3 border-b border-stone-700/50"
           >
             <Coffee size={16} className="text-orange-400" /> {t("shortRest")}
@@ -711,6 +759,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         </div>
       )}
 
+      {/* MODALS (Edit, HP, Slots) ... */}
       {editingStat && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-stone-900 border border-stone-700 p-6 rounded-2xl w-full max-w-xs animate-in zoom-in duration-200">
@@ -739,7 +788,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           </div>
         </div>
       )}
-
       {isEditingMaxHP && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-stone-900 border border-stone-700 p-6 rounded-2xl w-full max-w-xs animate-in zoom-in duration-200">
@@ -767,7 +815,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           </div>
         </div>
       )}
-
       {isEditingSlots && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-stone-900 border border-stone-700 p-6 rounded-2xl w-full max-w-sm animate-in zoom-in duration-200 max-h-[80vh] overflow-y-auto">
@@ -815,6 +862,74 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
             >
               Done
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* NUEVO: MODAL SHORT REST */}
+      {showShortRest && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-stone-900 border border-stone-700 p-6 rounded-2xl w-full max-w-sm relative">
+            <button
+              onClick={() => setShowShortRest(false)}
+              className="absolute top-4 right-4 text-stone-500 hover:text-white"
+            >
+              <X />
+            </button>
+            <h3 className="text-stone-100 font-bold mb-2 flex items-center gap-2">
+              <Coffee className="text-orange-400" size={20} /> {t("shortRest")}
+            </h3>
+
+            <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 mb-4 text-center">
+              <p className="text-stone-400 text-xs uppercase font-bold mb-1">
+                {t("hitDiceRemaining")}
+              </p>
+              <div className="text-3xl font-bold text-white mb-2">
+                {hitDiceTotal - hitDiceUsed}{" "}
+                <span className="text-stone-500 text-lg">/ {hitDiceTotal}</span>
+              </div>
+              <div className="flex justify-center gap-1 mb-2">
+                {Array.from({ length: hitDiceTotal }).map((_, i) => (
+                  <div
+                    key={i}
+                    className={`w-3 h-3 rounded-full ${
+                      i < hitDiceTotal - hitDiceUsed
+                        ? "bg-orange-500"
+                        : "bg-stone-700"
+                    }`}
+                  ></div>
+                ))}
+              </div>
+            </div>
+
+            <div className="text-center">
+              <button
+                onClick={() => {
+                  if (hitDiceUsed < hitDiceTotal) {
+                    // Lógica de tirada simple integrada
+                    const dieMax = parseInt(hitDieType.substring(1));
+                    const roll = Math.floor(Math.random() * dieMax) + 1;
+                    handleApplyHeal(Math.max(0, roll + mods.con), 1);
+                  } else {
+                    showToast("No Hit Dice left!", "error");
+                  }
+                }}
+                disabled={hitDiceUsed >= hitDiceTotal || currentHP >= maxHP}
+                className="w-full py-4 bg-stone-700 hover:bg-stone-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl mb-3 flex flex-col items-center justify-center gap-1"
+              >
+                <span>Roll Hit Die</span>
+                <span className="text-xs text-stone-400 font-normal">
+                  1{hitDieType} + {mods.con}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setShowShortRest(false)}
+                className="text-stone-500 text-sm hover:text-white"
+              >
+                Done
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -936,10 +1051,11 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
       >
         {activeTab === "combat" && (
           <div className="space-y-6 animate-in slide-in-from-left duration-200">
+            {/* INICIATIVA + ADVANTAGE TOGGLE */}
             <div className="flex gap-3 mb-2">
               <button
                 onClick={toggleInspiration}
-                className={`flex-1 p-3 rounded-xl border flex flex-col items-center justify-center transition ${
+                className={`p-3 rounded-xl border flex flex-col items-center justify-center transition w-16 shrink-0 ${
                   inspiration
                     ? "bg-yellow-500/20 border-yellow-500 text-yellow-500"
                     : "bg-stone-800 border-stone-700 text-stone-500 grayscale"
@@ -950,12 +1066,58 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                   {t("inspiration")}
                 </span>
               </button>
-              <div className="bg-stone-800 p-3 rounded-xl border border-stone-700 flex flex-col items-center justify-center flex-1">
+
+              {/* TOGGLE ADVANTAGE/DISADVANTAGE */}
+              <div className="flex-1 bg-stone-800 rounded-xl border border-stone-700 flex p-1 relative">
+                {/* Fondo animado del toggle */}
+                <div
+                  className={`absolute top-1 bottom-1 w-[32%] bg-stone-700 rounded-lg transition-all duration-300 ${
+                    rollMode === "adv"
+                      ? "left-[34%]"
+                      : rollMode === "dis"
+                      ? "left-[67%]"
+                      : "left-1"
+                  }`}
+                ></div>
+
+                <button
+                  onClick={() =>
+                    setRollMode(rollMode === "normal" ? "normal" : "normal")
+                  }
+                  className={`flex-1 z-10 text-[10px] font-bold uppercase py-2 rounded-lg transition ${
+                    rollMode === "normal" ? "text-white" : "text-stone-500"
+                  }`}
+                >
+                  {t("normal")}
+                </button>
+                <button
+                  onClick={() =>
+                    setRollMode(rollMode === "adv" ? "normal" : "adv")
+                  }
+                  className={`flex-1 z-10 text-[10px] font-bold uppercase py-2 rounded-lg transition ${
+                    rollMode === "adv" ? "text-green-400" : "text-stone-500"
+                  }`}
+                >
+                  {t("advantage")}
+                </button>
+                <button
+                  onClick={() =>
+                    setRollMode(rollMode === "dis" ? "normal" : "dis")
+                  }
+                  className={`flex-1 z-10 text-[10px] font-bold uppercase py-2 rounded-lg transition ${
+                    rollMode === "dis" ? "text-red-400" : "text-stone-500"
+                  }`}
+                >
+                  {t("disadvantage")}
+                </button>
+              </div>
+
+              <div className="bg-stone-800 p-3 rounded-xl border border-stone-700 flex flex-col items-center justify-center w-16 shrink-0">
                 <Zap className="text-yellow-600 mb-1 w-5 h-5" />
                 <span className="text-xs text-stone-400 font-bold uppercase">
                   {t("init")}
                 </span>
-                <span className="text-2xl font-bold text-yellow-500">
+                <span className="text-xl font-bold text-yellow-500">
                   {initiative}
                 </span>
               </div>
@@ -971,7 +1133,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                   {armorClass}
                 </span>
               </div>
-
               <div
                 onClick={() => setIsEditingMaxHP(true)}
                 className={`p-3 rounded-xl border flex flex-col items-center justify-center transition duration-300 relative overflow-hidden cursor-pointer hover:border-yellow-500 ${
@@ -1016,6 +1177,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               </button>
             </div>
 
+            {/* Resources/Conditions/Attacks (Igual) */}
             <div>
               <div className="flex justify-between items-center mb-2">
                 <h3 className="text-stone-400 font-bold text-sm uppercase tracking-wider">
@@ -1215,37 +1377,9 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 </div>
               </div>
             )}
-            {currentHP > 0 && currentHP < maxHP && (
-              <div className="bg-stone-800 p-4 rounded-xl border border-stone-700">
-                <div className="flex justify-between items-center mb-2">
-                  <h3 className="text-stone-400 font-bold text-sm uppercase flex items-center gap-2">
-                    <Coffee size={16} /> {t("hitDice")} ({hitDieType})
-                  </h3>
-                  <span className="text-xs text-stone-500">
-                    {hitDiceTotal - hitDiceUsed} / {hitDiceTotal}
-                  </span>
-                </div>
-                <div className="flex gap-2">
-                  {Array.from({ length: hitDiceTotal }).map((_, i) => (
-                    <div
-                      key={i}
-                      className={`w-6 h-6 rounded border transition ${
-                        i < hitDiceTotal - hitDiceUsed
-                          ? "bg-stone-600 border-stone-500"
-                          : "bg-stone-900 border-stone-800 opacity-30"
-                      }`}
-                    ></div>
-                  ))}
-                </div>
-                <button
-                  onClick={useHitDie}
-                  disabled={hitDiceUsed >= hitDiceTotal || currentHP >= maxHP}
-                  className="mt-3 w-full py-2 bg-stone-700 hover:bg-stone-600 disabled:opacity-50 disabled:cursor-not-allowed text-stone-200 text-xs font-bold rounded-lg transition"
-                >
-                  Roll (1{hitDieType} + {mods.con})
-                </button>
-              </div>
-            )}
+            {/* (El bloque de Hit Dice se movio al Modal de Short Rest, aqui ya no es necesario o se deja como resumen) */}
+
+            {/* ATTACKS */}
             <div>
               <div className="flex justify-between items-center mb-3">
                 <h3 className="text-stone-400 font-bold text-sm uppercase tracking-wider">
@@ -1338,6 +1472,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 })}
               </div>
             </div>
+            {/* CUSTOM FEATURES (Igual) */}
             <div>
               <div className="flex justify-between items-center mb-3">
                 <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
@@ -1403,165 +1538,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           </div>
         )}
 
-        {activeTab === "inventory" && (
-          <div className="space-y-6 animate-in slide-in-from-right duration-200">
-            <div className="bg-stone-800 p-4 rounded-xl border border-stone-700">
-              <h3 className="text-stone-400 font-bold text-xs uppercase mb-3 flex items-center gap-2">
-                <span className="text-yellow-500">●</span> {t("currency")}
-              </h3>
-              <div className="grid grid-cols-5 gap-2">
-                {["cp", "sp", "ep", "gp", "pp"].map((coin) => (
-                  <div key={coin} className="flex flex-col items-center">
-                    <label className="text-[10px] uppercase font-bold text-stone-500 mb-1">
-                      {coin}
-                    </label>
-                    <input
-                      type="number"
-                      value={money[coin]}
-                      onChange={(e) => updateMoney(coin, e.target.value)}
-                      className="w-full bg-stone-900 border border-stone-600 rounded-lg p-1 text-center text-sm font-bold text-stone-200 focus:border-yellow-500 outline-none"
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div>
-              <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
-                <Backpack size={16} /> {t("equipment")}
-              </h3>
-              <div className="mb-4 relative">
-                <div className="flex items-center gap-2 bg-stone-900 border border-stone-600 rounded-lg p-2 focus-within:border-yellow-500">
-                  <Search size={16} className="text-stone-500" />
-                  <input
-                    type="text"
-                    placeholder={t("searchItem")}
-                    className="bg-transparent w-full text-xs text-stone-100 outline-none"
-                    value={itemQuery}
-                    onChange={(e) => setItemQuery(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleItemSearch()}
-                  />
-                  <button
-                    onClick={handleItemSearch}
-                    className="text-xs font-bold text-yellow-600 hover:text-yellow-500 uppercase"
-                  >
-                    {isSearching ? "..." : "GO"}
-                  </button>
-                </div>
-                {itemResults.length > 0 && (
-                  <div className="absolute top-full left-0 w-full bg-stone-800 border border-stone-600 rounded-b-lg shadow-xl z-20 max-h-48 overflow-y-auto">
-                    {itemResults.map((res, i) => (
-                      <button
-                        key={i}
-                        onClick={() => selectItem(res)}
-                        className="w-full text-left p-2 text-xs text-stone-300 hover:bg-stone-700 border-b border-stone-700/50 last:border-0 flex justify-between items-center"
-                      >
-                        <div>
-                          <span className="font-bold block">{res.name}</span>
-                          <span className="text-[10px] text-stone-500">
-                            {res.category} • {res.cost}
-                          </span>
-                        </div>
-                        {res.damage && (
-                          <span className="text-yellow-500 font-mono">
-                            {res.damage}
-                          </span>
-                        )}
-                        {res.ac && (
-                          <span className="text-blue-400 font-mono">
-                            AC {res.ac}
-                          </span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div className="flex gap-2 mb-4">
-                <input
-                  type="text"
-                  placeholder={t("addItem")}
-                  value={newItemName}
-                  onChange={(e) => setNewItemName(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && addItem()}
-                  className="flex-1 bg-stone-800/50 border border-stone-700 rounded-xl px-4 py-2 text-xs text-stone-200 placeholder-stone-600 focus:border-yellow-500 outline-none"
-                />
-                <button
-                  onClick={addItem}
-                  className="bg-stone-800 border border-stone-700 hover:bg-stone-700 text-stone-200 w-10 rounded-xl flex items-center justify-center transition"
-                >
-                  <Plus size={16} />
-                </button>
-              </div>
-              <div className="space-y-2">
-                {inventory.map((item) => {
-                  const isWearable =
-                    item.type === "armor" ||
-                    item.type === "shield" ||
-                    item.armorType ||
-                    (item.desc && item.desc.includes("AC "));
-                  return (
-                    <div
-                      key={item.id}
-                      className={`group flex items-center justify-between p-3 rounded-xl border transition ${
-                        item.isEquipped
-                          ? "bg-stone-800 border-yellow-500/50 shadow-lg shadow-yellow-500/10"
-                          : "bg-stone-800/50 border-stone-700/50 hover:bg-stone-800"
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        {isWearable && (
-                          <button
-                            onClick={() => toggleEquip(item.id)}
-                            className={`p-1.5 rounded-lg transition ${
-                              item.isEquipped
-                                ? "bg-yellow-500 text-stone-900"
-                                : "bg-stone-900 text-stone-500 hover:text-stone-300 border border-stone-700"
-                            }`}
-                          >
-                            {item.isEquipped ? (
-                              <ToggleRight size={18} />
-                            ) : (
-                              <ToggleLeft size={18} />
-                            )}
-                          </button>
-                        )}
-                        <div className="flex flex-col">
-                          <span
-                            className={`text-sm ${
-                              item.isEquipped
-                                ? "text-yellow-500 font-bold"
-                                : "text-stone-200"
-                            }`}
-                          >
-                            {item.name} {item.isEquipped && "(Equipped)"}
-                          </span>
-                          {item.desc && (
-                            <span className="text-[10px] text-stone-500">
-                              {item.desc}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => removeItem(item.id)}
-                        className="text-stone-600 hover:text-red-400 p-1"
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
-                  );
-                })}
-                {inventory.length === 0 && (
-                  <p className="text-center text-stone-600 text-sm py-4">
-                    Backpack empty.
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ... (Rest of tabs remain same) ... */}
+        {/* ... (SKILLS, SPELLS, INVENTORY, PROFILE - Mantienen igual) ... */}
         {activeTab === "skills" && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 flex items-center justify-between">
@@ -1969,6 +1946,163 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
             </div>
           </div>
         )}
+        {activeTab === "inventory" && (
+          <div className="space-y-6 animate-in slide-in-from-right duration-200">
+            <div className="bg-stone-800 p-4 rounded-xl border border-stone-700">
+              <h3 className="text-stone-400 font-bold text-xs uppercase mb-3 flex items-center gap-2">
+                <span className="text-yellow-500">●</span> {t("currency")}
+              </h3>
+              <div className="grid grid-cols-5 gap-2">
+                {["cp", "sp", "ep", "gp", "pp"].map((coin) => (
+                  <div key={coin} className="flex flex-col items-center">
+                    <label className="text-[10px] uppercase font-bold text-stone-500 mb-1">
+                      {coin}
+                    </label>
+                    <input
+                      type="number"
+                      value={money[coin]}
+                      onChange={(e) => updateMoney(coin, e.target.value)}
+                      className="w-full bg-stone-900 border border-stone-600 rounded-lg p-1 text-center text-sm font-bold text-stone-200 focus:border-yellow-500 outline-none"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div>
+              <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
+                <Backpack size={16} /> {t("equipment")}
+              </h3>
+              <div className="mb-4 relative">
+                <div className="flex items-center gap-2 bg-stone-900 border border-stone-600 rounded-lg p-2 focus-within:border-yellow-500">
+                  <Search size={16} className="text-stone-500" />
+                  <input
+                    type="text"
+                    placeholder={t("searchItem")}
+                    className="bg-transparent w-full text-xs text-stone-100 outline-none"
+                    value={itemQuery}
+                    onChange={(e) => setItemQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleItemSearch()}
+                  />
+                  <button
+                    onClick={handleItemSearch}
+                    className="text-xs font-bold text-yellow-600 hover:text-yellow-500 uppercase"
+                  >
+                    {isSearching ? "..." : "GO"}
+                  </button>
+                </div>
+                {itemResults.length > 0 && (
+                  <div className="absolute top-full left-0 w-full bg-stone-800 border border-stone-600 rounded-b-lg shadow-xl z-20 max-h-48 overflow-y-auto">
+                    {itemResults.map((res, i) => (
+                      <button
+                        key={i}
+                        onClick={() => selectItem(res)}
+                        className="w-full text-left p-2 text-xs text-stone-300 hover:bg-stone-700 border-b border-stone-700/50 last:border-0 flex justify-between items-center"
+                      >
+                        <div>
+                          <span className="font-bold block">{res.name}</span>
+                          <span className="text-[10px] text-stone-500">
+                            {res.category} • {res.cost}
+                          </span>
+                        </div>
+                        {res.damage && (
+                          <span className="text-yellow-500 font-mono">
+                            {res.damage}
+                          </span>
+                        )}
+                        {res.ac && (
+                          <span className="text-blue-400 font-mono">
+                            AC {res.ac}
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="flex gap-2 mb-4">
+                <input
+                  type="text"
+                  placeholder={t("addItem")}
+                  value={newItemName}
+                  onChange={(e) => setNewItemName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && addItem()}
+                  className="flex-1 bg-stone-800/50 border border-stone-700 rounded-xl px-4 py-2 text-xs text-stone-200 placeholder-stone-600 focus:border-yellow-500 outline-none"
+                />
+                <button
+                  onClick={addItem}
+                  className="bg-stone-800 border border-stone-700 hover:bg-stone-700 text-stone-200 w-10 rounded-xl flex items-center justify-center transition"
+                >
+                  <Plus size={16} />
+                </button>
+              </div>
+              <div className="space-y-2">
+                {inventory.map((item) => {
+                  const isWearable =
+                    item.type === "armor" ||
+                    item.type === "shield" ||
+                    item.armorType ||
+                    (item.desc && item.desc.includes("AC "));
+                  return (
+                    <div
+                      key={item.id}
+                      className={`group flex items-center justify-between p-3 rounded-xl border transition ${
+                        item.isEquipped
+                          ? "bg-stone-800 border-yellow-500/50 shadow-lg shadow-yellow-500/10"
+                          : "bg-stone-800/50 border-stone-700/50 hover:bg-stone-800"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        {isWearable && (
+                          <button
+                            onClick={() => toggleEquip(item.id)}
+                            className={`p-1.5 rounded-lg transition ${
+                              item.isEquipped
+                                ? "bg-yellow-500 text-stone-900"
+                                : "bg-stone-900 text-stone-500 hover:text-stone-300 border border-stone-700"
+                            }`}
+                          >
+                            {item.isEquipped ? (
+                              <ToggleRight size={18} />
+                            ) : (
+                              <ToggleLeft size={18} />
+                            )}
+                          </button>
+                        )}
+                        <div className="flex flex-col">
+                          <span
+                            className={`text-sm ${
+                              item.isEquipped
+                                ? "text-yellow-500 font-bold"
+                                : "text-stone-200"
+                            }`}
+                          >
+                            {item.name} {item.isEquipped && "(Equipped)"}
+                          </span>
+                          {item.desc && (
+                            <span className="text-[10px] text-stone-500">
+                              {item.desc}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => removeItem(item.id)}
+                        className="text-stone-600 hover:text-red-400 p-1"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  );
+                })}
+                {inventory.length === 0 && (
+                  <p className="text-center text-stone-600 text-sm py-4">
+                    Backpack empty.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
         {activeTab === "profile" && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
             <div className="bg-stone-800 p-5 rounded-xl border border-stone-700">
@@ -1999,12 +2133,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 <div className="h-2 bg-stone-950 rounded-full overflow-hidden border border-stone-700/50">
                   <div
                     className="h-full bg-purple-600 transition-all duration-500"
-                    style={{
-                      width: `${Math.min(
-                        100,
-                        (xp / (XP_TABLE[hero.level + 1] || xp || 1)) * 100
-                      )}%`,
-                    }}
+                    style={{ width: `${Math.min(100, xpProgress)}%` }}
                   ></div>
                 </div>
               </div>
@@ -2172,6 +2301,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         )}
       </div>
 
+      {/* MODAL RESULTADOS (MEJORADO CON ADV/DIS) */}
       {rollResult && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-stone-900 border border-stone-700 p-6 rounded-2xl shadow-2xl w-full max-w-sm relative text-center">
@@ -2184,29 +2314,100 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
             <h3 className="text-stone-400 text-sm uppercase font-bold tracking-widest mb-4">
               {rollResult.title}
             </h3>
-            <div
-              className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-4 border-4 text-4xl font-bold ${
-                rollResult.isCrit
-                  ? "border-yellow-500 text-yellow-500 shadow-yellow-500/20 shadow-lg"
-                  : ""
-              } ${
-                rollResult.isFail
-                  ? "border-red-600 text-red-600"
-                  : "border-stone-600 text-stone-200"
-              }`}
-            >
-              {rollResult.roll}
-            </div>
+
+            {/* Si es Adv/Dis, mostramos los dos dados */}
+            {(rollResult.rollType === "adv" || rollResult.rollType === "dis") &&
+            rollResult.droppedRoll ? (
+              <div className="flex justify-center items-center gap-4 mb-4">
+                {/* Dado descartado */}
+                <div className="flex flex-col items-center opacity-50 scale-75">
+                  <div className="w-16 h-16 rounded-full flex items-center justify-center border-2 border-stone-600 text-2xl font-bold text-stone-500 bg-stone-950">
+                    {rollResult.droppedRoll}
+                  </div>
+                  <span className="text-[10px] text-stone-500 mt-1 uppercase">
+                    Dropped
+                  </span>
+                </div>
+
+                {/* Dado final */}
+                <div className="flex flex-col items-center scale-110">
+                  <div
+                    className={`w-20 h-20 rounded-full flex items-center justify-center border-4 text-3xl font-bold ${
+                      rollResult.isCrit
+                        ? "border-yellow-500 text-yellow-500 shadow-yellow-500/20 shadow-lg"
+                        : rollResult.isFail
+                        ? "border-red-600 text-red-600"
+                        : "border-stone-600 text-stone-200 bg-stone-800"
+                    }`}
+                  >
+                    {rollResult.roll}
+                  </div>
+                  <span
+                    className={`text-[10px] font-bold mt-1 uppercase ${
+                      rollResult.rollType === "adv"
+                        ? "text-green-500"
+                        : "text-red-500"
+                    }`}
+                  >
+                    {rollResult.rollType === "adv"
+                      ? "Advantage"
+                      : "Disadvantage"}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              // Dado normal (solo uno)
+              <div
+                className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-4 border-4 text-4xl font-bold ${
+                  rollResult.isCrit
+                    ? "border-yellow-500 text-yellow-500 shadow-yellow-500/20 shadow-lg"
+                    : ""
+                } ${
+                  rollResult.isFail
+                    ? "border-red-600 text-red-600"
+                    : "border-stone-600 text-stone-200"
+                }`}
+              >
+                {rollResult.roll}
+              </div>
+            )}
+
             <div className="text-stone-500 text-sm mb-6 flex justify-center gap-2 items-center font-mono bg-stone-950/50 py-2 rounded-lg">
-              <span>Roll {rollResult.roll}</span>
-              <span>
-                {rollResult.mod >= 0 ? "+" : "-"} {Math.abs(rollResult.mod)}
-              </span>
-              <span>=</span>
-              <span className="text-xl font-bold text-stone-200">
-                {rollResult.total}
-              </span>
+              {rollResult.type === "damage" ? (
+                <span>
+                  {rollResult.formula} + {rollResult.mod} ={" "}
+                  <strong className="text-white text-lg">
+                    {rollResult.total}
+                  </strong>
+                </span>
+              ) : (
+                <span>
+                  Roll {rollResult.roll} {rollResult.mod >= 0 ? "+" : "-"}{" "}
+                  {Math.abs(rollResult.mod)} ={" "}
+                  <strong className="text-white text-lg">
+                    {rollResult.total}
+                  </strong>
+                </span>
+              )}
             </div>
+
+            {/* BOTÓN DE DAÑO */}
+            {rollResult.type === "attack" && rollResult.damageDice && (
+              <button
+                onClick={handleDamageRoll}
+                className={`w-full py-3 mb-3 rounded-xl font-bold flex items-center justify-center gap-2 transition
+                        ${
+                          rollResult.isCrit
+                            ? "bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-900/50"
+                            : "bg-stone-700 hover:bg-stone-600 text-stone-200"
+                        }
+                    `}
+              >
+                <Hammer size={18} /> {t("rollDamage")}{" "}
+                {rollResult.isCrit && "(x2)"}
+              </button>
+            )}
+
             <button
               onClick={() => setRollResult(null)}
               className="w-full py-3 bg-stone-800 hover:bg-stone-700 text-stone-100 rounded-xl font-bold"

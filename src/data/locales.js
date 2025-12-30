@@ -75,6 +75,13 @@ export const dictionary = {
     rollDamage: "Roll Damage",
     critDamage: "CRITICAL DAMAGE!",
     totalDmg: "Total Damage",
+    advantage: "ADV",
+    normal: "NORM",
+    disadvantage: "DIS",
+    rolledWith: "Rolled with",
+    hitDiceRemaining: "Hit Dice Remaining",
+    healRoll: "Heal Roll",
+    rest: "Rest",
     
     // Spells
     spellDC: "Spell Save DC",
@@ -204,6 +211,13 @@ export const dictionary = {
     rollDamage: "Tirar Daño",
     critDamage: "¡DAÑO CRÍTICO!",
     totalDmg: "Daño Total",
+    advantage: "VENT",
+    normal: "NORM",
+    disadvantage: "DESV",
+    rolledWith: "Tirada con",
+    hitDiceRemaining: "Dados de Golpe Restantes",
+    healRoll: "Curación",
+    rest: "Descansar",
     
     // Spells
     spellDC: "CD Salvación",
