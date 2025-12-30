@@ -134,6 +134,13 @@ export const dictionary = {
     addFeature: "Add Feature",
     featureName: "Feature Name",
     featureDesc: "Description",
+
+    // About / Credits (NUEVO)
+    aboutTitle: "About & Legal",
+    legalNotice: "Legal Notice",
+    licenseText: "This work includes material taken from the System Reference Document 5.1 (“SRD 5.1”) by Wizards of the Coast LLC and available at https://dnd.wizards.com/resources/systems-reference-document. The SRD 5.1 is licensed under the Creative Commons Attribution 4.0 International License available at https://creativecommons.org/licenses/by/4.0/legalcode.",
+    developedBy: "Developed by",
+    version: "Version"
   },
   es: {
     // General
@@ -270,5 +277,12 @@ export const dictionary = {
     addFeature: "Añadir Rasgo",
     featureName: "Nombre del Rasgo",
     featureDesc: "Descripción",
+
+    // About / Credits (NUEVO)
+    aboutTitle: "Acerca de y Legal",
+    legalNotice: "Aviso Legal",
+    licenseText: "Este trabajo incluye material tomado del System Reference Document 5.1 (“SRD 5.1”) de Wizards of the Coast LLC y disponible en https://dnd.wizards.com/resources/systems-reference-document. El SRD 5.1 está licenciado bajo la Creative Commons Attribution 4.0 International License disponible en https://creativecommons.org/licenses/by/4.0/legalcode.",
+    developedBy: "Desarrollado por",
+    version: "Versión"
   }
 };

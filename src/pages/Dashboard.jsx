@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   Plus,
   Download,
@@ -14,9 +15,11 @@ import {
   Flame,
   Book,
   Crosshair,
-  Crown,
   Ghost,
   Dices,
+  Info, // IMPORTAR NUEVO ICONO
+  X,
+  User,
 } from "lucide-react";
 import { useLanguage } from "../context/LanguageContext";
 
@@ -28,6 +31,7 @@ export function Dashboard({
   onRandom,
 }) {
   const { t } = useLanguage();
+  const [showAbout, setShowAbout] = useState(false); // ESTADO PARA EL MODAL
 
   // Mapa de Iconos por Clase (ESPAÑOL)
   const getClassIcon = (className) => {
@@ -84,6 +88,7 @@ export function Dashboard({
 
   return (
     <div className="p-6 pb-24 min-h-screen animate-in fade-in duration-500">
+      {/* HEADER */}
       <header className="mb-8 flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-black text-stone-100 tracking-tight">
@@ -92,6 +97,15 @@ export function Dashboard({
           <p className="text-stone-500 text-sm mt-1">{t("subTitle")}</p>
         </div>
         <div className="flex gap-2">
+          {/* Botón About */}
+          <button
+            onClick={() => setShowAbout(true)}
+            className="p-2 bg-stone-800 rounded-full text-stone-400 hover:text-yellow-500 transition"
+          >
+            <Info size={20} />
+          </button>
+
+          {/* Botón Importar */}
           <label className="p-2 bg-stone-800 rounded-full text-stone-400 hover:text-white cursor-pointer transition">
             <Upload size={20} />
             <input
@@ -188,6 +202,56 @@ export function Dashboard({
           <Dices size={18} /> {t("randomHero")}
         </button>
       </div>
+
+      {/* MODAL ABOUT / LEGAL */}
+      {showAbout && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-stone-900 border border-stone-700 p-6 rounded-2xl w-full max-w-sm relative shadow-2xl">
+            <button
+              onClick={() => setShowAbout(false)}
+              className="absolute top-4 right-4 text-stone-500 hover:text-white"
+            >
+              <X />
+            </button>
+
+            <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+              <Book size={20} className="text-yellow-500" /> {t("aboutTitle")}
+            </h2>
+
+            <div className="space-y-4 text-sm text-stone-400 max-h-[60vh] overflow-y-auto pr-2">
+              <div>
+                <h3 className="font-bold text-stone-200 mb-1">
+                  {t("appTitle")}
+                </h3>
+                <p>{t("version")} 1.7</p>
+                <p className="mt-1">
+                  {t("developedBy")} <strong>Tu Nombre/Proyecto</strong>
+                </p>
+              </div>
+
+              <div className="p-3 bg-stone-950 rounded-xl border border-stone-800">
+                <h3 className="font-bold text-stone-200 mb-2 text-xs uppercase tracking-wider">
+                  {t("legalNotice")}
+                </h3>
+                <p className="text-xs leading-relaxed italic opacity-80">
+                  {t("licenseText")}
+                </p>
+              </div>
+
+              <div className="text-xs text-center pt-2 opacity-50">
+                <p>Not affiliated with Wizards of the Coast.</p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowAbout(false)}
+              className="w-full mt-6 py-3 bg-stone-800 hover:bg-stone-700 text-stone-100 rounded-xl font-bold transition"
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
