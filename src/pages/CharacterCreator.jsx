@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   ArrowLeft,
   Check,
@@ -11,14 +11,12 @@ import {
   MessageCircle,
   User,
   ScrollText,
-  Sparkles,
   Image as ImageIcon,
   Search,
   Plus,
   Trash2,
   Dices,
   RotateCcw,
-  X,
   Book,
 } from "lucide-react";
 import { RACES, CLASSES, BACKGROUNDS } from "../data/srd";
@@ -47,10 +45,14 @@ export function CharacterCreator({ onBack, onSave }) {
   const [selectedBg, setSelectedBg] = useState(null);
   const [classSkills, setClassSkills] = useState([]);
 
+  // --- NUEVO ESTADO PARA HECHIZOS ---
   const [startingSpells, setStartingSpells] = useState([]);
-  const [spellQuery, setSpellQuery] = useState("");
-  const [spellResults, setSpellResults] = useState([]);
-  const [isSearchingSpell, setIsSearchingSpell] = useState(false);
+  const [availableSpells, setAvailableSpells] = useState({
+    cantrips: [],
+    level1: [],
+  });
+  const [loadingSpells, setLoadingSpells] = useState(false);
+  // ----------------------------------
 
   const [details, setDetails] = useState({
     name: "",
@@ -70,6 +72,28 @@ export function CharacterCreator({ onBack, onSave }) {
   });
 
   const isCaster = selectedClass?.spellcasting !== undefined;
+
+  // --- EFECTO PARA CARGAR HECHIZOS AUTOMÁTICAMENTE ---
+  useEffect(() => {
+    if (step === 5 && isCaster && selectedClass) {
+      const loadSpells = async () => {
+        setLoadingSpells(true);
+        // Buscamos solo los hechizos válidos para la clase
+        const cantrips = await searchSpells("", {
+          class: selectedClass.name,
+          level: 0,
+        });
+        const level1 = await searchSpells("", {
+          class: selectedClass.name,
+          level: 1,
+        });
+        setAvailableSpells({ cantrips, level1 });
+        setLoadingSpells(false);
+      };
+      loadSpells();
+    }
+  }, [step, isCaster, selectedClass]);
+  // ---------------------------------------------------
 
   const handleNext = () => {
     if (step === 1 && selectedRace) setStep(2);
@@ -144,22 +168,17 @@ export function CharacterCreator({ onBack, onSave }) {
     }
   };
 
-  const handleSpellSearch = async () => {
-    if (!spellQuery) return;
-    setIsSearchingSpell(true);
-    const results = await searchSpells(spellQuery);
-    setSpellResults(results);
-    setIsSearchingSpell(false);
+  // --- NUEVA LÓGICA DE SELECCIÓN DE HECHIZOS ---
+  const toggleSpell = (spell) => {
+    const exists = startingSpells.some((s) => s.name === spell.name);
+    if (exists) {
+      setStartingSpells(startingSpells.filter((s) => s.name !== spell.name));
+    } else {
+      // Opcional: Podrías añadir validación de límites aquí (ej: máx 3 trucos)
+      setStartingSpells([...startingSpells, { id: Date.now(), ...spell }]);
+    }
   };
-  const addStarterSpell = (spell) => {
-    if (startingSpells.some((s) => s.name === spell.name)) return;
-    setStartingSpells([...startingSpells, { id: Date.now(), ...spell }]);
-    setSpellResults([]);
-    setSpellQuery("");
-  };
-  const removeStarterSpell = (id) => {
-    setStartingSpells(startingSpells.filter((s) => s.id !== id));
-  };
+  // ---------------------------------------------
 
   const finishCreation = () => {
     const finalStats = {
@@ -237,7 +256,7 @@ export function CharacterCreator({ onBack, onSave }) {
     if (step === 2) return "Elegir Clase";
     if (step === 3) return "Asignar Atributos";
     if (step === 4) return "Trasfondo y Habilidades";
-    if (step === 5) return "Conjuros";
+    if (step === 5) return "Libro de Conjuros"; // Actualizado
     if (step === 6) return "Identidad";
     return "";
   };
@@ -604,82 +623,124 @@ export function CharacterCreator({ onBack, onSave }) {
           </div>
         )}
 
+        {/* --- PASO 5 ACTUALIZADO CON API LOCAL --- */}
         {step === 5 && isCaster && (
           <div className="space-y-4 animate-in slide-in-from-right duration-300">
             <div className="bg-stone-800/50 p-4 rounded-xl border border-stone-700 mb-2 text-center">
               <p className="text-stone-400 text-sm">
-                Busca y añade tus Trucos y Conjuros Nv1.
+                Conjuros disponibles para <strong>{selectedClass.name}</strong>.
               </p>
             </div>
-            <div className="relative">
-              <div className="flex items-center gap-2 bg-stone-800 border border-stone-600 rounded-lg p-3 focus-within:border-yellow-500">
-                <Search size={18} className="text-stone-500" />
-                <input
-                  type="text"
-                  placeholder="Bola de fuego, Curar..."
-                  className="bg-transparent w-full text-sm text-stone-100 outline-none"
-                  value={spellQuery}
-                  onChange={(e) => setSpellQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleSpellSearch()}
-                />
-                <button
-                  onClick={handleSpellSearch}
-                  className="text-xs font-bold text-yellow-600 hover:text-yellow-500 uppercase"
-                >
-                  {isSearchingSpell ? "..." : "BUSCAR"}
-                </button>
+
+            {loadingSpells ? (
+              <div className="p-8 text-center text-stone-500 animate-pulse">
+                <Book size={32} className="mx-auto mb-2 opacity-50" />
+                Consultando grimorio...
               </div>
-              {spellResults.length > 0 && (
-                <div className="absolute top-full left-0 w-full bg-stone-800 border border-stone-600 rounded-b-lg shadow-xl z-20 max-h-48 overflow-y-auto mt-1">
-                  {spellResults.map((res, i) => (
-                    <button
-                      key={i}
-                      onClick={() => addStarterSpell(res)}
-                      className="w-full text-left p-3 text-sm text-stone-300 hover:bg-stone-700 border-b border-stone-700/50 last:border-0 flex justify-between items-center"
-                    >
-                      <span>{res.name}</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-stone-500 text-xs">
-                          {res.level === 0 ? "Truco" : `Nv ${res.level}`}
-                        </span>
-                        <Plus size={14} className="text-yellow-500" />
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="space-y-2">
-              {startingSpells.map((spell) => (
-                <div
-                  key={spell.id}
-                  className="bg-stone-800 p-3 rounded-xl border border-stone-700 flex justify-between items-center group"
-                >
+            ) : (
+              <div className="space-y-6 h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+                {/* TRUCOS */}
+                {availableSpells.cantrips.length > 0 && (
                   <div>
-                    <p className="font-bold text-stone-200 text-sm">
-                      {spell.name}
-                    </p>
-                    <p className="text-xs text-stone-500">
-                      {spell.level === 0 ? "Truco" : `Nivel ${spell.level}`} •{" "}
-                      {spell.school}
-                    </p>
+                    <h4 className="text-xs font-bold text-stone-500 uppercase mb-2 sticky top-0 bg-[#1c1917] py-2 z-10 border-b border-stone-800">
+                      Trucos (Nivel 0)
+                    </h4>
+                    <div className="grid grid-cols-1 gap-2">
+                      {availableSpells.cantrips.map((spell) => {
+                        const isSelected = startingSpells.some(
+                          (s) => s.name === spell.name
+                        );
+                        return (
+                          <div
+                            key={spell.name}
+                            onClick={() => toggleSpell(spell)}
+                            className={`p-3 rounded-xl border-2 cursor-pointer transition flex justify-between items-center ${
+                              isSelected
+                                ? "bg-stone-800 border-yellow-500"
+                                : "bg-stone-900 border-stone-800 hover:border-stone-600"
+                            }`}
+                          >
+                            <div>
+                              <p
+                                className={`font-bold text-sm ${
+                                  isSelected ? "text-white" : "text-stone-400"
+                                }`}
+                              >
+                                {spell.name}
+                              </p>
+                              <p className="text-[10px] text-stone-600">
+                                {spell.school}
+                              </p>
+                            </div>
+                            {isSelected ? (
+                              <Check size={18} className="text-yellow-500" />
+                            ) : (
+                              <Plus size={18} className="text-stone-600" />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <button
-                    onClick={() => removeStarterSpell(spell.id)}
-                    className="p-2 text-stone-500 hover:text-red-500 bg-stone-900 rounded-lg transition"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              ))}
-              {startingSpells.length === 0 && (
-                <div className="text-center py-8 text-stone-600 italic border-2 border-dashed border-stone-800 rounded-xl">
-                  Grimorio vacío.
-                </div>
-              )}
-            </div>
+                )}
+
+                {/* NIVEL 1 */}
+                {availableSpells.level1.length > 0 && (
+                  <div>
+                    <h4 className="text-xs font-bold text-stone-500 uppercase mb-2 sticky top-0 bg-[#1c1917] py-2 z-10 border-b border-stone-800">
+                      Nivel 1
+                    </h4>
+                    <div className="grid grid-cols-1 gap-2">
+                      {availableSpells.level1.map((spell) => {
+                        const isSelected = startingSpells.some(
+                          (s) => s.name === spell.name
+                        );
+                        return (
+                          <div
+                            key={spell.name}
+                            onClick={() => toggleSpell(spell)}
+                            className={`p-3 rounded-xl border-2 cursor-pointer transition flex justify-between items-center ${
+                              isSelected
+                                ? "bg-stone-800 border-blue-500"
+                                : "bg-stone-900 border-stone-800 hover:border-stone-600"
+                            }`}
+                          >
+                            <div>
+                              <p
+                                className={`font-bold text-sm ${
+                                  isSelected ? "text-white" : "text-stone-400"
+                                }`}
+                              >
+                                {spell.name}
+                              </p>
+                              <p className="text-[10px] text-stone-600">
+                                {spell.school} • {spell.damage || "Utilidad"}
+                              </p>
+                            </div>
+                            {isSelected ? (
+                              <Check size={18} className="text-blue-500" />
+                            ) : (
+                              <Plus size={18} className="text-stone-600" />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {availableSpells.cantrips.length === 0 &&
+                  availableSpells.level1.length === 0 && (
+                    <div className="text-center py-10 text-stone-500">
+                      No se encontraron hechizos para esta clase en la base de
+                      datos local.
+                    </div>
+                  )}
+              </div>
+            )}
           </div>
         )}
+        {/* --------------------------------------------- */}
 
         {step === 6 && (
           <div className="space-y-4 animate-in slide-in-from-right duration-300">
