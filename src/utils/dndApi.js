@@ -1,104 +1,148 @@
 import { SPELLS } from "../data/spells";
 import { WEAPONS, ARMOR, ADVENTURING_GEAR, MAGIC_ITEMS } from "../data/items";
 
-// --- BUSCADOR DE HECHIZOS (LOCAL) ---
-export async function searchSpells(query) {
-  // Simulamos una promesa para no romper componentes que esperen 'await'
-  // aunque ya no sea estrictamente necesario.
+// ==========================================
+// 🧙‍♂️ API DE HECHIZOS
+// ==========================================
+
+/**
+ * Busca hechizos con filtros avanzados.
+ * @param {string} query - Texto a buscar (opcional)
+ * @param {object} filters - { level, class, school, exactMatch }
+ */
+export async function searchSpells(query = "", filters = {}) {
   return new Promise((resolve) => {
-    if (!query || query.length < 3) {
-      resolve([]);
-      return;
+    let results = SPELLS;
+
+    // 1. Filtrar por Texto (Nombre)
+    if (query) {
+      const lowerQuery = query.toLowerCase();
+      results = results.filter((s) =>
+        s.name.toLowerCase().includes(lowerQuery)
+      );
     }
 
-    const lowerQuery = query.toLowerCase();
+    // 2. Filtrar por Nivel (0-9)
+    if (filters.level !== undefined && filters.level !== "") {
+      results = results.filter((s) => s.level === parseInt(filters.level));
+    }
 
-    const results = SPELLS.filter((spell) =>
-      spell.name.toLowerCase().includes(lowerQuery)
-    ).map((spell) => ({
-      name: spell.name,
-      level: spell.level,
-      school: spell.school,
-      time: spell.time,
-      desc: spell.desc,
-      damage: spell.damage || detectDamage(spell.desc), // Usa el predefinido o intenta detectarlo
-      components: spell.components,
-      range: spell.range,
-      duration: spell.duration,
+    // 3. Filtrar por Clase (ej: "Mago")
+    if (filters.class) {
+      results = results.filter((s) => s.classes.includes(filters.class));
+    }
+
+    // 4. Filtrar por Escuela
+    if (filters.school) {
+      results = results.filter((s) => s.school === filters.school);
+    }
+
+    // Formatear salida para la vista
+    const mapped = results.map((spell) => ({
+      ...spell, // Devolvemos todo el objeto original
+      damage: spell.damage || detectDamage(spell.desc), // Aseguramos que haya daño si es detectable
     }));
 
-    resolve(results);
+    resolve(mapped);
   });
 }
 
-// --- BUSCADOR DE EQUIPO UNIFICADO (LOCAL) ---
-export async function searchEquipment(query) {
-  return new Promise((resolve) => {
-    if (!query || query.length < 3) {
-      resolve([]);
-      return;
-    }
+/**
+ * Obtiene un hechizo específico por su ID exacto.
+ * Útil para cargar la hoja de personaje.
+ */
+export function getSpellById(spellId) {
+  return SPELLS.find((s) => s.id === spellId) || null;
+}
 
+// ==========================================
+// 🛡️ API DE EQUIPO
+// ==========================================
+
+/**
+ * Busca equipo combinando todas las listas.
+ * @param {string} query
+ * @param {object} filters - { type: 'weapon'|'armor'|'gear'|'magic', category }
+ */
+export async function searchEquipment(query = "", filters = {}) {
+  return new Promise((resolve) => {
     const lowerQuery = query.toLowerCase();
 
-    // 1. Buscar Armas
-    const weapons = WEAPONS.filter((w) =>
-      w.name.toLowerCase().includes(lowerQuery)
-    ).map((w) => ({
-      type: "weapon",
-      name: w.name,
-      category: w.category,
-      damage: w.damage,
-      cost: w.cost,
-      weight: w.weight,
-      properties: w.properties,
-      desc: `${w.damageType}. ${w.properties}`, // Formato para vista simple
-    }));
+    // Recopilamos todo si no hay filtro de tipo específico, o solo lo solicitado
+    let pool = [];
 
-    // 2. Buscar Armaduras
-    const armors = ARMOR.filter((a) =>
-      a.name.toLowerCase().includes(lowerQuery)
-    ).map((a) => ({
-      type: "armor",
-      name: a.name,
-      category: a.category,
-      ac: a.ac,
-      cost: a.cost,
-      weight: a.weight,
-      strength: a.strength,
-      desc: `CA: ${a.ac} | Sigilo: ${a.stealth}`,
-    }));
+    // Selección de fuentes según filtro 'type'
+    const includeWeapons = !filters.type || filters.type === "weapon";
+    const includeArmor = !filters.type || filters.type === "armor";
+    const includeGear = !filters.type || filters.type === "gear";
+    const includeMagic = !filters.type || filters.type === "magic-item";
 
-    // 3. Buscar Equipo General
-    const gear = ADVENTURING_GEAR.filter((g) =>
-      g.name.toLowerCase().includes(lowerQuery)
-    ).map((g) => ({
-      type: "gear",
-      name: g.name,
-      cost: g.cost,
-      weight: g.weight,
-      desc: g.desc,
-    }));
+    if (includeWeapons) {
+      pool.push(
+        ...WEAPONS.map((w) => ({
+          ...w,
+          type: "weapon",
+          desc: `${w.damageType}. ${w.properties}`,
+        }))
+      );
+    }
+    if (includeArmor) {
+      pool.push(
+        ...ARMOR.map((a) => ({
+          ...a,
+          type: "armor",
+          desc: `CA: ${a.ac} | Sigilo: ${a.stealth}`,
+        }))
+      );
+    }
+    if (includeGear) {
+      pool.push(...ADVENTURING_GEAR.map((g) => ({ ...g, type: "gear" })));
+    }
+    if (includeMagic) {
+      pool.push(
+        ...MAGIC_ITEMS.map((m) => ({
+          ...m,
+          type: "magic-item",
+          requiresAttunement: m.attunement === "Sí",
+        }))
+      );
+    }
 
-    // 4. Buscar Objetos Mágicos
-    const magic = MAGIC_ITEMS.filter((m) =>
-      m.name.toLowerCase().includes(lowerQuery)
-    ).map((m) => ({
-      type: "magic-item",
-      name: m.name,
-      rarity: m.rarity,
-      desc: m.desc,
-      requiresAttunement: m.attunement === "Sí",
-    }));
+    // 1. Filtrado por Texto
+    if (query) {
+      pool = pool.filter((item) =>
+        item.name.toLowerCase().includes(lowerQuery)
+      );
+    }
 
-    // Combinar todo
-    resolve([...weapons, ...armors, ...gear, ...magic]);
+    // 2. Filtrado por Categoría (ej: "Marcial", "Ligera")
+    if (filters.category) {
+      pool = pool.filter((item) => item.category === filters.category);
+    }
+
+    resolve(pool);
   });
 }
 
-// Utilidad auxiliar por si algún hechizo no tiene campo 'damage' explícito
+/**
+ * Obtiene un objeto por su nombre exacto.
+ */
+export function getItemByName(name) {
+  const allItems = [
+    ...WEAPONS.map((w) => ({ ...w, type: "weapon" })),
+    ...ARMOR.map((a) => ({ ...a, type: "armor" })),
+    ...ADVENTURING_GEAR.map((g) => ({ ...g, type: "gear" })),
+    ...MAGIC_ITEMS.map((m) => ({ ...m, type: "magic-item" })),
+  ];
+  return allItems.find((i) => i.name === name) || null;
+}
+
+// ==========================================
+// 🔧 UTILIDADES
+// ==========================================
+
 function detectDamage(desc) {
-  const regex = /(\d+d\d+(\s?\+\s?\d+)?)/; // Mejorado para capturar modificadores simples (ej: 1d4 + 1)
+  const regex = /(\d+d\d+(\s?\+\s?\d+)?)/;
   const match = desc.match(regex);
   return match ? match[0] : "";
 }
