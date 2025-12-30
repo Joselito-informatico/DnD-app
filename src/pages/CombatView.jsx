@@ -122,19 +122,11 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   );
   const hasMonkDefense = (hero.features || []).some(
     (f) => f.name === "Defensa sin Armadura" && f.desc.includes("SAB")
-  ); // Wis renamed SAB internally check desc? No, desc uses keys usually or generic text. Updated SRD uses localized desc.
+  );
 
   if (!hasArmor) {
     if (hasBarbarianDefense) calculatedAC = 10 + mods.dex + mods.con;
-    // Monk: uses WIS (SAB)
-    if (
-      (hero.features || []).some(
-        (f) =>
-          f.name === "Defensa sin Armadura" &&
-          (f.desc.includes("SAB") || f.desc.includes("WIS"))
-      )
-    )
-      calculatedAC = 10 + mods.dex + mods.wis;
+    if (hasMonkDefense) calculatedAC = 10 + mods.dex + mods.wis;
 
     const equippedShield = (hero.inventory || []).find(
       (i) =>
@@ -152,6 +144,8 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
 
   const skillProfs = hero.skillProfs || [];
   const expertises = hero.expertises || [];
+
+  // Use correct Spanish keys for detection
   const isPerceptionProf =
     skillProfs.includes("Percepción") || skillProfs.includes("Perception");
   const isPerceptionExpert =

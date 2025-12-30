@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ArrowLeft, BookOpen, Skull, Shield, Sword } from "lucide-react";
-import { CONDITIONS, COMBAT_ACTIONS, CLASSES, RACES } from "../data/srd";
+import { CONDITIONS, COMBAT_ACTIONS, CLASSES } from "../data/srd";
 
 export function Compendium({ onBack }) {
   const [section, setSection] = useState("actions");

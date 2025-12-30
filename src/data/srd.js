@@ -546,7 +546,7 @@ export const CLASSES = [
       },
       { name: "Armadura de cuero", type: "armor", ac: 11, qty: 1 },
       { name: "Herramientas de ladrón", type: "item", qty: 1 },
-      { name: "Burglar's Pack", type: "item", qty: 1 },
+      { name: "Pack de Ladrón", type: "item", qty: 1 },
     ],
     features: [
       {
@@ -775,7 +775,6 @@ export const BACKGROUNDS = [
   },
 ];
 
-// OGL COMPLIANT: Use placeholder or manually input standard SRD spells
 export const SPELLS = [];
 
 export const XP_TABLE = {
@@ -801,7 +800,6 @@ export const XP_TABLE = {
   20: 355000,
 };
 
-// NEW: COMBAT ACTIONS
 export const COMBAT_ACTIONS = [
   { name: "Atacar", desc: "Realizas un ataque cuerpo a cuerpo o a distancia." },
   {

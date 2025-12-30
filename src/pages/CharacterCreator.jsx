@@ -29,7 +29,6 @@ import { searchSpells } from "../utils/dndApi";
 export function CharacterCreator({ onBack, onSave }) {
   const { t } = useLanguage();
 
-  // Flujo: 1.Raza -> 2.Clase -> 3.Stats -> 4.Trasfondo -> [5.Hechizos] -> 6.Identidad
   const [step, setStep] = useState(1);
   const [selectedRace, setSelectedRace] = useState(null);
   const [selectedClass, setSelectedClass] = useState(null);
@@ -250,7 +249,6 @@ export function CharacterCreator({ onBack, onSave }) {
     return mod > 0 ? `+${mod}` : mod;
   };
 
-  // CONFIGURACIÓN EN ESPAÑOL
   const statConfig = [
     { id: "str", label: "FUE", icon: Sword, color: "text-red-400" },
     { id: "dex", label: "DES", icon: Zap, color: "text-yellow-400" },

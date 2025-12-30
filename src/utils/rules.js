@@ -1,9 +1,12 @@
 /**
- * Calcula la Clase de Armadura (CA) basándose en el equipo.
- * Soporta nombres en ESPAÑOL del SRD 5.1
+ * Calcula la Clase de Armadura (CA) basándose en el equipo en ESPAÑOL (SRD).
+ * @param {Array} inventory - Lista de items.
+ * @param {number} dexMod - Modificador de Destreza.
+ * @param {Array} features - Rasgos (para Monje/Bárbaro).
+ * @returns {number} Clase de Armadura final.
  */
 export function calculateAC(inventory, dexMod, features = []) {
-  let baseAC = 10 + dexMod;
+  let baseAC = 10 + dexMod; // Base por defecto (Sin armadura)
   let shieldBonus = 0;
   let hasArmor = false;
 
@@ -26,26 +29,25 @@ export function calculateAC(inventory, dexMod, features = []) {
     const name = equippedArmor.name.toLowerCase();
 
     // Pesada (No suma DES)
+    // Excluye "camisa" (media) y "semi" (media) para evitar falsos positivos con "malla" y "placas"
     if (
-      name.includes("anillas") ||
-      name.includes("malla") ||
-      name.includes("bandas") ||
-      name.includes("placas")
+      (name.includes("anillas") ||
+        name.includes("malla") ||
+        name.includes("bandas") ||
+        name.includes("placas")) &&
+      !name.includes("camisa") &&
+      !name.includes("semi") &&
+      !name.includes("escamas")
     ) {
-      // Excepción: "Camisa de malla" (Chain Shirt) y "Cota de escamas" (Scale Mail) son Medias
-      if (name.includes("camisa") || name.includes("escamas")) {
-        baseAC = acVal + Math.min(dexMod, 2); // Media
-      } else {
-        baseAC = acVal; // Pesada real
-      }
+      baseAC = acVal; // Pesada real
     }
     // Media (Max DES +2)
     else if (
       name.includes("pieles") ||
       name.includes("coraza") ||
       name.includes("semiplacas") ||
-      name.includes("camisa") ||
-      name.includes("escamas")
+      name.includes("escamas") ||
+      name.includes("camisa")
     ) {
       baseAC = acVal + Math.min(dexMod, 2);
     }
@@ -55,13 +57,10 @@ export function calculateAC(inventory, dexMod, features = []) {
     }
   }
 
-  // 3. Aplicar Escudo
+  // 3. Aplicar Escudo (+2 por defecto si no viene dato)
   if (equippedShield) {
     shieldBonus = parseInt(equippedShield.ac) || 2;
   }
-
-  // 4. Defensa sin Armadura (Bárbaro/Monje) - Se maneja en CombatView si !hasArmor
-  // Aquí devolvemos el cálculo de equipo estándar.
 
   return baseAC + shieldBonus;
 }

@@ -1,6 +1,6 @@
 import { RACES, CLASSES } from "../data/srd";
 
-// Listas de sabor (Flavor Text)
+// Listas de sabor (Flavor Text) en Español
 const NAMES = [
   "Valeros",
   "Ezren",
@@ -22,81 +22,92 @@ const NAMES = [
   "Dorn",
 ];
 const BACKGROUNDS = [
-  "Acolyte",
+  "Acólito",
   "Criminal",
-  "Folk Hero",
-  "Noble",
-  "Sage",
-  "Soldier",
-  "Urchin",
-  "Hermit",
-  "Outlander",
-  "Entertainer",
+  "Héroe del Pueblo",
+  "Sabio",
+  "Soldado",
 ];
 const ALIGNMENTS = [
-  "Lawful Good",
-  "Neutral Good",
-  "Chaotic Good",
-  "Lawful Neutral",
-  "True Neutral",
-  "Chaotic Neutral",
-  "Lawful Evil",
-  "Neutral Evil",
-  "Chaotic Evil",
+  "Legal Bueno",
+  "Neutral Bueno",
+  "Caótico Bueno",
+  "Legal Neutral",
+  "Neutral Puro",
+  "Caótico Neutral",
+  "Legal Malvado",
+  "Neutral Malvado",
+  "Caótico Malvado",
 ];
 
 const TRAITS = [
-  "I always have a plan.",
-  "I blow up at the slightest insult.",
-  "I collect strange rocks.",
-  "I am incredibly slow to trust.",
-  "I quote sacred texts constantly.",
+  "Siempre tengo un plan B.",
+  "Exploto al menor insulto.",
+  "Colecciono piedras raras.",
+  "Soy increíblemente lento para confiar.",
+  "Cito textos sagrados constantemente.",
 ];
 const IDEALS = [
-  "Freedom",
-  "Respect",
-  "Greed",
-  "Power",
-  "Knowledge",
-  "Nature",
+  "Libertad",
+  "Respeto",
+  "Codicia",
+  "Poder",
+  "Conocimiento",
+  "Naturaleza",
   "Honor",
-  "Balance",
+  "Equilibrio",
 ];
 const BONDS = [
-  "My sword belongs to my father.",
-  "I will protect my village.",
-  "I seek revenge for my sister.",
-  "I owe a debt to a guild.",
+  "Mi espada pertenece a mi padre.",
+  "Protegeré mi aldea a toda costa.",
+  "Busco venganza por mi hermana.",
+  "Tengo una deuda con un gremio.",
 ];
 const FLAWS = [
-  "I can't resist gold.",
-  "I am secretly a coward.",
-  "I speak without thinking.",
-  "I hold grudges forever.",
+  "No puedo resistirme al oro.",
+  "Secretamente soy un cobarde.",
+  "Hablo sin pensar.",
+  "Guardo rencor para siempre.",
 ];
 
 const APPEARANCE = {
-  eyes: ["Blue", "Green", "Brown", "Hazel", "Grey", "Violet", "Red", "Amber"],
-  hair: ["Black", "Brown", "Blond", "Red", "White", "Grey", "Bald", "Dyed"],
+  eyes: [
+    "Azules",
+    "Verdes",
+    "Marrones",
+    "Avellana",
+    "Grises",
+    "Violetas",
+    "Rojos",
+    "Ámbar",
+  ],
+  hair: [
+    "Negro",
+    "Castaño",
+    "Rubio",
+    "Pelirrojo",
+    "Blanco",
+    "Gris",
+    "Calvo",
+    "Teñido",
+  ],
   skin: [
-    "Pale",
-    "Fair",
-    "Tan",
-    "Olive",
-    "Brown",
-    "Dark",
-    "Greenish",
-    "Reddish",
+    "Pálida",
+    "Clara",
+    "Bronceada",
+    "Oliva",
+    "Marrón",
+    "Oscura",
+    "Verdosa",
+    "Rojiza",
   ],
 };
 
-// Función auxiliar para elegir uno al azar
 export const pick = (array) => array[Math.floor(Math.random() * array.length)];
 
-// Generador de Stats (Método: 4d6 drop lowest, simplificado a rango 8-16 para MVP)
 const rollStat = () => Math.floor(Math.random() * 9) + 8; // Genera entre 8 y 16
 
-// --- GENERADOR DE IDENTIDAD (Para el Creador) ---
+// --- GENERADOR DE IDENTIDAD ---
 export const getRandomDetails = () => ({
   name: pick(NAMES),
   alignment: pick(ALIGNMENTS),
@@ -105,7 +116,7 @@ export const getRandomDetails = () => ({
   height: `${Math.floor(Math.random() * 3) + 4}'${Math.floor(
     Math.random() * 11
   )}"`,
-  weight: `${Math.floor(Math.random() * 150) + 100} lbs`,
+  weight: `${Math.floor(Math.random() * 150) + 50} kg`,
   eyes: pick(APPEARANCE.eyes),
   hair: pick(APPEARANCE.hair),
   skin: pick(APPEARANCE.skin),
@@ -113,12 +124,12 @@ export const getRandomDetails = () => ({
   ideals: pick(IDEALS),
   bonds: pick(BONDS),
   flaws: pick(FLAWS),
-  allies: "None yet.",
-  treasure: "10gp",
-  backstory: "A mystery to everyone, including themselves.",
+  allies: "Ninguno por ahora.",
+  treasure: "10po",
+  backstory: "Un misterio para todos, incluyéndose a sí mismo.",
 });
 
-// --- GENERADOR DE HÉROE COMPLETO (Para el Dashboard) ---
+// --- GENERADOR DE HÉROE COMPLETO ---
 export const generateRandomHero = () => {
   const race = pick(RACES);
   const cls = pick(CLASSES);
@@ -132,20 +143,19 @@ export const generateRandomHero = () => {
     cha: rollStat(),
   };
 
-  // Aseguramos que el stat principal sea bueno (mínimo 16)
   if (cls.id === "fighter") stats.str = 16;
   if (cls.id === "rogue") stats.dex = 16;
   if (cls.id === "wizard") stats.int = 16;
 
   const details = getRandomDetails();
 
-  // Armas básicas según clase
+  // Armas en Español para coincidir con reglas
   let weapons = [];
   if (cls.id === "fighter")
     weapons = [
       {
         id: Date.now(),
-        name: "Longsword",
+        name: "Espada larga",
         type: "melee",
         damage: "1d8",
         stat: "str",
@@ -155,7 +165,7 @@ export const generateRandomHero = () => {
     weapons = [
       {
         id: Date.now(),
-        name: "Dagger",
+        name: "Daga",
         type: "melee",
         damage: "1d4",
         stat: "dex",
@@ -165,7 +175,7 @@ export const generateRandomHero = () => {
     weapons = [
       {
         id: Date.now(),
-        name: "Quarterstaff",
+        name: "Bastón",
         type: "melee",
         damage: "1d6",
         stat: "str",
@@ -183,6 +193,6 @@ export const generateRandomHero = () => {
     weapons,
     features: cls.features || [],
     details,
-    currentHP: null, // Se calculará al abrir
+    currentHP: null,
   };
 };
