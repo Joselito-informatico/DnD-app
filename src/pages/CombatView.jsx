@@ -37,13 +37,13 @@ import {
   ToggleRight,
   Crown,
 } from "lucide-react";
-import {
-  CLASSES,
-  SKILLS,
-  SPELLS as SRD_SPELLS,
-  CONDITIONS,
-  XP_TABLE,
-} from "../data/srd";
+
+// --- IMPORTACIONES ACTUALIZADAS ---
+import { CLASSES } from "../data/character";
+import { SKILLS, CONDITIONS, XP_TABLE } from "../data/rules";
+import { SPELLS as SRD_SPELLS } from "../data/spells"; // Usamos la BD completa como fallback
+// ----------------------------------
+
 import { useLanguage } from "../context/LanguageContext";
 import { useToast } from "../context/ToastContext";
 import { searchSpells, searchEquipment } from "../utils/dndApi";
@@ -77,7 +77,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     school: "Evocación",
     desc: "",
     time: "1 Acción",
-    damage: "", // Nuevo campo
+    damage: "",
   });
   const [isAddingCondition, setIsAddingCondition] = useState(false);
   const [isEditingSlots, setIsEditingSlots] = useState(false);
@@ -114,7 +114,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
 
   let calculatedAC = calculateAC(hero.inventory || [], mods.dex, hero.features);
 
-  // Lógica de defensa sin armadura manual si calculateAC no lo cubre
   const hasArmor = (hero.inventory || []).some(
     (i) =>
       i.isEquipped &&
@@ -209,7 +208,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   if (hero.race === "Tiefling") languages.push("Infernal");
   if (hero.race === "Humano") languages.push("Un idioma extra");
 
-  // --- LÓGICA DE DADOS ---
   const getD20Roll = () => {
     const r1 = Math.floor(Math.random() * 20) + 1;
     const r2 = Math.floor(Math.random() * 20) + 1;
@@ -299,7 +297,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     });
   };
 
-  // --- MANEJADORES DE ESTADO ---
   const toggleSkillProficiency = (e, skillName) => {
     e.stopPropagation();
     const isProf = skillProfs.includes(skillName);
@@ -319,7 +316,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const toggleEquip = (itemId) => {
     const updatedInventory = inventory.map((item) => {
       if (item.id === itemId) return { ...item, isEquipped: !item.isEquipped };
-      // Desequipar otras armaduras si se equipa una
       const currentItem = inventory.find((i) => i.id === itemId);
       if (
         currentItem &&
@@ -464,8 +460,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     setShowMenu(false);
     showToast("Resumen copiado", "success");
   };
-
-  // --- INTEGRACIÓN CON API LOCAL ---
   const handleSpellSearch = async () => {
     if (!searchQuery) return;
     setIsSearching(true);
@@ -480,7 +474,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
       school: apiSpell.school,
       desc: apiSpell.desc,
       time: apiSpell.time,
-      damage: apiSpell.damage || "", // IMPORTANTE: Captura el daño
+      damage: apiSpell.damage || "",
     });
     setSearchResults([]);
     setSearchQuery("");
@@ -493,13 +487,10 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     setIsSearching(false);
   };
 
-  // Lógica de mapeo adaptada a la nueva API Local
   const selectItem = (item) => {
-    // Detectamos estadísticas para armas sutiles
     const isFinesse = item.properties && item.properties.includes("Sutil");
     const attackStat = isFinesse ? "dex" : "str";
 
-    // Mapeo seguro de categorías
     let itemType = "item";
     if (item.type === "weapon") itemType = "weapon";
     if (item.type === "armor") itemType = "armor";
@@ -512,10 +503,10 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
       qty: 1,
       desc: item.desc || item.properties || "",
       type: itemType,
-      ac: parseInt(item.ac) || 0, // La nueva API devuelve strings "11 + Des"
+      ac: parseInt(item.ac) || 0,
       armorType: item.category === "Escudo" ? "shield" : item.category,
       isEquipped: false,
-      damage: item.damage, // Guardamos daño base para referencia
+      damage: item.damage,
       stat: attackStat,
     };
 
@@ -527,9 +518,9 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         const newWep = {
           id: Date.now() + 1,
           name: item.name,
-          damage: item.damage || "1d4", // Usa el daño real
+          damage: item.damage || "1d4",
           stat: attackStat,
-          type: "melee", // Podrías refinar esto si la API devuelve "Rango"
+          type: "melee",
         };
         newWeaponsList = [...weapons, newWep];
         showToast("Añadido a Inventario y Ataques", "success");
@@ -749,16 +740,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           <Settings size={20} />
         </button>
       </header>
-
-      {/* ... MENUS, POPUPS (Código UI omitido por brevedad, es igual al original) ... */}
-      {/* Mantenemos toda la parte visual de menús y popups igual que en tu archivo original */}
-
-      {/* IMPORTANTE: Para no hacer el mensaje eterno, asumo que mantienes el bloque de UI 
-          desde {showMenu && ...} hasta el renderizado de Tabs. 
-          
-          Si copias el código, asegúrate de que el RETURN incluye todo el JSX original.
-          He pegado el bloque RETURN completo abajo para asegurar que no falte nada.
-      */}
 
       {showMenu && (
         <div className="absolute top-20 right-6 z-20 w-56 bg-stone-800 border border-stone-700 rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in duration-200 origin-top-right">
@@ -1091,8 +1072,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 </span>
               </div>
             </div>
-
-            {/* ... Resto de componentes de combate (Curar/Daño, Recursos, Estados) se mantienen igual ... */}
             <div className="flex gap-2">
               <button
                 onClick={() => changeHP(-1)}
@@ -1200,9 +1179,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 })}
               </div>
             </div>
-            {/* FIN ATAQUES */}
 
-            {/* RECURSOS Y DEMÁS COMPONENTES (Se mantienen igual) */}
             <div>
               <div className="flex justify-between items-center mb-2">
                 <h3 className="text-stone-400 font-bold text-sm uppercase tracking-wider">
@@ -1281,6 +1258,83 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                     </button>
                   </div>
                 ))}
+              </div>
+            </div>
+
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="text-stone-400 font-bold text-sm uppercase tracking-wider">
+                  ESTADOS
+                </h3>
+                <button
+                  onClick={() => setIsAddingCondition(!isAddingCondition)}
+                  className="text-xs bg-stone-800 border border-stone-600 px-2 py-1 rounded text-stone-300 hover:text-white hover:border-yellow-500 flex items-center gap-1"
+                >
+                  {isAddingCondition ? <X size={12} /> : <Plus size={12} />}{" "}
+                  AÑADIR
+                </button>
+              </div>
+              {isAddingCondition && (
+                <div className="bg-stone-800 p-2 rounded-xl border border-yellow-500/50 mb-3 grid grid-cols-2 gap-2 animate-in fade-in zoom-in duration-200">
+                  {CONDITIONS.filter((c) => c.id !== "exhaustion").map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => toggleCondition(c.id)}
+                      className={`text-xs p-2 rounded border text-left truncate ${
+                        activeConditions.includes(c.id)
+                          ? "bg-red-900/30 border-red-500 text-red-200"
+                          : "bg-stone-900 border-stone-600 text-stone-300 hover:border-yellow-500"
+                      }`}
+                    >
+                      {c.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="flex flex-wrap gap-2 mb-4">
+                <div className="flex items-center gap-2 bg-stone-900 border border-stone-700 px-3 py-1 rounded-full">
+                  <span
+                    className={`text-xs font-bold ${
+                      exhaustionLevel > 0 ? "text-orange-500" : "text-stone-500"
+                    }`}
+                  >
+                    Agotamiento
+                  </span>
+                  <div className="flex gap-1">
+                    {[1, 2, 3, 4, 5, 6].map((lvl) => (
+                      <div
+                        key={lvl}
+                        onClick={() =>
+                          updateExhaustion(
+                            lvl === exhaustionLevel ? lvl - 1 : lvl
+                          )
+                        }
+                        className={`w-2 h-4 rounded-sm cursor-pointer transition ${
+                          lvl <= exhaustionLevel
+                            ? lvl >= 5
+                              ? "bg-red-600"
+                              : "bg-orange-500"
+                            : "bg-stone-800"
+                        }`}
+                      ></div>
+                    ))}
+                  </div>
+                </div>
+                {activeConditions.map((cId) => {
+                  const cond = CONDITIONS.find((c) => c.id === cId);
+                  return (
+                    <div
+                      key={cId}
+                      onClick={() => toggleCondition(cId)}
+                      className="flex items-center gap-1 bg-red-900/20 border border-red-500/50 px-3 py-1 rounded-full cursor-pointer hover:bg-red-900/40"
+                    >
+                      <AlertTriangle size={12} className="text-red-400" />
+                      <span className="text-xs text-red-200 font-bold">
+                        {cond?.name}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 

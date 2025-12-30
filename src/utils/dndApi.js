@@ -1,13 +1,7 @@
 import { SPELLS } from "../data/spells";
 import { WEAPONS, ARMOR, ADVENTURING_GEAR, MAGIC_ITEMS } from "../data/items";
-import {
-  CONDITIONS,
-  COMBAT_ACTIONS,
-  SKILLS,
-  RACES,
-  CLASSES,
-  BACKGROUNDS,
-} from "../data/srd";
+import { CONDITIONS, COMBAT_ACTIONS, SKILLS } from "../data/rules";
+import { RACES, CLASSES, BACKGROUNDS } from "../data/character";
 
 // ==========================================
 // 🧙‍♂️ API DE HECHIZOS

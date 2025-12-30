@@ -7,7 +7,7 @@ import {
 } from "../utils/dndApi";
 import { rollDamage } from "../utils/dice";
 import { useToast } from "../context/ToastContext";
-import { CLASSES } from "../data/srd";
+import { CLASSES } from "../data/character";
 
 // Listas estáticas para filtros de hechizos
 const SCHOOLS = [

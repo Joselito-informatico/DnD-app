@@ -1,4 +1,4 @@
-import { RACES, CLASSES } from "../data/srd";
+import { RACES, CLASSES } from "../data/character";
 
 // Listas de sabor (Flavor Text) en Español
 const NAMES = [

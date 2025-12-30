@@ -19,7 +19,7 @@ import {
   RotateCcw,
   Book,
 } from "lucide-react";
-import { RACES, CLASSES, BACKGROUNDS } from "../data/srd";
+import { RACES, CLASSES, BACKGROUNDS } from "../data/character";
 import { getRandomDetails } from "../utils/randomizer";
 import { useLanguage } from "../context/LanguageContext";
 import { searchSpells } from "../utils/dndApi";
