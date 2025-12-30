@@ -1,20 +1,22 @@
 import { SPELLS } from "../data/spells";
 import { WEAPONS, ARMOR, ADVENTURING_GEAR, MAGIC_ITEMS } from "../data/items";
+import {
+  CONDITIONS,
+  COMBAT_ACTIONS,
+  SKILLS,
+  RACES,
+  CLASSES,
+  BACKGROUNDS,
+} from "../data/srd";
 
 // ==========================================
 // 🧙‍♂️ API DE HECHIZOS
 // ==========================================
 
-/**
- * Busca hechizos con filtros avanzados.
- * @param {string} query - Texto a buscar (opcional)
- * @param {object} filters - { level, class, school, exactMatch }
- */
 export async function searchSpells(query = "", filters = {}) {
   return new Promise((resolve) => {
     let results = SPELLS;
 
-    // 1. Filtrar por Texto (Nombre)
     if (query) {
       const lowerQuery = query.toLowerCase();
       results = results.filter((s) =>
@@ -22,35 +24,28 @@ export async function searchSpells(query = "", filters = {}) {
       );
     }
 
-    // 2. Filtrar por Nivel (0-9)
     if (filters.level !== undefined && filters.level !== "") {
       results = results.filter((s) => s.level === parseInt(filters.level));
     }
 
-    // 3. Filtrar por Clase (ej: "Mago")
     if (filters.class) {
       results = results.filter((s) => s.classes.includes(filters.class));
     }
 
-    // 4. Filtrar por Escuela
     if (filters.school) {
       results = results.filter((s) => s.school === filters.school);
     }
 
-    // Formatear salida para la vista
     const mapped = results.map((spell) => ({
-      ...spell, // Devolvemos todo el objeto original
-      damage: spell.damage || detectDamage(spell.desc), // Aseguramos que haya daño si es detectable
+      ...spell,
+      type: "spell", // Identificador para la UI
+      damage: spell.damage || detectDamage(spell.desc),
     }));
 
     resolve(mapped);
   });
 }
 
-/**
- * Obtiene un hechizo específico por su ID exacto.
- * Útil para cargar la hoja de personaje.
- */
 export function getSpellById(spellId) {
   return SPELLS.find((s) => s.id === spellId) || null;
 }
@@ -59,82 +54,148 @@ export function getSpellById(spellId) {
 // 🛡️ API DE EQUIPO
 // ==========================================
 
-/**
- * Busca equipo combinando todas las listas.
- * @param {string} query
- * @param {object} filters - { type: 'weapon'|'armor'|'gear'|'magic', category }
- */
 export async function searchEquipment(query = "", filters = {}) {
   return new Promise((resolve) => {
     const lowerQuery = query.toLowerCase();
-
-    // Recopilamos todo si no hay filtro de tipo específico, o solo lo solicitado
     let pool = [];
 
-    // Selección de fuentes según filtro 'type'
-    const includeWeapons = !filters.type || filters.type === "weapon";
-    const includeArmor = !filters.type || filters.type === "armor";
-    const includeGear = !filters.type || filters.type === "gear";
-    const includeMagic = !filters.type || filters.type === "magic-item";
+    const includeWeapons = !filters.category || filters.category === "Armas";
+    // Nota: El filtro 'category' en Compendium suele ser específico (ej: "Marcial").
+    // Aquí simplificamos: si busca texto, busca en todo. Si hay filtro específico, se aplica abajo.
 
-    if (includeWeapons) {
-      pool.push(
-        ...WEAPONS.map((w) => ({
-          ...w,
-          type: "weapon",
-          desc: `${w.damageType}. ${w.properties}`,
-        }))
-      );
-    }
-    if (includeArmor) {
-      pool.push(
-        ...ARMOR.map((a) => ({
-          ...a,
-          type: "armor",
-          desc: `CA: ${a.ac} | Sigilo: ${a.stealth}`,
-        }))
-      );
-    }
-    if (includeGear) {
-      pool.push(...ADVENTURING_GEAR.map((g) => ({ ...g, type: "gear" })));
-    }
-    if (includeMagic) {
-      pool.push(
-        ...MAGIC_ITEMS.map((m) => ({
-          ...m,
-          type: "magic-item",
-          requiresAttunement: m.attunement === "Sí",
-        }))
-      );
-    }
+    // 1. Unificar fuentes
+    pool.push(
+      ...WEAPONS.map((w) => ({
+        ...w,
+        type: "weapon",
+        desc: `${w.damageType}. ${w.properties}`,
+      }))
+    );
+    pool.push(
+      ...ARMOR.map((a) => ({
+        ...a,
+        type: "armor",
+        desc: `CA: ${a.ac} | Sigilo: ${a.stealth}`,
+      }))
+    );
+    pool.push(...ADVENTURING_GEAR.map((g) => ({ ...g, type: "gear" })));
+    pool.push(
+      ...MAGIC_ITEMS.map((m) => ({
+        ...m,
+        type: "magic-item",
+        requiresAttunement: m.attunement === "Sí",
+      }))
+    );
 
-    // 1. Filtrado por Texto
+    // 2. Filtrado por Texto
     if (query) {
       pool = pool.filter((item) =>
         item.name.toLowerCase().includes(lowerQuery)
       );
     }
 
-    // 2. Filtrado por Categoría (ej: "Marcial", "Ligera")
-    if (filters.category) {
-      pool = pool.filter((item) => item.category === filters.category);
+    // 3. Filtrado por Categoría Específica (si viene del dropdown)
+    if (filters.category && filters.category !== "") {
+      pool = pool.filter(
+        (item) =>
+          item.category === filters.category ||
+          (item.type === "magic-item" &&
+            filters.category === "Objeto Mágico") ||
+          (item.type === "weapon" && filters.category === "Armas") // Ejemplo de agrupación
+      );
     }
 
     resolve(pool);
   });
 }
 
-/**
- * Obtiene un objeto por su nombre exacto.
- */
 export function getItemByName(name) {
-  const allItems = [
-    ...WEAPONS.map((w) => ({ ...w, type: "weapon" })),
-    ...ARMOR.map((a) => ({ ...a, type: "armor" })),
-    ...ADVENTURING_GEAR.map((g) => ({ ...g, type: "gear" })),
-    ...MAGIC_ITEMS.map((m) => ({ ...m, type: "magic-item" })),
-  ];
+  const allItems = [...WEAPONS, ...ARMOR, ...ADVENTURING_GEAR, ...MAGIC_ITEMS];
   return allItems.find((i) => i.name === name) || null;
+}
+
+// ==========================================
+// 📜 API DE REGLAS (NUEVA)
+// ==========================================
+// Busca en Condiciones, Acciones de Combate y Habilidades
+
+export async function searchRules(query = "") {
+  return new Promise((resolve) => {
+    const lowerQuery = query.toLowerCase();
+
+    // Normalizamos los datos para que tengan una estructura común
+    const conditions = CONDITIONS.map((c) => ({
+      ...c,
+      type: "condition",
+      category: "Condición",
+    }));
+    const actions = COMBAT_ACTIONS.map((a) => ({
+      ...a,
+      type: "action",
+      category: "Acción de Combate",
+    }));
+    const skills = SKILLS.map((s) => ({
+      name: s.name,
+      desc: `Habilidad basada en ${s.stat.toUpperCase()}.`,
+      type: "skill",
+      category: "Habilidad",
+    }));
+
+    let pool = [...conditions, ...actions, ...skills];
+
+    if (query) {
+      pool = pool.filter((item) =>
+        item.name.toLowerCase().includes(lowerQuery)
+      );
+    }
+
+    resolve(pool);
+  });
+}
+
+// ==========================================
+// 👤 API DE OPCIONES DE PERSONAJE (NUEVA)
+// ==========================================
+// Busca en Razas, Clases y Trasfondos
+
+export async function searchCharacterOptions(query = "") {
+  return new Promise((resolve) => {
+    const lowerQuery = query.toLowerCase();
+
+    const races = RACES.map((r) => ({
+      name: r.name,
+      desc: r.description,
+      details: `Velocidad: ${r.speed} | Tamaño: ${r.size}`,
+      type: "race",
+      category: "Raza",
+    }));
+
+    const classes = CLASSES.map((c) => ({
+      name: c.name,
+      desc: `DG: ${c.hitDie} | Principal: ${c.primaryStat.toUpperCase()}`,
+      details: `Salvaciones: ${c.saves.join(", ")}`,
+      type: "class",
+      category: "Clase",
+    }));
+
+    const backgrounds = BACKGROUNDS.map((b) => ({
+      name: b.name,
+      desc: b.desc,
+      details: `Habilidades: ${b.skills.join(", ")}`,
+      type: "background",
+      category: "Trasfondo",
+    }));
+
+    let pool = [...races, ...classes, ...backgrounds];
+
+    if (query) {
+      pool = pool.filter((item) =>
+        item.name.toLowerCase().includes(lowerQuery)
+      );
+    }
+
+    resolve(pool);
+  });
 }
 
 // ==========================================
@@ -142,6 +203,7 @@ export function getItemByName(name) {
 // ==========================================
 
 function detectDamage(desc) {
+  if (!desc) return "";
   const regex = /(\d+d\d+(\s?\+\s?\d+)?)/;
   const match = desc.match(regex);
   return match ? match[0] : "";
