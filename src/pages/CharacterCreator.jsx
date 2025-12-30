@@ -18,7 +18,6 @@ import {
   Trash2,
   Dices,
   RotateCcw,
-  X,
 } from "lucide-react";
 import { RACES, CLASSES } from "../data/srd";
 import { getRandomDetails } from "../utils/randomizer";
@@ -28,6 +27,7 @@ import { searchSpells } from "../utils/dndApi";
 export function CharacterCreator({ onBack, onSave }) {
   const { t } = useLanguage();
 
+  // Flujo: 1.Raza -> 2.Clase -> 3.Stats -> [4.Hechizos] -> 5.Identidad
   const [step, setStep] = useState(1);
   const [selectedRace, setSelectedRace] = useState(null);
   const [selectedClass, setSelectedClass] = useState(null);
@@ -41,11 +41,8 @@ export function CharacterCreator({ onBack, onSave }) {
     wis: 0,
     cha: 0,
   });
-
-  // LOGICA DADOS MEJORADA
-  // rolledPool será un array de objetos: { id: 1, value: 16, assignedTo: 'str' | null }
   const [rolledPool, setRolledPool] = useState([]);
-  const [selectedRollId, setSelectedRollId] = useState(null); // ID del dado seleccionado actualmente
+  const [selectedRollId, setSelectedRollId] = useState(null);
 
   // HECHIZOS
   const [startingSpells, setStartingSpells] = useState([]);
@@ -73,7 +70,29 @@ export function CharacterCreator({ onBack, onSave }) {
 
   const isCaster = selectedClass?.spellcasting !== undefined;
 
-  // --- LÓGICA DE DADOS INTERACTIVA ---
+  // --- NAVEGACIÓN ROBUSTA ---
+  const handleNext = () => {
+    if (step === 1 && selectedRace) setStep(2);
+    else if (step === 2 && selectedClass) setStep(3);
+    else if (step === 3) {
+      // Validar stats vacíos
+      if (Object.values(baseStats).some((v) => v === 0)) {
+        if (!confirm("Some stats are 0. Continue?")) return;
+      }
+      // Si es mago -> Paso 4. Si no -> Salta al 5
+      setStep(isCaster ? 4 : 5);
+    } else if (step === 4) setStep(5);
+    else if (step === 5) finishCreation();
+  };
+
+  const handleBackStep = () => {
+    if (step === 1) onBack(); // Salir al Dashboard
+    else if (step === 5 && !isCaster)
+      setStep(3); // Si no es mago, volver de 5 a 3
+    else setStep(step - 1);
+  };
+
+  // --- LÓGICA DE DADOS ---
   const rollAttributePool = () => {
     const newPool = Array.from({ length: 6 }, (_, i) => {
       const rolls = Array.from(
@@ -95,36 +114,27 @@ export function CharacterCreator({ onBack, onSave }) {
     setSelectedRollId(null);
   };
 
-  // Seleccionar un número de la bandeja
   const handleSelectRoll = (id) => {
-    if (selectedRollId === id) setSelectedRollId(null); // Deseleccionar
+    if (selectedRollId === id) setSelectedRollId(null);
     else setSelectedRollId(id);
   };
 
-  // Asignar el número seleccionado a un atributo
   const handleAssignStat = (statKey) => {
-    // 1. Si hay un número seleccionado en la bandeja
     if (selectedRollId !== null) {
       const roll = rolledPool.find((r) => r.id === selectedRollId);
       if (!roll) return;
 
-      // Si este stat ya tenía un número asignado, liberarlo
-      const prevRoll = rolledPool.find((r) => r.assignedTo === statKey);
-
       const newPool = rolledPool.map((r) => {
-        // Liberar el anterior si existía
-        if (r.assignedTo === statKey) return { ...r, assignedTo: null };
-        // Asignar el nuevo
-        if (r.id === selectedRollId) return { ...r, assignedTo: statKey };
+        if (r.assignedTo === statKey) return { ...r, assignedTo: null }; // Liberar previo
+        if (r.id === selectedRollId) return { ...r, assignedTo: statKey }; // Asignar nuevo
         return r;
       });
 
       setRolledPool(newPool);
       setBaseStats((prev) => ({ ...prev, [statKey]: roll.value }));
-      setSelectedRollId(null); // Limpiar selección
-    }
-    // 2. Si NO hay selección y toco un stat lleno -> Limpiarlo (Devolver a la bandeja)
-    else if (rolledPool.length > 0 && baseStats[statKey] > 0) {
+      setSelectedRollId(null);
+    } else if (rolledPool.length > 0 && baseStats[statKey] > 0) {
+      // Devolver a la bandeja
       const newPool = rolledPool.map((r) => {
         if (r.assignedTo === statKey) return { ...r, assignedTo: null };
         return r;
@@ -134,24 +144,22 @@ export function CharacterCreator({ onBack, onSave }) {
     }
   };
 
-  // Edición Manual (Fallback)
   const manualUpdateStat = (key, value) => {
-    if (rolledPool.length > 0) return; // Bloqueado si hay dados rodados
+    if (rolledPool.length > 0) return;
     const val = parseInt(value) || 0;
     setBaseStats((prev) => ({
       ...prev,
-      [key]: Math.max(0, Math.min(20, val)),
+      [key]: Math.max(0, Math.min(18, val)),
     }));
   };
 
-  // --- RESTO DE FUNCIONES (Igual que antes) ---
+  // --- UTILIDADES ---
   const getRaceBonus = (statKey) => selectedRace?.bonuses?.[statKey] || 0;
   const getTotalStat = (statKey) => baseStats[statKey] + getRaceBonus(statKey);
   const getMod = (score) => {
     const mod = Math.floor((score - 10) / 2);
     return mod > 0 ? `+${mod}` : mod;
   };
-
   const handleAutoFill = () => {
     const random = getRandomDetails();
     setDetails((prev) => ({
@@ -160,6 +168,8 @@ export function CharacterCreator({ onBack, onSave }) {
       avatar: prev.avatar,
     }));
   };
+
+  // --- API HECHIZOS ---
   const handleSpellSearch = async () => {
     if (!spellQuery) return;
     setIsSearchingSpell(true);
@@ -177,18 +187,7 @@ export function CharacterCreator({ onBack, onSave }) {
     setStartingSpells(startingSpells.filter((s) => s.id !== id));
   };
 
-  const handleNext = () => {
-    if (step === 1 && selectedRace) setStep(2);
-    else if (step === 2 && selectedClass) setStep(3);
-    else if (step === 3) {
-      if (Object.values(baseStats).some((v) => v === 0)) {
-        if (!confirm("Some stats are 0. Continue?")) return;
-      }
-      setStep(isCaster ? 4 : 5);
-    } else if (step === 4) setStep(5);
-    else finishCreation();
-  };
-
+  // --- FINALIZAR ---
   const finishCreation = () => {
     const finalStats = {
       str: getTotalStat("str"),
@@ -258,7 +257,8 @@ export function CharacterCreator({ onBack, onSave }) {
     if (step === 2) return t("step2");
     if (step === 3) return "Assign Stats";
     if (step === 4) return t("cantrips");
-    return t("step4");
+    if (step === 5) return t("step4"); // Identidad siempre es paso 5 ahora
+    return "";
   };
 
   const statConfig = [
@@ -280,7 +280,7 @@ export function CharacterCreator({ onBack, onSave }) {
       <header className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
           <button
-            onClick={onBack}
+            onClick={handleBackStep}
             className="p-2 text-stone-400 hover:text-stone-100 transition"
           >
             <ArrowLeft />
@@ -298,6 +298,7 @@ export function CharacterCreator({ onBack, onSave }) {
       </header>
 
       <div className="grid grid-cols-1 gap-4">
+        {/* 1. RAZA */}
         {step === 1 &&
           RACES.map((race) => (
             <div
@@ -333,6 +334,7 @@ export function CharacterCreator({ onBack, onSave }) {
             </div>
           ))}
 
+        {/* 2. CLASE */}
         {step === 2 &&
           CLASSES.map((cls) => (
             <div
@@ -368,10 +370,9 @@ export function CharacterCreator({ onBack, onSave }) {
             </div>
           ))}
 
-        {/* PASO 3: STATS MEJORADO */}
+        {/* 3. STATS */}
         {step === 3 && (
           <div className="space-y-4">
-            {/* BANDEJA DE DADOS */}
             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 text-center relative overflow-hidden">
               {rolledPool.length === 0 ? (
                 <div className="py-4">
@@ -396,7 +397,7 @@ export function CharacterCreator({ onBack, onSave }) {
                       onClick={clearPool}
                       className="text-xs text-red-400 flex items-center gap-1 hover:underline"
                     >
-                      <Trash2 size={12} /> Reset
+                      <RotateCcw size={12} /> Reset
                     </button>
                   </div>
                   <div className="flex flex-wrap gap-2 justify-center">
@@ -408,15 +409,13 @@ export function CharacterCreator({ onBack, onSave }) {
                           key={roll.id}
                           onClick={() => !isUsed && handleSelectRoll(roll.id)}
                           disabled={isUsed}
-                          className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold text-lg transition-all duration-200 border-2
-                                            ${
-                                              isUsed
-                                                ? "bg-stone-900 border-stone-800 text-stone-700 opacity-50 scale-90"
-                                                : isSelected
-                                                ? "bg-yellow-500 border-yellow-300 text-stone-900 scale-110 shadow-lg shadow-yellow-500/20"
-                                                : "bg-stone-700 border-stone-600 text-stone-300 hover:border-yellow-500"
-                                            }
-                                        `}
+                          className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold text-lg transition-all duration-200 border-2 ${
+                            isUsed
+                              ? "bg-stone-900 border-stone-800 text-stone-700 opacity-50 scale-90"
+                              : isSelected
+                              ? "bg-yellow-500 border-yellow-300 text-stone-900 scale-110 shadow-lg shadow-yellow-500/20"
+                              : "bg-stone-700 border-stone-600 text-stone-300 hover:border-yellow-500"
+                          }`}
                         >
                           {roll.value}
                         </button>
@@ -432,14 +431,11 @@ export function CharacterCreator({ onBack, onSave }) {
               )}
             </div>
 
-            {/* LISTA DE ATRIBUTOS */}
             <div className="space-y-3">
               {statConfig.map((stat) => {
                 const raceBonus = getRaceBonus(stat.id);
                 const baseVal = baseStats[stat.id];
                 const total = getTotalStat(stat.id);
-
-                // Modo "Asignación activa" (si hay dados rodados y este stat no está lleno o hay selección)
                 const isAssignMode = rolledPool.length > 0;
                 const isFilled = baseVal > 0;
 
@@ -447,27 +443,17 @@ export function CharacterCreator({ onBack, onSave }) {
                   <div
                     key={stat.id}
                     onClick={() => isAssignMode && handleAssignStat(stat.id)}
-                    className={`flex items-center justify-between bg-stone-800 p-3 rounded-xl border-2 transition relative overflow-hidden group
-                                ${isAssignMode ? "cursor-pointer" : ""}
-                                ${
-                                  isAssignMode &&
-                                  selectedRollId !== null &&
-                                  !isFilled
-                                    ? "border-yellow-500/50 bg-stone-800/80 animate-pulse"
-                                    : "border-stone-700"
-                                }
-                                ${
-                                  isAssignMode && isFilled
-                                    ? "border-stone-700"
-                                    : ""
-                                }
-                            `}
+                    className={`flex items-center justify-between bg-stone-800 p-3 rounded-xl border-2 transition relative overflow-hidden group ${
+                      isAssignMode ? "cursor-pointer" : ""
+                    } ${
+                      isAssignMode && selectedRollId !== null && !isFilled
+                        ? "border-yellow-500/50 bg-stone-800/80 animate-pulse"
+                        : "border-stone-700"
+                    } ${isAssignMode && isFilled ? "border-stone-700" : ""}`}
                   >
-                    {/* Fondo de progreso visual si está lleno */}
                     {isFilled && (
                       <div className="absolute inset-0 bg-yellow-500/5 z-0"></div>
                     )}
-
                     <div className="flex items-center gap-3 w-1/3 z-10">
                       <div
                         className={`p-2 rounded-lg bg-stone-900 ${stat.color}`}
@@ -481,19 +467,15 @@ export function CharacterCreator({ onBack, onSave }) {
                         </p>
                       </div>
                     </div>
-
                     <div className="flex items-center gap-4 flex-1 justify-end z-10">
-                      {/* Base Value (Input o Caja) */}
                       <div className="flex flex-col items-center">
                         {isAssignMode ? (
                           <div
-                            className={`w-12 h-10 rounded flex items-center justify-center font-bold border-2 transition-all
-                                        ${
-                                          isFilled
-                                            ? "bg-stone-700 border-stone-600 text-white"
-                                            : "bg-stone-900 border-dashed border-stone-600 text-stone-500"
-                                        }
-                                     `}
+                            className={`w-12 h-10 rounded flex items-center justify-center font-bold border-2 transition-all ${
+                              isFilled
+                                ? "bg-stone-700 border-stone-600 text-white"
+                                : "bg-stone-900 border-dashed border-stone-600 text-stone-500"
+                            }`}
                           >
                             {baseVal || "-"}
                           </div>
@@ -512,10 +494,7 @@ export function CharacterCreator({ onBack, onSave }) {
                           Base
                         </span>
                       </div>
-
                       <Plus size={12} className="text-stone-600" />
-
-                      {/* Race Bonus */}
                       <div className="flex flex-col items-center">
                         <div className="w-8 h-10 flex items-center justify-center font-bold text-stone-400">
                           {raceBonus}
@@ -524,10 +503,7 @@ export function CharacterCreator({ onBack, onSave }) {
                           Race
                         </span>
                       </div>
-
                       <div className="h-8 w-px bg-stone-700 mx-1"></div>
-
-                      {/* Total */}
                       <div className="flex flex-col items-center">
                         <div className="w-10 h-10 flex items-center justify-center bg-stone-900 rounded font-bold text-yellow-500 text-lg border border-stone-600">
                           {total}
@@ -544,6 +520,7 @@ export function CharacterCreator({ onBack, onSave }) {
           </div>
         )}
 
+        {/* 4. HECHIZOS (SOLO CASTERS) */}
         {step === 4 && isCaster && (
           <div className="space-y-4 animate-in slide-in-from-right duration-300">
             <div className="bg-stone-800/50 p-4 rounded-xl border border-stone-700 mb-2 text-center">
@@ -621,7 +598,8 @@ export function CharacterCreator({ onBack, onSave }) {
           </div>
         )}
 
-        {((isCaster && step === 5) || (!isCaster && step === 4)) && (
+        {/* 5. IDENTIDAD (AHORA SIEMPRE ES EL 5) */}
+        {step === 5 && (
           <div className="space-y-4 animate-in slide-in-from-right duration-300">
             <div className="flex justify-end">
               <button
@@ -773,12 +751,8 @@ export function CharacterCreator({ onBack, onSave }) {
           disabled={step === 1 ? !selectedRace : !selectedClass}
           className="w-full py-4 bg-yellow-500 text-stone-900 font-bold rounded-xl shadow-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-yellow-400 transition flex items-center justify-center gap-2"
         >
-          {(isCaster && step === 5) || (!isCaster && step === 4)
-            ? t("complete")
-            : t("next")}{" "}
-          {((isCaster && step !== 5) || (!isCaster && step !== 4)) && (
-            <ArrowLeft className="rotate-180" size={20} />
-          )}
+          {step === 5 ? t("complete") : t("next")}{" "}
+          {step !== 5 && <ArrowLeft className="rotate-180" size={20} />}
         </button>
       </div>
     </div>
