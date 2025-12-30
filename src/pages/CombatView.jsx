@@ -37,9 +37,7 @@ import {
   Hammer,
   ToggleLeft,
   ToggleRight,
-  ChevronsUp,
-  ChevronsDown,
-  MinusCircle,
+  Crown,
 } from "lucide-react";
 import {
   CLASSES,
@@ -64,11 +62,11 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const [isEditingMaxHP, setIsEditingMaxHP] = useState(false);
 
   // ESTADOS DE JUEGO
-  const [rollMode, setRollMode] = useState("normal"); // 'normal', 'adv', 'dis'
+  const [rollMode, setRollMode] = useState("normal");
   const [rollResult, setRollResult] = useState(null);
-  const [showShortRest, setShowShortRest] = useState(false); // Nuevo Modal
+  const [showShortRest, setShowShortRest] = useState(false);
 
-  // Modales de Creación
+  // Modales
   const [isAddingAttack, setIsAddingAttack] = useState(false);
   const [newAttack, setNewAttack] = useState({
     name: "",
@@ -91,7 +89,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const [isAddingFeature, setIsAddingFeature] = useState(false);
   const [newFeature, setNewFeature] = useState({ name: "", desc: "" });
 
-  // Utilidades UI
+  // UI Utils
   const [showDiceTray, setShowDiceTray] = useState(false);
   const [diceMod, setDiceMod] = useState(0);
   const [newItemName, setNewItemName] = useState("");
@@ -119,7 +117,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const currentHP = hero.currentHP ?? maxHP;
   const hpPercent = Math.min(100, Math.max(0, (currentHP / maxHP) * 100));
 
-  // AC Calculation
   let calculatedAC = calculateAC(hero.inventory || [], mods.dex, hero.features);
   const hasArmor = (hero.inventory || []).some(
     (i) => i.isEquipped && i.type === "armor" && i.armorType !== "shield"
@@ -144,10 +141,19 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const initiative = mods.dex >= 0 ? `+${mods.dex}` : mods.dex;
 
   const inspiration = hero.inspiration || false;
+
+  // SKILLS & EXPERTISE LOGIC
   const skillProfs = hero.skillProfs || [];
+  const expertises = hero.expertises || []; // Nuevo array para pericia
+
   const isPerceptionProf = skillProfs.includes("Perception");
-  const passivePerception =
-    10 + mods.wis + (isPerceptionProf ? proficiencyBonus : 0);
+  const isPerceptionExpert = expertises.includes("Perception");
+  const passiveBonus = isPerceptionExpert
+    ? proficiencyBonus * 2
+    : isPerceptionProf
+    ? proficiencyBonus
+    : 0;
+  const passivePerception = 10 + mods.wis + passiveBonus;
 
   const heroClassData = CLASSES.find((c) => c.name === hero.class);
   const saveProficiencies =
@@ -199,15 +205,12 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
 
   // --- ACTIONS ---
 
-  // 1. Core Logic for d20 with Adv/Dis
   const getD20Roll = () => {
     const r1 = Math.floor(Math.random() * 20) + 1;
     const r2 = Math.floor(Math.random() * 20) + 1;
-
     let result = r1;
     let dropped = null;
     let type = "normal";
-
     if (rollMode === "adv") {
       result = Math.max(r1, r2);
       dropped = Math.min(r1, r2);
@@ -217,10 +220,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
       dropped = Math.max(r1, r2);
       type = "dis";
     }
-
-    // Reset mode after roll (optional, usually preferred in apps)
     setRollMode("normal");
-
     return { result, dropped, type };
   };
 
@@ -230,8 +230,8 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
       type: "check",
       title: name,
       roll: result,
-      droppedRoll: dropped, // For visual
-      rollType: type, // 'normal', 'adv', 'dis'
+      droppedRoll: dropped,
+      rollType: type,
       mod: modifier,
       total: result + modifier,
       isCrit: result === 20,
@@ -277,6 +277,29 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     });
   };
 
+  // NUEVO: TOGGLE EXPERTISE
+  // Cycle: None -> Proficient -> Expert -> None
+  const toggleSkillProficiency = (e, skillName) => {
+    e.stopPropagation();
+    const isProf = skillProfs.includes(skillName);
+    const isExpert = expertises.includes(skillName);
+
+    if (!isProf && !isExpert) {
+      // 0 -> 1: Add Proficiency
+      onUpdateHero({ ...hero, skillProfs: [...skillProfs, skillName] });
+    } else if (isProf && !isExpert) {
+      // 1 -> 2: Add Expertise (Keep Prof)
+      onUpdateHero({ ...hero, expertises: [...expertises, skillName] });
+    } else {
+      // 2 -> 0: Remove Both
+      onUpdateHero({
+        ...hero,
+        skillProfs: skillProfs.filter((s) => s !== skillName),
+        expertises: expertises.filter((s) => s !== skillName),
+      });
+    }
+  };
+
   const toggleEquip = (itemId) => {
     const updatedInventory = inventory.map((item) => {
       if (item.id === itemId) return { ...item, isEquipped: !item.isEquipped };
@@ -298,7 +321,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     onUpdateHero({ ...hero, inventory: updatedInventory });
   };
 
-  // RESTING
+  // SHORT REST (MEJORADO CON RECARGA DE WARLOCK)
   const handleShortRestClick = () => {
     setShowMenu(false);
     setShowShortRest(true);
@@ -307,11 +330,24 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const handleApplyHeal = (amount, diceCost) => {
     const newHP = Math.min(maxHP, currentHP + amount);
     const newHitDiceUsed = hitDiceUsed + diceCost;
-    onUpdateHero({ ...hero, currentHP: newHP, hitDiceUsed: newHitDiceUsed });
+    let newSlots = spellSlots;
+
+    // REGLA WARLOCK: Recarga slots en descanso corto
+    if (hero.class === "Warlock") {
+      newSlots = { ...spellSlots };
+      Object.keys(newSlots).forEach((level) => (newSlots[level].used = 0));
+      showToast("Pact Magic Slots Restored!", "success");
+    }
+
+    onUpdateHero({
+      ...hero,
+      currentHP: newHP,
+      hitDiceUsed: newHitDiceUsed,
+      spellSlots: newSlots,
+    });
     showToast(`Healed ${amount} HP`, "success");
   };
 
-  // ... Standard Updaters ...
   const updateXP = (val) => {
     const newXP = Math.max(0, parseInt(val) || 0);
     let newLevel = 1;
@@ -362,8 +398,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     setShowMenu(false);
     showToast("Long Rest: Stats & Resources restored", "success");
   };
-
-  // ... Others ...
   const addFeature = () => {
     if (!newFeature.name) return;
     const feat = { id: Date.now(), ...newFeature };
@@ -527,14 +561,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     });
     onUpdateHero({ ...hero, resources: updatedResources });
   };
-  const toggleSkillProficiency = (e, skillName) => {
-    e.stopPropagation();
-    const exists = skillProfs.includes(skillName);
-    const newProfs = exists
-      ? skillProfs.filter((s) => s !== skillName)
-      : [...skillProfs, skillName];
-    onUpdateHero({ ...hero, skillProfs: newProfs });
-  };
   const toggleCondition = (conditionId) => {
     const exists = activeConditions.includes(conditionId);
     let newConditions = exists
@@ -618,25 +644,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
       },
     };
     onUpdateHero({ ...hero, spellSlots: newSlots });
-  };
-  const useHitDie = () => {
-    if (hitDiceUsed < hitDiceTotal) {
-      const dieMax = parseInt(hitDieType.substring(1));
-      const roll = Math.floor(Math.random() * dieMax) + 1;
-      const healAmount = Math.max(0, roll + mods.con);
-      const newHP = Math.min(maxHP, currentHP + healAmount);
-      onUpdateHero({ ...hero, currentHP: newHP, hitDiceUsed: hitDiceUsed + 1 });
-      setRollResult({
-        type: "check",
-        title: t("shortRest"),
-        roll: roll,
-        mod: mods.con,
-        total: healAmount,
-        isCrit: false,
-        isFail: false,
-      });
-      showToast(`Healed ${healAmount} HP`, "success");
-    }
   };
   const updateDeathSave = (type, index) => {
     const currentVal = deathSaves[type];
@@ -722,10 +729,8 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         </button>
       </header>
 
-      {/* MENÚ EXPANDIDO */}
       {showMenu && (
         <div className="absolute top-20 right-6 z-20 w-56 bg-stone-800 border border-stone-700 rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in duration-200 origin-top-right">
-          {/* BOTÓN SHORT REST ACTUALIZADO */}
           <button
             onClick={handleShortRestClick}
             className="w-full text-left px-4 py-3 text-stone-200 hover:bg-stone-700 flex items-center gap-3 border-b border-stone-700/50"
@@ -759,7 +764,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         </div>
       )}
 
-      {/* MODALS (Edit, HP, Slots) ... */}
       {editingStat && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-stone-900 border border-stone-700 p-6 rounded-2xl w-full max-w-xs animate-in zoom-in duration-200">
@@ -866,7 +870,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         </div>
       )}
 
-      {/* NUEVO: MODAL SHORT REST */}
       {showShortRest && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-stone-900 border border-stone-700 p-6 rounded-2xl w-full max-w-sm relative">
@@ -879,7 +882,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
             <h3 className="text-stone-100 font-bold mb-2 flex items-center gap-2">
               <Coffee className="text-orange-400" size={20} /> {t("shortRest")}
             </h3>
-
             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 mb-4 text-center">
               <p className="text-stone-400 text-xs uppercase font-bold mb-1">
                 {t("hitDiceRemaining")}
@@ -901,12 +903,10 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 ))}
               </div>
             </div>
-
             <div className="text-center">
               <button
                 onClick={() => {
                   if (hitDiceUsed < hitDiceTotal) {
-                    // Lógica de tirada simple integrada
                     const dieMax = parseInt(hitDieType.substring(1));
                     const roll = Math.floor(Math.random() * dieMax) + 1;
                     handleApplyHeal(Math.max(0, roll + mods.con), 1);
@@ -922,10 +922,15 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                   1{hitDieType} + {mods.con}
                 </span>
               </button>
-
+              {/* Mensaje especial para Warlocks */}
+              {hero.class === "Warlock" && (
+                <p className="text-[10px] text-purple-400 mt-2 italic">
+                  *Pact Magic slots will be restored.
+                </p>
+              )}
               <button
                 onClick={() => setShowShortRest(false)}
-                className="text-stone-500 text-sm hover:text-white"
+                className="text-stone-500 text-sm hover:text-white mt-2"
               >
                 Done
               </button>
@@ -1051,7 +1056,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
       >
         {activeTab === "combat" && (
           <div className="space-y-6 animate-in slide-in-from-left duration-200">
-            {/* INICIATIVA + ADVANTAGE TOGGLE */}
             <div className="flex gap-3 mb-2">
               <button
                 onClick={toggleInspiration}
@@ -1066,10 +1070,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                   {t("inspiration")}
                 </span>
               </button>
-
-              {/* TOGGLE ADVANTAGE/DISADVANTAGE */}
               <div className="flex-1 bg-stone-800 rounded-xl border border-stone-700 flex p-1 relative">
-                {/* Fondo animado del toggle */}
                 <div
                   className={`absolute top-1 bottom-1 w-[32%] bg-stone-700 rounded-lg transition-all duration-300 ${
                     rollMode === "adv"
@@ -1079,7 +1080,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                       : "left-1"
                   }`}
                 ></div>
-
                 <button
                   onClick={() =>
                     setRollMode(rollMode === "normal" ? "normal" : "normal")
@@ -1111,7 +1111,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                   {t("disadvantage")}
                 </button>
               </div>
-
               <div className="bg-stone-800 p-3 rounded-xl border border-stone-700 flex flex-col items-center justify-center w-16 shrink-0">
                 <Zap className="text-yellow-600 mb-1 w-5 h-5" />
                 <span className="text-xs text-stone-400 font-bold uppercase">
@@ -1122,7 +1121,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 </span>
               </div>
             </div>
-
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-stone-800 p-3 rounded-xl border border-stone-700 flex flex-col items-center justify-center relative overflow-hidden">
                 <Shield className="text-stone-600 absolute opacity-20 -right-2 -bottom-2 w-16 h-16" />
@@ -1161,7 +1159,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 </span>
               </div>
             </div>
-
             <div className="flex gap-2">
               <button
                 onClick={() => changeHP(-1)}
@@ -1176,8 +1173,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 + {t("heal")}
               </button>
             </div>
-
-            {/* Resources/Conditions/Attacks (Igual) */}
             <div>
               <div className="flex justify-between items-center mb-2">
                 <h3 className="text-stone-400 font-bold text-sm uppercase tracking-wider">
@@ -1377,9 +1372,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 </div>
               </div>
             )}
-            {/* (El bloque de Hit Dice se movio al Modal de Short Rest, aqui ya no es necesario o se deja como resumen) */}
-
-            {/* ATTACKS */}
             <div>
               <div className="flex justify-between items-center mb-3">
                 <h3 className="text-stone-400 font-bold text-sm uppercase tracking-wider">
@@ -1472,7 +1464,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 })}
               </div>
             </div>
-            {/* CUSTOM FEATURES (Igual) */}
             <div>
               <div className="flex justify-between items-center mb-3">
                 <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
@@ -1538,7 +1529,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           </div>
         )}
 
-        {/* ... (SKILLS, SPELLS, INVENTORY, PROFILE - Mantienen igual) ... */}
         {activeTab === "skills" && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 flex items-center justify-between">
@@ -1549,7 +1539,12 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                     {t("passivePerception")}
                   </span>
                   <span className="text-[10px] text-stone-500">
-                    10 + WIS{isPerceptionProf ? " + PROF" : ""}
+                    10 + WIS
+                    {isPerceptionExpert
+                      ? " + EXP"
+                      : isPerceptionProf
+                      ? " + PROF"
+                      : ""}
                   </span>
                 </div>
               </div>
@@ -1605,6 +1600,8 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 })}
               </div>
             </div>
+
+            {/* SKILLS CON EXPERTISE */}
             <div>
               <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
                 <Activity size={16} /> {t("skills")}
@@ -1612,8 +1609,16 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               <div className="bg-stone-800 rounded-xl border border-stone-700 divide-y divide-stone-700/50">
                 {SKILLS.map((skill) => {
                   const isProf = skillProfs.includes(skill.name);
+                  const isExpert = expertises.includes(skill.name);
+                  // Cálculo de Bono: Base + (Experto x2) o (Proficiente x1)
                   const totalMod =
-                    mods[skill.stat] + (isProf ? proficiencyBonus : 0);
+                    mods[skill.stat] +
+                    (isExpert
+                      ? proficiencyBonus * 2
+                      : isProf
+                      ? proficiencyBonus
+                      : 0);
+
                   return (
                     <div
                       key={skill.name}
@@ -1625,19 +1630,30 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                           onClick={(e) => toggleSkillProficiency(e, skill.name)}
                           className="p-1 rounded hover:bg-stone-600 transition"
                         >
-                          <Star
-                            size={16}
-                            className={
-                              isProf
-                                ? "text-yellow-500 fill-yellow-500"
-                                : "text-stone-600"
-                            }
-                          />
+                          {isExpert ? (
+                            <Crown
+                              size={16}
+                              className="text-blue-400 fill-blue-400"
+                            />
+                          ) : (
+                            <Star
+                              size={16}
+                              className={
+                                isProf
+                                  ? "text-yellow-500 fill-yellow-500"
+                                  : "text-stone-600"
+                              }
+                            />
+                          )}
                         </button>
                         <div>
                           <span
                             className={`text-sm font-medium ${
-                              isProf ? "text-yellow-500" : "text-stone-300"
+                              isExpert
+                                ? "text-blue-400"
+                                : isProf
+                                ? "text-yellow-500"
+                                : "text-stone-300"
                             }`}
                           >
                             {skill.name}
@@ -1649,7 +1665,9 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                       </div>
                       <span
                         className={`font-mono text-sm ${
-                          isProf
+                          isExpert
+                            ? "text-blue-400 font-bold"
+                            : isProf
                             ? "text-yellow-500 font-bold"
                             : "text-stone-400"
                         }`}
@@ -1701,6 +1719,8 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
             </div>
           </div>
         )}
+
+        {/* ... (SPELLS, INVENTORY, PROFILE IGUAL) ... */}
         {activeTab === "spells" && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
             <div className="flex items-start gap-4">
@@ -2301,7 +2321,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         )}
       </div>
 
-      {/* MODAL RESULTADOS (MEJORADO CON ADV/DIS) */}
       {rollResult && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-stone-900 border border-stone-700 p-6 rounded-2xl shadow-2xl w-full max-w-sm relative text-center">
@@ -2314,12 +2333,9 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
             <h3 className="text-stone-400 text-sm uppercase font-bold tracking-widest mb-4">
               {rollResult.title}
             </h3>
-
-            {/* Si es Adv/Dis, mostramos los dos dados */}
             {(rollResult.rollType === "adv" || rollResult.rollType === "dis") &&
             rollResult.droppedRoll ? (
               <div className="flex justify-center items-center gap-4 mb-4">
-                {/* Dado descartado */}
                 <div className="flex flex-col items-center opacity-50 scale-75">
                   <div className="w-16 h-16 rounded-full flex items-center justify-center border-2 border-stone-600 text-2xl font-bold text-stone-500 bg-stone-950">
                     {rollResult.droppedRoll}
@@ -2328,8 +2344,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                     Dropped
                   </span>
                 </div>
-
-                {/* Dado final */}
                 <div className="flex flex-col items-center scale-110">
                   <div
                     className={`w-20 h-20 rounded-full flex items-center justify-center border-4 text-3xl font-bold ${
@@ -2356,7 +2370,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 </div>
               </div>
             ) : (
-              // Dado normal (solo uno)
               <div
                 className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-4 border-4 text-4xl font-bold ${
                   rollResult.isCrit
@@ -2371,7 +2384,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 {rollResult.roll}
               </div>
             )}
-
             <div className="text-stone-500 text-sm mb-6 flex justify-center gap-2 items-center font-mono bg-stone-950/50 py-2 rounded-lg">
               {rollResult.type === "damage" ? (
                 <span>
@@ -2390,24 +2402,19 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 </span>
               )}
             </div>
-
-            {/* BOTÓN DE DAÑO */}
             {rollResult.type === "attack" && rollResult.damageDice && (
               <button
                 onClick={handleDamageRoll}
-                className={`w-full py-3 mb-3 rounded-xl font-bold flex items-center justify-center gap-2 transition
-                        ${
-                          rollResult.isCrit
-                            ? "bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-900/50"
-                            : "bg-stone-700 hover:bg-stone-600 text-stone-200"
-                        }
-                    `}
+                className={`w-full py-3 mb-3 rounded-xl font-bold flex items-center justify-center gap-2 transition ${
+                  rollResult.isCrit
+                    ? "bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-900/50"
+                    : "bg-stone-700 hover:bg-stone-600 text-stone-200"
+                }`}
               >
                 <Hammer size={18} /> {t("rollDamage")}{" "}
                 {rollResult.isCrit && "(x2)"}
               </button>
             )}
-
             <button
               onClick={() => setRollResult(null)}
               className="w-full py-3 bg-stone-800 hover:bg-stone-700 text-stone-100 rounded-xl font-bold"
