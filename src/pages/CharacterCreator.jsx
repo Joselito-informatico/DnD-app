@@ -18,6 +18,7 @@ import {
   Trash2,
   Dices,
   RotateCcw,
+  X,
 } from "lucide-react";
 import { RACES, CLASSES } from "../data/srd";
 import { getRandomDetails } from "../utils/randomizer";
@@ -27,12 +28,10 @@ import { searchSpells } from "../utils/dndApi";
 export function CharacterCreator({ onBack, onSave }) {
   const { t } = useLanguage();
 
-  // Flujo: 1.Raza -> 2.Clase -> 3.Stats -> [4.Hechizos] -> 5.Identidad
   const [step, setStep] = useState(1);
   const [selectedRace, setSelectedRace] = useState(null);
   const [selectedClass, setSelectedClass] = useState(null);
 
-  // STATS
   const [baseStats, setBaseStats] = useState({
     str: 0,
     dex: 0,
@@ -44,13 +43,11 @@ export function CharacterCreator({ onBack, onSave }) {
   const [rolledPool, setRolledPool] = useState([]);
   const [selectedRollId, setSelectedRollId] = useState(null);
 
-  // HECHIZOS
   const [startingSpells, setStartingSpells] = useState([]);
   const [spellQuery, setSpellQuery] = useState("");
   const [spellResults, setSpellResults] = useState([]);
   const [isSearchingSpell, setIsSearchingSpell] = useState(false);
 
-  // DETALLES
   const [details, setDetails] = useState({
     name: "",
     alignment: "",
@@ -70,25 +67,22 @@ export function CharacterCreator({ onBack, onSave }) {
 
   const isCaster = selectedClass?.spellcasting !== undefined;
 
-  // --- NAVEGACIÓN ROBUSTA ---
+  // --- NAVEGACIÓN ---
   const handleNext = () => {
     if (step === 1 && selectedRace) setStep(2);
     else if (step === 2 && selectedClass) setStep(3);
     else if (step === 3) {
-      // Validar stats vacíos
       if (Object.values(baseStats).some((v) => v === 0)) {
         if (!confirm("Some stats are 0. Continue?")) return;
       }
-      // Si es mago -> Paso 4. Si no -> Salta al 5
       setStep(isCaster ? 4 : 5);
     } else if (step === 4) setStep(5);
     else if (step === 5) finishCreation();
   };
 
   const handleBackStep = () => {
-    if (step === 1) onBack(); // Salir al Dashboard
-    else if (step === 5 && !isCaster)
-      setStep(3); // Si no es mago, volver de 5 a 3
+    if (step === 1) onBack();
+    else if (step === 5 && !isCaster) setStep(3);
     else setStep(step - 1);
   };
 
@@ -125,8 +119,8 @@ export function CharacterCreator({ onBack, onSave }) {
       if (!roll) return;
 
       const newPool = rolledPool.map((r) => {
-        if (r.assignedTo === statKey) return { ...r, assignedTo: null }; // Liberar previo
-        if (r.id === selectedRollId) return { ...r, assignedTo: statKey }; // Asignar nuevo
+        if (r.assignedTo === statKey) return { ...r, assignedTo: null };
+        if (r.id === selectedRollId) return { ...r, assignedTo: statKey };
         return r;
       });
 
@@ -134,7 +128,6 @@ export function CharacterCreator({ onBack, onSave }) {
       setBaseStats((prev) => ({ ...prev, [statKey]: roll.value }));
       setSelectedRollId(null);
     } else if (rolledPool.length > 0 && baseStats[statKey] > 0) {
-      // Devolver a la bandeja
       const newPool = rolledPool.map((r) => {
         if (r.assignedTo === statKey) return { ...r, assignedTo: null };
         return r;
@@ -169,7 +162,6 @@ export function CharacterCreator({ onBack, onSave }) {
     }));
   };
 
-  // --- API HECHIZOS ---
   const handleSpellSearch = async () => {
     if (!spellQuery) return;
     setIsSearchingSpell(true);
@@ -217,6 +209,9 @@ export function CharacterCreator({ onBack, onSave }) {
               : item.type === "weapon"
               ? `${item.damage}`
               : "",
+          type: item.type, // Asegurar que pasamos el tipo (armor/weapon/item)
+          ac: item.ac, // Asegurar que pasamos la AC
+          armorType: item.type === "armor" ? "Heavy" : null, // Simplificación para auto-detectar
         });
         if (item.type === "weapon")
           starterWeapons.push({
@@ -257,7 +252,7 @@ export function CharacterCreator({ onBack, onSave }) {
     if (step === 2) return t("step2");
     if (step === 3) return "Assign Stats";
     if (step === 4) return t("cantrips");
-    if (step === 5) return t("step4"); // Identidad siempre es paso 5 ahora
+    if (step === 5) return t("step4");
     return "";
   };
 
@@ -598,7 +593,7 @@ export function CharacterCreator({ onBack, onSave }) {
           </div>
         )}
 
-        {/* 5. IDENTIDAD (AHORA SIEMPRE ES EL 5) */}
+        {/* 5. IDENTIDAD */}
         {step === 5 && (
           <div className="space-y-4 animate-in slide-in-from-right duration-300">
             <div className="flex justify-end">
