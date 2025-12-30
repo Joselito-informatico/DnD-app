@@ -100,6 +100,16 @@ export const CLASSES = [
       { name: "Javelin", type: "weapon", damage: "1d6", stat: "str", qty: 4 },
       { name: "Explorer's Pack", type: "item", qty: 1 },
     ],
+    features: [
+      {
+        name: "Rage",
+        desc: "Bonus Action. Adv on STR checks/saves. Bonus melee dmg. Resistance to B/P/S damage. Ends if unconscious or no attack/dmg taken.",
+      },
+      {
+        name: "Unarmored Defense",
+        desc: "AC = 10 + DEX mod + CON mod (while not wearing armor).",
+      },
+    ],
   },
   {
     id: "bard",
@@ -122,6 +132,16 @@ export const CLASSES = [
       { name: "Leather Armor", type: "armor", ac: 11, qty: 1 },
       { name: "Entertainer's Pack", type: "item", qty: 1 },
       { name: "Lute", type: "item", qty: 1 },
+    ],
+    features: [
+      {
+        name: "Bardic Inspiration",
+        desc: "Bonus Action. Give a creature d6 die to add to one check, attack, or save. Uses: CHA mod (min 1). Regain on Long Rest.",
+      },
+      {
+        name: "Spellcasting",
+        desc: "You can cast known bard spells using Charisma.",
+      },
     ],
   },
   {
@@ -146,6 +166,16 @@ export const CLASSES = [
       { name: "Priest's Pack", type: "item", qty: 1 },
       { name: "Shield", type: "armor", ac: 2, qty: 1 },
     ],
+    features: [
+      {
+        name: "Spellcasting",
+        desc: "Prepare spells daily equal to WIS mod + Level. Ritual casting available.",
+      },
+      {
+        name: "Divine Domain",
+        desc: "Choose a domain related to your deity (e.g. Life).",
+      },
+    ],
   },
   {
     id: "druid",
@@ -166,6 +196,13 @@ export const CLASSES = [
       { name: "Wooden Shield", type: "armor", ac: 2, qty: 1 },
       { name: "Explorer's Pack", type: "item", qty: 1 },
       { name: "Druidic Focus", type: "item", qty: 1 },
+    ],
+    features: [
+      { name: "Druidic", desc: "You know the secret language of druids." },
+      {
+        name: "Spellcasting",
+        desc: "Prepare spells daily equal to WIS mod + Level.",
+      },
     ],
   },
   {
@@ -189,6 +226,16 @@ export const CLASSES = [
       },
       { name: "Dungeoneer's Pack", type: "item", qty: 1 },
     ],
+    features: [
+      {
+        name: "Fighting Style",
+        desc: "Choose one: Archery (+2 hit), Defense (+1 AC), Dueling (+2 dmg), Great Weapon (Reroll 1-2).",
+      },
+      {
+        name: "Second Wind",
+        desc: "Bonus Action. Regain 1d10 + Level HP. Once per Short Rest.",
+      },
+    ],
   },
   {
     id: "monk",
@@ -209,6 +256,16 @@ export const CLASSES = [
       { name: "Darts", type: "weapon", damage: "1d4", stat: "dex", qty: 10 },
       { name: "Explorer's Pack", type: "item", qty: 1 },
     ],
+    features: [
+      {
+        name: "Unarmored Defense",
+        desc: "AC = 10 + DEX mod + WIS mod (while not wearing armor).",
+      },
+      {
+        name: "Martial Arts",
+        desc: "Use DEX for unarmed/monk weapons. Unarmed strike d4. Bonus Action unarmed strike.",
+      },
+    ],
   },
   {
     id: "paladin",
@@ -224,6 +281,16 @@ export const CLASSES = [
       { name: "Shield", type: "armor", ac: 2, qty: 1 },
       { name: "Javelin", type: "weapon", damage: "1d6", stat: "str", qty: 5 },
       { name: "Priest's Pack", type: "item", qty: 1 },
+    ],
+    features: [
+      {
+        name: "Divine Sense",
+        desc: "Action. Detect celestial, fiend, undead within 60ft. Uses: 1 + CHA mod.",
+      },
+      {
+        name: "Lay on Hands",
+        desc: "Pool of HP = 5 x Level. Action to heal or cure disease (5 pts).",
+      },
     ],
   },
   {
@@ -246,6 +313,16 @@ export const CLASSES = [
       { name: "Longbow", type: "weapon", damage: "1d8", stat: "dex", qty: 1 },
       { name: "Arrows", type: "item", qty: 20 },
       { name: "Explorer's Pack", type: "item", qty: 1 },
+    ],
+    features: [
+      {
+        name: "Favored Enemy",
+        desc: "Adv on Survival/INT checks related to enemy type. Learn language.",
+      },
+      {
+        name: "Natural Explorer",
+        desc: "Double prof on checks in favored terrain. Ignore difficult terrain.",
+      },
     ],
   },
   {
@@ -271,6 +348,16 @@ export const CLASSES = [
       { name: "Dagger", type: "weapon", damage: "1d4", stat: "dex", qty: 2 },
       { name: "Thieves' Tools", type: "item", qty: 1 },
       { name: "Burglar's Pack", type: "item", qty: 1 },
+    ],
+    features: [
+      {
+        name: "Sneak Attack",
+        desc: "Deal extra 1d6 dmg if you have Adv or ally is 5ft from target. Finesse/Ranged only.",
+      },
+      {
+        name: "Thieves' Cant",
+        desc: "Secret mix of dialect, jargon, and code.",
+      },
     ],
   },
   {
@@ -301,6 +388,13 @@ export const CLASSES = [
       { name: "Dagger", type: "weapon", damage: "1d4", stat: "dex", qty: 2 },
       { name: "Explorer's Pack", type: "item", qty: 1 },
     ],
+    features: [
+      {
+        name: "Sorcerous Origin",
+        desc: "Choose source of magic (e.g. Draconic Bloodline).",
+      },
+      { name: "Spellcasting", desc: "Cast known spells using Charisma." },
+    ],
   },
   {
     id: "warlock",
@@ -310,7 +404,7 @@ export const CLASSES = [
     saves: ["Wisdom", "Charisma"],
     proficiencies: ["Light Armor", "Simple Weapons"],
     srdSubclass: "The Fiend",
-    spellcasting: { stat: "cha", slots: { 1: { total: 1, used: 0 } } }, // Warlocks start with 1 slot
+    spellcasting: { stat: "cha", slots: { 1: { total: 1, used: 0 } } }, // Warlock start with 1
     startingEquipment: [
       {
         name: "Light Crossbow",
@@ -324,6 +418,16 @@ export const CLASSES = [
       { name: "Leather Armor", type: "armor", ac: 11, qty: 1 },
       { name: "Dagger", type: "weapon", damage: "1d4", stat: "dex", qty: 2 },
       { name: "Scholar's Pack", type: "item", qty: 1 },
+    ],
+    features: [
+      {
+        name: "Otherworldly Patron",
+        desc: "Pact with a powerful being (e.g. Fiend).",
+      },
+      {
+        name: "Pact Magic",
+        desc: "Slots restore on Short Rest. Always cast at highest slot level.",
+      },
     ],
   },
   {
@@ -352,6 +456,16 @@ export const CLASSES = [
       { name: "Arcane Focus", type: "item", qty: 1 },
       { name: "Spellbook", type: "item", qty: 1 },
       { name: "Scholar's Pack", type: "item", qty: 1 },
+    ],
+    features: [
+      {
+        name: "Arcane Recovery",
+        desc: "Once per day after Short Rest, recover spell slots (combined level <= half Wizard level).",
+      },
+      {
+        name: "Spellcasting",
+        desc: "Cast prepared spells using Intelligence.",
+      },
     ],
   },
 ];
