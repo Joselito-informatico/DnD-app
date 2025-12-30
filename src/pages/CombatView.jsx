@@ -34,6 +34,7 @@ import {
   Download,
   Copy,
   Edit3,
+  Hammer,
 } from "lucide-react";
 import {
   CLASSES,
@@ -45,18 +46,23 @@ import {
 import { useLanguage } from "../context/LanguageContext";
 import { useToast } from "../context/ToastContext";
 import { searchSpells, searchEquipment } from "../utils/dndApi";
+import { rollDamage } from "../utils/dice"; // IMPORTAMOS EL MOTOR DE DADOS
 
 export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const { t } = useLanguage();
   const { showToast } = useToast();
 
   const [activeTab, setActiveTab] = useState("combat");
-  const [rollResult, setRollResult] = useState(null);
   const [showMenu, setShowMenu] = useState(false);
   const [editingStat, setEditingStat] = useState(null);
   const [isEditingMaxHP, setIsEditingMaxHP] = useState(false);
 
-  // Modales
+  // ESTADO DE RESULTADOS (MODAL)
+  const [rollResult, setRollResult] = useState(null);
+  // Estructura de rollResult:
+  // { type: 'check' | 'attack' | 'damage', title, total, roll, mod, isCrit, isFail, damageDice: "1d8", damageMod: 3 }
+
+  // Modales y Formularios
   const [isAddingAttack, setIsAddingAttack] = useState(false);
   const [newAttack, setNewAttack] = useState({
     name: "",
@@ -64,6 +70,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     stat: "str",
     type: "melee",
   });
+
   const [isAddingSpell, setIsAddingSpell] = useState(false);
   const [newSpell, setNewSpell] = useState({
     name: "",
@@ -74,6 +81,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   });
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
+
   const [isAddingCondition, setIsAddingCondition] = useState(false);
   const [isEditingSlots, setIsEditingSlots] = useState(false);
   const [isAddingResource, setIsAddingResource] = useState(false);
@@ -123,26 +131,10 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const hitDiceTotal = hero.level;
   const deathSaves = hero.deathSaves || { successes: 0, failures: 0 };
   const xp = hero.xp || 0;
-
-  // --- CÁLCULO DE BARRA DE XP (NUEVA LÓGICA) ---
-  const currentLevelBaseXP = XP_TABLE[hero.level] || 0;
-  const nextLevelBaseXP = XP_TABLE[hero.level + 1] || currentLevelBaseXP; // Si es lvl 20, no hay siguiente
-  const xpProgress =
-    nextLevelBaseXP > currentLevelBaseXP
-      ? ((xp - currentLevelBaseXP) / (nextLevelBaseXP - currentLevelBaseXP)) *
-        100
-      : 100;
-
-  const activeConditions = hero.conditions || [];
-  const exhaustionLevel = hero.exhaustion || 0;
   const resources = hero.resources || [];
   const features = hero.features || [];
-
-  const languages = ["Common"];
-  if (hero.race === "Elf") languages.push("Elvish");
-  if (hero.race === "Dwarf") languages.push("Dwarvish");
-  if (hero.race === "Tiefling") languages.push("Infernal");
-  if (hero.race === "Human") languages.push("One extra choice");
+  const activeConditions = hero.conditions || [];
+  const exhaustionLevel = hero.exhaustion || 0;
 
   const weapons = hero.weapons || [];
   const details = hero.details || {
@@ -165,47 +157,94 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const spellAttackBonus = mods[spellCastingStat] + proficiencyBonus;
   const spellSaveDC = 8 + proficiencyBonus + mods[spellCastingStat];
 
-  // --- ACCIONES ---
+  const languages = ["Common"];
+  if (hero.race === "Elf") languages.push("Elvish");
+  if (hero.race === "Dwarf") languages.push("Dwarvish");
+  if (hero.race === "Tiefling") languages.push("Infernal");
+  if (hero.race === "Human") languages.push("One extra choice");
 
-  // NUEVO: ACTUALIZAR XP Y NIVEL AUTOMÁTICO
+  // --- LÓGICA DE DADOS AVANZADA ---
+
+  // 1. Tirada simple de d20 (Skills, Saves, Init)
+  const rollCheck = (name, modifier) => {
+    const d20 = Math.floor(Math.random() * 20) + 1;
+    setRollResult({
+      type: "check",
+      title: name,
+      roll: d20,
+      mod: modifier,
+      total: d20 + modifier,
+      isCrit: d20 === 20,
+      isFail: d20 === 1,
+    });
+    if (d20 === 20) showToast("Natural 20!", "success");
+    if (d20 === 1) showToast("Critical Fail...", "error");
+  };
+
+  // 2. Tirada de Ataque (Prepara el daño)
+  const rollAttack = (name, modifier, damageDice, damageStat) => {
+    const d20 = Math.floor(Math.random() * 20) + 1;
+    // Calcular mod de daño (stat mod)
+    const dmgMod = damageStat ? mods[damageStat] : 0;
+
+    setRollResult({
+      type: "attack",
+      title: `${name} Attack`,
+      roll: d20,
+      mod: modifier,
+      total: d20 + modifier,
+      isCrit: d20 === 20,
+      isFail: d20 === 1,
+      // Datos para el siguiente paso (Daño)
+      damageDice: damageDice, // "1d8"
+      damageMod: dmgMod, // +3
+    });
+
+    if (d20 === 20) showToast("CRITICAL HIT!", "success");
+  };
+
+  // 3. Tirada de Daño (Usando el motor dice.js)
+  const handleDamageRoll = () => {
+    if (!rollResult || !rollResult.damageDice) return;
+
+    // Calcular daño
+    const isCrit = rollResult.isCrit;
+    const { total, rolls, formula } = rollDamage(rollResult.damageDice, isCrit);
+    const finalTotal = total + rollResult.damageMod;
+
+    setRollResult({
+      type: "damage",
+      title: isCrit ? t("critDamage") : t("totalDmg"),
+      roll: total, // Suma de los dados
+      diceRolls: rolls, // Array [4, 2]
+      mod: rollResult.damageMod,
+      total: finalTotal,
+      formula: formula, // "2d8" si fue crit
+      isCrit: isCrit,
+    });
+  };
+
+  // --- RESTO DE ACCIONES (Igual que antes) ---
   const updateXP = (val) => {
     const newXP = Math.max(0, parseInt(val) || 0);
     let newLevel = 1;
-
-    // Buscar en qué nivel cae la nueva XP (Iteramos desde el 20 hacia abajo)
     for (let lvl = 20; lvl >= 1; lvl--) {
       if (newXP >= XP_TABLE[lvl]) {
         newLevel = lvl;
         break;
       }
     }
-
-    // Si hubo cambio de nivel, notificamos
-    if (newLevel > hero.level) {
-      showToast(`🎉 Level Up! You reached level ${newLevel}`, "success");
-    } else if (newLevel < hero.level) {
-      showToast(`Level decreased to ${newLevel}`, "info");
-    }
-
+    if (newLevel > hero.level)
+      showToast(`🎉 Level Up! Level ${newLevel}`, "success");
     onUpdateHero({ ...hero, xp: newXP, level: newLevel });
     setEditingStat(null);
   };
-
-  // NUEVO: ACTUALIZAR NIVEL MANUAL (Y AJUSTAR XP BASE)
   const updateLevel = (val) => {
     const lvl = Math.max(1, Math.min(20, parseInt(val) || 1));
-    const baseXP = XP_TABLE[lvl] || 0; // Buscamos la XP mínima para ese nivel
-
+    const baseXP = XP_TABLE[lvl] || 0;
     onUpdateHero({ ...hero, level: lvl, xp: baseXP });
     setEditingStat(null);
-    showToast(`Level set to ${lvl}. XP reset to ${baseXP}`, "info");
-  };
-
-  const updateAttribute = (statName, val) => {
-    const newVal = Math.max(1, Math.min(30, parseInt(val) || 10));
-    onUpdateHero({ ...hero, stats: { ...hero.stats, [statName]: newVal } });
-    setEditingStat(null);
-    showToast(`${statName.toUpperCase()} updated`, "success");
+    showToast(`Level set to ${lvl}`, "info");
   };
   const updateMaxHP = (newVal) => {
     const val = parseInt(newVal) || 1;
@@ -233,6 +272,26 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
       });
     }
   };
+  const rollGeneric = (sides) => {
+    const roll = Math.floor(Math.random() * sides) + 1;
+    const total = roll + parseInt(diceMod || 0);
+    setRollResult({
+      type: "check",
+      title: `d${sides} Roll`,
+      roll: roll,
+      mod: parseInt(diceMod || 0),
+      total: total,
+      isCrit: sides === 20 && roll === 20,
+      isFail: sides === 20 && roll === 1,
+    });
+    setShowDiceTray(false);
+  };
+  const updateAttribute = (statName, val) => {
+    const newVal = Math.max(1, Math.min(30, parseInt(val) || 10));
+    onUpdateHero({ ...hero, stats: { ...hero.stats, [statName]: newVal } });
+    setEditingStat(null);
+    showToast(`${statName.toUpperCase()} updated`, "success");
+  };
   const handleExportJSON = () => {
     const dataStr = JSON.stringify([hero], null, 2);
     const blob = new Blob([dataStr], { type: "application/json" });
@@ -251,19 +310,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     navigator.clipboard.writeText(summary);
     setShowMenu(false);
     showToast(t("copied"), "success");
-  };
-  const rollGeneric = (sides) => {
-    const roll = Math.floor(Math.random() * sides) + 1;
-    const total = roll + parseInt(diceMod || 0);
-    setRollResult({
-      title: `d${sides} Roll`,
-      roll: roll,
-      mod: parseInt(diceMod || 0),
-      total: total,
-      isCrit: sides === 20 && roll === 20,
-      isFail: sides === 20 && roll === 1,
-    });
-    setShowDiceTray(false);
   };
   const handleSpellSearch = async () => {
     if (!searchQuery) return;
@@ -484,6 +530,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
       const newHP = Math.min(maxHP, currentHP + healAmount);
       onUpdateHero({ ...hero, currentHP: newHP, hitDiceUsed: hitDiceUsed + 1 });
       setRollResult({
+        type: "check",
         title: t("shortRest"),
         roll: roll,
         mod: mods.con,
@@ -524,19 +571,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
       ...hero,
       inventory: inventory.filter((i) => i.id !== itemId),
     });
-  };
-  const rollDice = (name, modifier) => {
-    const d20 = Math.floor(Math.random() * 20) + 1;
-    setRollResult({
-      title: name,
-      roll: d20,
-      mod: modifier,
-      total: d20 + modifier,
-      isCrit: d20 === 20,
-      isFail: d20 === 1,
-    });
-    if (d20 === 20) showToast("CRITICAL HIT! 🔥", "success");
-    if (d20 === 1) showToast("Critical Fail...", "error");
   };
   const changeHP = (val) => {
     const newHP = Math.min(maxHP, Math.max(0, currentHP + val));
@@ -628,14 +662,13 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         </div>
       )}
 
-      {/* EDIT MODAL (STATS & XP & LVL) */}
+      {/* EDIT MODAL */}
       {editingStat && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-stone-900 border border-stone-700 p-6 rounded-2xl w-full max-w-xs animate-in zoom-in duration-200">
             <h3 className="text-stone-100 font-bold mb-4 capitalize">
               {t("edit")} {t(editingStat) || editingStat}
             </h3>
-            {/* LÓGICA DE INPUT CAMBIADA PARA USAR updateXP Y updateLevel */}
             <input
               type="number"
               autoFocus
@@ -897,7 +930,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 </span>
               </div>
 
-              {/* HP VISUAL BAR - CLICKABLE FOR EDIT */}
               <div
                 onClick={() => setIsEditingMaxHP(true)}
                 className={`p-3 rounded-xl border flex flex-col items-center justify-center transition duration-300 relative overflow-hidden cursor-pointer hover:border-yellow-500 ${
@@ -942,7 +974,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               </button>
             </div>
 
-            {/* RESOURCES & CONDITIONS & ATTACKS (Resto igual) */}
+            {/* RESOURCES & CONDITIONS & ATTACKS */}
             <div>
               <div className="flex justify-between items-center mb-2">
                 <h3 className="text-stone-400 font-bold text-sm uppercase tracking-wider">
@@ -1176,6 +1208,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               </div>
             )}
 
+            {/* ATTACKS - AHORA CON DADOS CORRECTOS */}
             <div>
               <div className="flex justify-between items-center mb-3">
                 <h3 className="text-stone-400 font-bold text-sm uppercase tracking-wider">
@@ -1238,7 +1271,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                   return (
                     <div
                       key={w.id}
-                      onClick={() => rollDice(`${w.name} Attack`, mod)}
+                      onClick={() => rollAttack(w.name, mod, w.damage, w.stat)}
                       className="bg-stone-800 p-4 rounded-xl border border-stone-700 flex justify-between items-center cursor-pointer hover:border-yellow-500/50 transition group relative"
                     >
                       <div className="flex items-center gap-3">
@@ -1269,6 +1302,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               </div>
             </div>
 
+            {/* CUSTOM FEATURES */}
             <div>
               <div className="flex justify-between items-center mb-3">
                 <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
@@ -1375,7 +1409,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                     <button
                       key={stat}
                       onClick={() =>
-                        rollDice(`${stat.toUpperCase()} Save`, saveMod)
+                        rollCheck(`${stat.toUpperCase()} Save`, saveMod)
                       }
                       className={`p-3 rounded-lg border flex justify-between items-center ${
                         isSaveProficient
@@ -1413,7 +1447,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                   return (
                     <div
                       key={skill.name}
-                      onClick={() => rollDice(skill.name, totalMod)}
+                      onClick={() => rollCheck(skill.name, totalMod)}
                       className="p-3 flex justify-between items-center cursor-pointer hover:bg-stone-700/50 transition group"
                     >
                       <div className="flex items-center gap-3">
@@ -1498,7 +1532,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           </div>
         )}
 
-        {/* SPELLS (Igual) */}
+        {/* SPELLS */}
         {activeTab === "spells" && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
             <div className="flex items-start gap-4">
@@ -1682,21 +1716,17 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                         key={spell.id}
                         className="bg-stone-800 p-3 rounded-lg border border-stone-700 flex justify-between items-center group cursor-pointer hover:border-yellow-500/50 relative"
                         onClick={() =>
-                          rollDice(`${spell.name}`, spellAttackBonus)
+                          rollAttack(spell.name, spellAttackBonus, null, null)
                         }
                       >
-                        <div>
+                        <div className="pr-6">
                           <p className="font-bold text-stone-200 text-sm">
                             {spell.name}
                           </p>
-                          <p className="text-[10px] text-stone-500">
-                            {spell.school}
+                          <p className="text-[10px] text-stone-500 line-clamp-2">
+                            {spell.desc}
                           </p>
                         </div>
-                        <BookOpen
-                          size={16}
-                          className="text-stone-600 group-hover:text-yellow-500"
-                        />
                         <button
                           onClick={(e) => removeSpell(spell.id, e)}
                           className="p-2 text-stone-600 hover:text-red-500 hover:bg-stone-900 rounded-full transition opacity-0 group-hover:opacity-100 absolute right-1 top-1"
@@ -1722,7 +1752,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                           key={spell.id}
                           className="bg-stone-800 p-3 rounded-lg border border-stone-700 flex justify-between items-center group cursor-pointer hover:border-yellow-500/50 relative"
                           onClick={() =>
-                            rollDice(`${spell.name}`, spellAttackBonus)
+                            rollAttack(spell.name, spellAttackBonus, null, null)
                           }
                         >
                           <div className="pr-6">
@@ -1733,11 +1763,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                               {spell.desc}
                             </p>
                           </div>
-                          {spell.desc.toLowerCase().includes("damage") && (
-                            <div className="bg-stone-900 px-2 py-1 rounded text-xs font-bold text-stone-400 group-hover:text-yellow-500">
-                              Roll
-                            </div>
-                          )}
                           <button
                             onClick={(e) => removeSpell(spell.id, e)}
                             className="p-2 text-stone-600 hover:text-red-500 hover:bg-stone-900 rounded-full transition opacity-0 group-hover:opacity-100 absolute right-1 top-1"
@@ -1878,7 +1903,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           </div>
         )}
 
-        {/* PROFILE (ACTUALIZADO CON BARRA XP) */}
+        {/* PROFILE (Igual) */}
         {activeTab === "profile" && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
             <div className="bg-stone-800 p-5 rounded-xl border border-stone-700">
@@ -1904,14 +1929,19 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                     onClick={() => setEditingStat("xp")}
                     className="cursor-pointer hover:text-yellow-500"
                   >
-                    {xp} / {nextLevelBaseXP} XP{" "}
+                    {xp} / {XP_TABLE[hero.level] || "MAX"} XP{" "}
                     <Edit3 size={10} className="inline" />
                   </span>
                 </div>
                 <div className="h-2 bg-stone-950 rounded-full overflow-hidden border border-stone-700/50">
                   <div
                     className="h-full bg-purple-600 transition-all duration-500"
-                    style={{ width: `${Math.min(100, xpProgress)}%` }}
+                    style={{
+                      width: `${Math.min(
+                        100,
+                        (xp / (XP_TABLE[hero.level] || xp || 1)) * 100
+                      )}%`,
+                    }}
                   ></div>
                 </div>
               </div>
@@ -2082,7 +2112,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         )}
       </div>
 
-      {/* MODAL RESULTADOS (IGUAL) */}
+      {/* MODAL RESULTADOS (MEJORADO CON DAÑO) */}
       {rollResult && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-stone-900 border border-stone-700 p-6 rounded-2xl shadow-2xl w-full max-w-sm relative text-center">
@@ -2095,29 +2125,61 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
             <h3 className="text-stone-400 text-sm uppercase font-bold tracking-widest mb-4">
               {rollResult.title}
             </h3>
+
+            {/* Círculo Principal */}
             <div
-              className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-4 border-4 text-4xl font-bold ${
-                rollResult.isCrit
-                  ? "border-yellow-500 text-yellow-500 shadow-yellow-500/20 shadow-lg"
-                  : ""
-              } ${
-                rollResult.isFail
-                  ? "border-red-600 text-red-600"
-                  : "border-stone-600 text-stone-200"
-              }`}
+              className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-4 border-4 text-4xl font-bold 
+                ${
+                  rollResult.isCrit
+                    ? "border-yellow-500 text-yellow-500 shadow-yellow-500/20 shadow-lg animate-bounce"
+                    : ""
+                } 
+                ${
+                  rollResult.isFail
+                    ? "border-red-600 text-red-600"
+                    : "border-stone-600 text-stone-200"
+                }`}
             >
               {rollResult.roll}
             </div>
+
+            {/* Detalles del Roll */}
             <div className="text-stone-500 text-sm mb-6 flex justify-center gap-2 items-center font-mono bg-stone-950/50 py-2 rounded-lg">
-              <span>Roll {rollResult.roll}</span>
-              <span>
-                {rollResult.mod >= 0 ? "+" : "-"} {Math.abs(rollResult.mod)}
-              </span>
-              <span>=</span>
-              <span className="text-xl font-bold text-stone-200">
-                {rollResult.total}
-              </span>
+              {rollResult.type === "damage" ? (
+                <span>
+                  {rollResult.formula} + {rollResult.mod} ={" "}
+                  <strong className="text-white text-lg">
+                    {rollResult.total}
+                  </strong>
+                </span>
+              ) : (
+                <span>
+                  Roll {rollResult.roll} {rollResult.mod >= 0 ? "+" : "-"}{" "}
+                  {Math.abs(rollResult.mod)} ={" "}
+                  <strong className="text-white text-lg">
+                    {rollResult.total}
+                  </strong>
+                </span>
+              )}
             </div>
+
+            {/* BOTÓN DE DAÑO (Solo si es ataque) */}
+            {rollResult.type === "attack" && rollResult.damageDice && (
+              <button
+                onClick={handleDamageRoll}
+                className={`w-full py-3 mb-3 rounded-xl font-bold flex items-center justify-center gap-2 transition
+                        ${
+                          rollResult.isCrit
+                            ? "bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-900/50"
+                            : "bg-stone-700 hover:bg-stone-600 text-stone-200"
+                        }
+                    `}
+              >
+                <Hammer size={18} /> {t("rollDamage")}{" "}
+                {rollResult.isCrit && "(x2)"}
+              </button>
+            )}
+
             <button
               onClick={() => setRollResult(null)}
               className="w-full py-3 bg-stone-800 hover:bg-stone-700 text-stone-100 rounded-xl font-bold"

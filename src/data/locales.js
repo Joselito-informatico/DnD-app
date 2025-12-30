@@ -72,6 +72,9 @@ export const dictionary = {
     resources: "Class Resources",
     addResource: "Add Resource",
     max: "Max",
+    rollDamage: "Roll Damage",
+    critDamage: "CRITICAL DAMAGE!",
+    totalDmg: "Total Damage",
     
     // Spells
     spellDC: "Spell Save DC",
@@ -198,6 +201,9 @@ export const dictionary = {
     resources: "Recursos de Clase",
     addResource: "Añadir Recurso",
     max: "Máx",
+    rollDamage: "Tirar Daño",
+    critDamage: "¡DAÑO CRÍTICO!",
+    totalDmg: "Daño Total",
     
     // Spells
     spellDC: "CD Salvación",
