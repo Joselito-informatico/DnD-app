@@ -49,7 +49,7 @@ import {
 import { useLanguage } from "../context/LanguageContext";
 import { useToast } from "../context/ToastContext";
 import { searchSpells, searchEquipment } from "../utils/dndApi";
-import { rollDamage } from "../utils/dice";
+import { rollDamage, findDiceFormula } from "../utils/dice"; // IMPORTANTE
 import { calculateAC } from "../utils/rules";
 
 export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
@@ -139,13 +139,11 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   }
   const armorClass = calculatedAC;
   const initiative = mods.dex >= 0 ? `+${mods.dex}` : mods.dex;
-
   const inspiration = hero.inspiration || false;
 
-  // SKILLS & EXPERTISE LOGIC
+  // SKILLS & EXPERTISE
   const skillProfs = hero.skillProfs || [];
-  const expertises = hero.expertises || []; // Nuevo array para pericia
-
+  const expertises = hero.expertises || [];
   const isPerceptionProf = skillProfs.includes("Perception");
   const isPerceptionExpert = expertises.includes("Perception");
   const passiveBonus = isPerceptionExpert
@@ -164,7 +162,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const hitDiceTotal = hero.level;
   const deathSaves = hero.deathSaves || { successes: 0, failures: 0 };
   const xp = hero.xp || 0;
-
   const currentLevelBaseXP = XP_TABLE[hero.level] || 0;
   const nextLevelBaseXP = XP_TABLE[hero.level + 1] || currentLevelBaseXP;
   const xpProgress =
@@ -203,14 +200,14 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   if (hero.race === "Tiefling") languages.push("Infernal");
   if (hero.race === "Human") languages.push("One extra choice");
 
-  // --- ACTIONS ---
+  // --- DADOS Y ACCIONES ---
 
   const getD20Roll = () => {
     const r1 = Math.floor(Math.random() * 20) + 1;
     const r2 = Math.floor(Math.random() * 20) + 1;
-    let result = r1;
-    let dropped = null;
-    let type = "normal";
+    let result = r1,
+      dropped = null,
+      type = "normal";
     if (rollMode === "adv") {
       result = Math.max(r1, r2);
       dropped = Math.min(r1, r2);
@@ -260,38 +257,50 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     if (result === 20) showToast("CRITICAL HIT!", "success");
   };
 
+  // NUEVO: Lanzar fórmula directa (desde botón Hammer)
+  const rollFormula = (title, formula) => {
+    const { total, rolls, finalTotal, damageMod } = rollDamage(formula, false);
+    setRollResult({
+      type: "damage",
+      title: title,
+      roll: total,
+      diceRolls: rolls,
+      mod: damageMod,
+      total: finalTotal,
+      formula: formula,
+      isCrit: false,
+    });
+  };
+
   const handleDamageRoll = () => {
     if (!rollResult || !rollResult.damageDice) return;
     const isCrit = rollResult.isCrit;
-    const { total, rolls, formula } = rollDamage(rollResult.damageDice, isCrit);
-    const finalTotal = total + rollResult.damageMod;
+    const { total, rolls, finalTotal, damageMod, formula } = rollDamage(
+      rollResult.damageDice,
+      isCrit
+    );
+    const finalWithStat = finalTotal + rollResult.damageMod; // Sumar mod de stat del ataque
     setRollResult({
       type: "damage",
       title: isCrit ? t("critDamage") : t("totalDmg"),
       roll: total,
       diceRolls: rolls,
       mod: rollResult.damageMod,
-      total: finalTotal,
+      total: finalWithStat,
       formula: formula,
       isCrit: isCrit,
     });
   };
 
-  // NUEVO: TOGGLE EXPERTISE
-  // Cycle: None -> Proficient -> Expert -> None
   const toggleSkillProficiency = (e, skillName) => {
     e.stopPropagation();
     const isProf = skillProfs.includes(skillName);
     const isExpert = expertises.includes(skillName);
-
     if (!isProf && !isExpert) {
-      // 0 -> 1: Add Proficiency
       onUpdateHero({ ...hero, skillProfs: [...skillProfs, skillName] });
     } else if (isProf && !isExpert) {
-      // 1 -> 2: Add Expertise (Keep Prof)
       onUpdateHero({ ...hero, expertises: [...expertises, skillName] });
     } else {
-      // 2 -> 0: Remove Both
       onUpdateHero({
         ...hero,
         skillProfs: skillProfs.filter((s) => s !== skillName),
@@ -321,24 +330,19 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     onUpdateHero({ ...hero, inventory: updatedInventory });
   };
 
-  // SHORT REST (MEJORADO CON RECARGA DE WARLOCK)
   const handleShortRestClick = () => {
     setShowMenu(false);
     setShowShortRest(true);
   };
-
   const handleApplyHeal = (amount, diceCost) => {
     const newHP = Math.min(maxHP, currentHP + amount);
     const newHitDiceUsed = hitDiceUsed + diceCost;
     let newSlots = spellSlots;
-
-    // REGLA WARLOCK: Recarga slots en descanso corto
     if (hero.class === "Warlock") {
       newSlots = { ...spellSlots };
       Object.keys(newSlots).forEach((level) => (newSlots[level].used = 0));
-      showToast("Pact Magic Slots Restored!", "success");
+      showToast("Pact Magic Restored!", "success");
     }
-
     onUpdateHero({
       ...hero,
       currentHP: newHP,
@@ -869,7 +873,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           </div>
         </div>
       )}
-
       {showShortRest && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-stone-900 border border-stone-700 p-6 rounded-2xl w-full max-w-sm relative">
@@ -922,7 +925,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                   1{hitDieType} + {mods.con}
                 </span>
               </button>
-              {/* Mensaje especial para Warlocks */}
               {hero.class === "Warlock" && (
                 <p className="text-[10px] text-purple-400 mt-2 italic">
                   *Pact Magic slots will be restored.
@@ -938,7 +940,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           </div>
         </div>
       )}
-
       <div className="fixed bottom-24 right-6 z-40">
         <button
           onClick={() => setShowDiceTray(true)}
@@ -998,56 +999,23 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
       )}
 
       <div className="flex px-4 border-b border-stone-800 mb-4 overflow-x-auto no-scrollbar">
-        <button
-          onClick={() => setActiveTab("combat")}
-          className={`flex-1 min-w-[70px] pb-3 text-[10px] font-bold border-b-2 transition ${
-            activeTab === "combat"
-              ? "border-yellow-500 text-yellow-500"
-              : "border-transparent text-stone-500"
-          }`}
-        >
-          {t("tabCombat")}
-        </button>
-        <button
-          onClick={() => setActiveTab("skills")}
-          className={`flex-1 min-w-[70px] pb-3 text-[10px] font-bold border-b-2 transition ${
-            activeTab === "skills"
-              ? "border-yellow-500 text-yellow-500"
-              : "border-transparent text-stone-500"
-          }`}
-        >
-          {t("tabSkills")}
-        </button>
-        <button
-          onClick={() => setActiveTab("spells")}
-          className={`flex-1 min-w-[70px] pb-3 text-[10px] font-bold border-b-2 transition ${
-            activeTab === "spells"
-              ? "border-yellow-500 text-yellow-500"
-              : "border-transparent text-stone-500"
-          }`}
-        >
-          {t("tabSpells")}
-        </button>
-        <button
-          onClick={() => setActiveTab("inventory")}
-          className={`flex-1 min-w-[70px] pb-3 text-[10px] font-bold border-b-2 transition ${
-            activeTab === "inventory"
-              ? "border-yellow-500 text-yellow-500"
-              : "border-transparent text-stone-500"
-          }`}
-        >
-          {t("tabEquip")}
-        </button>
-        <button
-          onClick={() => setActiveTab("profile")}
-          className={`flex-1 min-w-[70px] pb-3 text-[10px] font-bold border-b-2 transition ${
-            activeTab === "profile"
-              ? "border-yellow-500 text-yellow-500"
-              : "border-transparent text-stone-500"
-          }`}
-        >
-          {t("tabProfile")}
-        </button>
+        {["combat", "skills", "spells", "inventory", "profile"].map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`flex-1 min-w-[70px] pb-3 text-[10px] font-bold border-b-2 transition capitalize ${
+              activeTab === tab
+                ? "border-yellow-500 text-yellow-500"
+                : "border-transparent text-stone-500"
+            }`}
+          >
+            {t(
+              tab === "inventory"
+                ? "tabEquip"
+                : `tab${tab.charAt(0).toUpperCase() + tab.slice(1)}`
+            )}
+          </button>
+        ))}
       </div>
 
       <div
@@ -1601,7 +1569,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               </div>
             </div>
 
-            {/* SKILLS CON EXPERTISE */}
+            {/* SKILLS CON EXPERTISE (MEJORADO) */}
             <div>
               <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
                 <Activity size={16} /> {t("skills")}
@@ -1610,7 +1578,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 {SKILLS.map((skill) => {
                   const isProf = skillProfs.includes(skill.name);
                   const isExpert = expertises.includes(skill.name);
-                  // Cálculo de Bono: Base + (Experto x2) o (Proficiente x1)
                   const totalMod =
                     mods[skill.stat] +
                     (isExpert
@@ -1720,7 +1687,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           </div>
         )}
 
-        {/* ... (SPELLS, INVENTORY, PROFILE IGUAL) ... */}
+        {/* ... (Spells, Inventory, Profile sin cambios, usar anteriores) ... */}
         {activeTab === "spells" && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
             <div className="flex items-start gap-4">
@@ -1915,12 +1882,28 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                             {spell.desc}
                           </p>
                         </div>
-                        <button
-                          onClick={(e) => removeSpell(spell.id, e)}
-                          className="p-2 text-stone-600 hover:text-red-500 hover:bg-stone-900 rounded-full transition opacity-0 group-hover:opacity-100 absolute right-1 top-1"
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                        <div className="flex gap-2 text-stone-600">
+                          {findDiceFormula(spell.desc) && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                rollFormula(
+                                  spell.name,
+                                  findDiceFormula(spell.desc)
+                                );
+                              }}
+                              className="p-2 hover:text-white bg-stone-900 rounded-lg"
+                            >
+                              <Hammer size={14} />
+                            </button>
+                          )}
+                          <button
+                            onClick={(e) => removeSpell(spell.id, e)}
+                            className="p-2 hover:text-red-500 hover:bg-stone-900 rounded-lg"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       </div>
                     ))}
                 </div>
@@ -1951,12 +1934,28 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                               {spell.desc}
                             </p>
                           </div>
-                          <button
-                            onClick={(e) => removeSpell(spell.id, e)}
-                            className="p-2 text-stone-600 hover:text-red-500 hover:bg-stone-900 rounded-full transition opacity-0 group-hover:opacity-100 absolute right-1 top-1"
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                          <div className="flex gap-2 text-stone-600">
+                            {findDiceFormula(spell.desc) && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  rollFormula(
+                                    spell.name,
+                                    findDiceFormula(spell.desc)
+                                  );
+                                }}
+                                className="p-2 hover:text-white bg-stone-900 rounded-lg"
+                              >
+                                <Hammer size={14} />
+                              </button>
+                            )}
+                            <button
+                              onClick={(e) => removeSpell(spell.id, e)}
+                              className="p-2 hover:text-red-500 hover:bg-stone-900 rounded-lg"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -2062,6 +2061,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                     item.type === "shield" ||
                     item.armorType ||
                     (item.desc && item.desc.includes("AC "));
+                  const formula = findDiceFormula(item.desc);
                   return (
                     <div
                       key={item.id}
@@ -2105,12 +2105,22 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                           )}
                         </div>
                       </div>
-                      <button
-                        onClick={() => removeItem(item.id)}
-                        className="text-stone-600 hover:text-red-400 p-1"
-                      >
-                        <X size={16} />
-                      </button>
+                      <div className="flex gap-2 items-center">
+                        {formula && (
+                          <button
+                            onClick={() => rollFormula(item.name, formula)}
+                            className="p-2 text-stone-500 hover:text-white bg-stone-900 rounded-lg"
+                          >
+                            <Hammer size={14} />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => removeItem(item.id)}
+                          className="text-stone-600 hover:text-red-400 p-1"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
@@ -2374,9 +2384,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-4 border-4 text-4xl font-bold ${
                   rollResult.isCrit
                     ? "border-yellow-500 text-yellow-500 shadow-yellow-500/20 shadow-lg"
-                    : ""
-                } ${
-                  rollResult.isFail
+                    : rollResult.isFail
                     ? "border-red-600 text-red-600"
                     : "border-stone-600 text-stone-200"
                 }`}
