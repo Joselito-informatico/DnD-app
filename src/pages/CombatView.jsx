@@ -49,7 +49,7 @@ import {
 import { useLanguage } from "../context/LanguageContext";
 import { useToast } from "../context/ToastContext";
 import { searchSpells, searchEquipment } from "../utils/dndApi";
-import { rollDamage, findDiceFormula } from "../utils/dice"; // IMPORTANTE
+import { rollDamage, findDiceFormula } from "../utils/dice";
 import { calculateAC } from "../utils/rules";
 
 export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
@@ -61,12 +61,10 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const [editingStat, setEditingStat] = useState(null);
   const [isEditingMaxHP, setIsEditingMaxHP] = useState(false);
 
-  // ESTADOS DE JUEGO
   const [rollMode, setRollMode] = useState("normal");
   const [rollResult, setRollResult] = useState(null);
   const [showShortRest, setShowShortRest] = useState(false);
 
-  // Modales
   const [isAddingAttack, setIsAddingAttack] = useState(false);
   const [newAttack, setNewAttack] = useState({
     name: "",
@@ -78,9 +76,9 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const [newSpell, setNewSpell] = useState({
     name: "",
     level: 0,
-    school: "Evocation",
+    school: "Evocación",
     desc: "",
-    time: "1 Action",
+    time: "1 Acción",
   });
   const [isAddingCondition, setIsAddingCondition] = useState(false);
   const [isEditingSlots, setIsEditingSlots] = useState(false);
@@ -89,7 +87,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const [isAddingFeature, setIsAddingFeature] = useState(false);
   const [newFeature, setNewFeature] = useState({ name: "", desc: "" });
 
-  // UI Utils
   const [showDiceTray, setShowDiceTray] = useState(false);
   const [diceMod, setDiceMod] = useState(0);
   const [newItemName, setNewItemName] = useState("");
@@ -99,7 +96,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
 
-  // --- REGLAS & CALCULOS ---
   const proficiencyBonus = Math.floor(2 + (hero.level - 1) / 4);
   const getModifier = (score) => Math.floor((score - 10) / 2);
   const stats = hero.stats;
@@ -122,17 +118,30 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     (i) => i.isEquipped && i.type === "armor" && i.armorType !== "shield"
   );
   const hasBarbarianDefense = (hero.features || []).some(
-    (f) => f.name === "Unarmored Defense" && f.desc.includes("CON")
+    (f) => f.name === "Defensa sin Armadura" && f.desc.includes("CON")
   );
   const hasMonkDefense = (hero.features || []).some(
-    (f) => f.name === "Unarmored Defense" && f.desc.includes("WIS")
-  );
+    (f) => f.name === "Defensa sin Armadura" && f.desc.includes("SAB")
+  ); // Wis renamed SAB internally check desc? No, desc uses keys usually or generic text. Updated SRD uses localized desc.
 
   if (!hasArmor) {
     if (hasBarbarianDefense) calculatedAC = 10 + mods.dex + mods.con;
-    if (hasMonkDefense) calculatedAC = 10 + mods.dex + mods.wis;
+    // Monk: uses WIS (SAB)
+    if (
+      (hero.features || []).some(
+        (f) =>
+          f.name === "Defensa sin Armadura" &&
+          (f.desc.includes("SAB") || f.desc.includes("WIS"))
+      )
+    )
+      calculatedAC = 10 + mods.dex + mods.wis;
+
     const equippedShield = (hero.inventory || []).find(
-      (i) => i.isEquipped && (i.type === "shield" || i.armorType === "shield")
+      (i) =>
+        i.isEquipped &&
+        (i.type === "shield" ||
+          i.armorType === "shield" ||
+          i.name.toLowerCase().includes("escudo"))
     );
     if (equippedShield && hasBarbarianDefense)
       calculatedAC += parseInt(equippedShield.ac) || 2;
@@ -141,11 +150,12 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const initiative = mods.dex >= 0 ? `+${mods.dex}` : mods.dex;
   const inspiration = hero.inspiration || false;
 
-  // SKILLS & EXPERTISE
   const skillProfs = hero.skillProfs || [];
   const expertises = hero.expertises || [];
-  const isPerceptionProf = skillProfs.includes("Perception");
-  const isPerceptionExpert = expertises.includes("Perception");
+  const isPerceptionProf =
+    skillProfs.includes("Percepción") || skillProfs.includes("Perception");
+  const isPerceptionExpert =
+    expertises.includes("Percepción") || expertises.includes("Perception");
   const passiveBonus = isPerceptionExpert
     ? proficiencyBonus * 2
     : isPerceptionProf
@@ -176,8 +186,8 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const exhaustionLevel = hero.exhaustion || 0;
   const weapons = hero.weapons || [];
   const details = hero.details || {
-    alignment: "Unknown",
-    background: "Unknown",
+    alignment: "Desconocido",
+    background: "Desconocido",
   };
   const inventory = hero.inventory || [];
   const money = hero.money || { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 };
@@ -185,22 +195,20 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const defaultSlots = { 1: { total: 2, used: 0 } };
   const spellSlots = hero.spellSlots || defaultSlots;
   const spellCastingStat =
-    hero.class === "Wizard"
+    hero.class === "Mago"
       ? "int"
-      : hero.class === "Bard" ||
-        hero.class === "Sorcerer" ||
-        hero.class === "Warlock"
+      : hero.class === "Bardo" ||
+        hero.class === "Hechicero" ||
+        hero.class === "Brujo"
       ? "cha"
       : "wis";
   const spellAttackBonus = mods[spellCastingStat] + proficiencyBonus;
   const spellSaveDC = 8 + proficiencyBonus + mods[spellCastingStat];
-  const languages = ["Common"];
-  if (hero.race === "Elf") languages.push("Elvish");
-  if (hero.race === "Dwarf") languages.push("Dwarvish");
+  const languages = ["Común"];
+  if (hero.race === "Elfo") languages.push("Élfico");
+  if (hero.race === "Enano") languages.push("Enano");
   if (hero.race === "Tiefling") languages.push("Infernal");
-  if (hero.race === "Human") languages.push("One extra choice");
-
-  // --- DADOS Y ACCIONES ---
+  if (hero.race === "Humano") languages.push("Un idioma extra");
 
   const getD20Roll = () => {
     const r1 = Math.floor(Math.random() * 20) + 1;
@@ -234,8 +242,8 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
       isCrit: result === 20,
       isFail: result === 1,
     });
-    if (result === 20) showToast("Natural 20!", "success");
-    if (result === 1) showToast("Critical Fail...", "error");
+    if (result === 20) showToast("¡20 Natural!", "success");
+    if (result === 1) showToast("Pifia...", "error");
   };
 
   const rollAttack = (name, modifier, damageDice, damageStat) => {
@@ -243,7 +251,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     const dmgMod = damageStat ? mods[damageStat] : 0;
     setRollResult({
       type: "attack",
-      title: `${name} Attack`,
+      title: `Ataque ${name}`,
       roll: result,
       droppedRoll: dropped,
       rollType: type,
@@ -254,10 +262,9 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
       damageDice: damageDice,
       damageMod: dmgMod,
     });
-    if (result === 20) showToast("CRITICAL HIT!", "success");
+    if (result === 20) showToast("¡CRÍTICO!", "success");
   };
 
-  // NUEVO: Lanzar fórmula directa (desde botón Hammer)
   const rollFormula = (title, formula) => {
     const { total, rolls, finalTotal, damageMod } = rollDamage(formula, false);
     setRollResult({
@@ -279,10 +286,10 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
       rollResult.damageDice,
       isCrit
     );
-    const finalWithStat = finalTotal + rollResult.damageMod; // Sumar mod de stat del ataque
+    const finalWithStat = finalTotal + rollResult.damageMod;
     setRollResult({
       type: "damage",
-      title: isCrit ? t("critDamage") : t("totalDmg"),
+      title: isCrit ? "¡DAÑO CRÍTICO!" : "Daño Total",
       roll: total,
       diceRolls: rolls,
       mod: rollResult.damageMod,
@@ -308,7 +315,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
       });
     }
   };
-
   const toggleEquip = (itemId) => {
     const updatedInventory = inventory.map((item) => {
       if (item.id === itemId) return { ...item, isEquipped: !item.isEquipped };
@@ -329,7 +335,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     });
     onUpdateHero({ ...hero, inventory: updatedInventory });
   };
-
   const handleShortRestClick = () => {
     setShowMenu(false);
     setShowShortRest(true);
@@ -338,10 +343,10 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     const newHP = Math.min(maxHP, currentHP + amount);
     const newHitDiceUsed = hitDiceUsed + diceCost;
     let newSlots = spellSlots;
-    if (hero.class === "Warlock") {
+    if (hero.class === "Brujo") {
       newSlots = { ...spellSlots };
       Object.keys(newSlots).forEach((level) => (newSlots[level].used = 0));
-      showToast("Pact Magic Restored!", "success");
+      showToast("Magia de Pacto restaurada!", "success");
     }
     onUpdateHero({
       ...hero,
@@ -349,9 +354,8 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
       hitDiceUsed: newHitDiceUsed,
       spellSlots: newSlots,
     });
-    showToast(`Healed ${amount} HP`, "success");
+    showToast(`Curado ${amount} PG`, "success");
   };
-
   const updateXP = (val) => {
     const newXP = Math.max(0, parseInt(val) || 0);
     let newLevel = 1;
@@ -361,8 +365,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         break;
       }
     }
-    if (newLevel > hero.level)
-      showToast(`🎉 Level Up! Level ${newLevel}`, "success");
+    if (newLevel > hero.level) showToast(`🎉 ¡Nivel ${newLevel}!`, "success");
     onUpdateHero({ ...hero, xp: newXP, level: newLevel });
     setEditingStat(null);
   };
@@ -371,7 +374,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     const baseXP = XP_TABLE[lvl] || 0;
     onUpdateHero({ ...hero, level: lvl, xp: baseXP });
     setEditingStat(null);
-    showToast(`Level set to ${lvl}`, "info");
+    showToast(`Nivel ajustado a ${lvl}`, "info");
   };
   const updateMaxHP = (newVal) => {
     const val = parseInt(newVal) || 1;
@@ -381,7 +384,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
       currentHP: Math.min(hero.currentHP, val),
     });
     setIsEditingMaxHP(false);
-    showToast(`Max HP set to ${val}`, "success");
+    showToast(`Max PG ajustado a ${val}`, "success");
   };
   const handleLongRest = () => {
     const resetSlots = { ...spellSlots };
@@ -400,7 +403,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
       resources: resetResources,
     });
     setShowMenu(false);
-    showToast("Long Rest: Stats & Resources restored", "success");
+    showToast("Descanso Largo: Todo restaurado", "success");
   };
   const addFeature = () => {
     if (!newFeature.name) return;
@@ -408,10 +411,10 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     onUpdateHero({ ...hero, features: [...features, feat] });
     setIsAddingFeature(false);
     setNewFeature({ name: "", desc: "" });
-    showToast("Feature added", "success");
+    showToast("Rasgo añadido", "success");
   };
   const removeFeature = (featId) => {
-    if (confirm("Delete this feature?")) {
+    if (confirm("¿Borrar este rasgo?")) {
       onUpdateHero({
         ...hero,
         features: features.filter((f) => f.id !== featId),
@@ -423,7 +426,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     const total = roll + parseInt(diceMod || 0);
     setRollResult({
       type: "check",
-      title: `d${sides} Roll`,
+      title: `Tirada d${sides}`,
       roll: roll,
       mod: parseInt(diceMod || 0),
       total: total,
@@ -436,7 +439,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     const newVal = Math.max(1, Math.min(30, parseInt(val) || 10));
     onUpdateHero({ ...hero, stats: { ...hero.stats, [statName]: newVal } });
     setEditingStat(null);
-    showToast(`${statName.toUpperCase()} updated`, "success");
+    showToast(`${statName.toUpperCase()} actualizado`, "success");
   };
   const handleExportJSON = () => {
     const dataStr = JSON.stringify([hero], null, 2);
@@ -449,13 +452,13 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     link.click();
     document.body.removeChild(link);
     setShowMenu(false);
-    showToast(t("successImport"), "success");
+    showToast("Exportado correctamente", "success");
   };
   const handleCopySummary = () => {
-    const summary = `**${hero.name}** | ${hero.race} ${hero.class} ${hero.level}\n❤️ HP: ${currentHP}/${maxHP} | 🛡️ AC: ${armorClass} | ⚡ Init: ${initiative}\n📝 PP: ${passivePerception} | DC: ${spellSaveDC}`;
+    const summary = `**${hero.name}** | ${hero.race} ${hero.class} ${hero.level}\n❤️ PG: ${currentHP}/${maxHP} | 🛡️ CA: ${armorClass} | ⚡ Init: ${initiative}\n📝 PP: ${passivePerception} | CD: ${spellSaveDC}`;
     navigator.clipboard.writeText(summary);
     setShowMenu(false);
-    showToast(t("copied"), "success");
+    showToast("Resumen copiado", "success");
   };
   const handleSpellSearch = async () => {
     if (!searchQuery) return;
@@ -490,7 +493,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
       desc: item.properties
         ? item.properties.join(", ")
         : item.ac
-        ? `AC ${item.ac}`
+        ? `CA ${item.ac}`
         : "",
       type: item.equipment_category?.toLowerCase().includes("armor")
         ? "armor"
@@ -505,7 +508,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     let newInventoryList = [...inventory, newItem];
     let newWeaponsList = weapons;
     if (newItem.type === "weapon") {
-      if (confirm(`Add ${item.name} to Attacks?`)) {
+      if (confirm(`¿Añadir ${item.name} a Ataques?`)) {
         const isFinesse =
           item.properties && item.properties.includes("Finesse");
         const attackStat = isFinesse ? "dex" : "str";
@@ -517,12 +520,12 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           type: "melee",
         };
         newWeaponsList = [...weapons, newWep];
-        showToast("Added to Inventory & Attacks", "success");
+        showToast("Añadido a Inventario y Ataques", "success");
       } else {
-        showToast("Added to Inventory", "success");
+        showToast("Añadido a Inventario", "success");
       }
     } else {
-      showToast(`${item.name} added`, "success");
+      showToast(`${item.name} añadido`, "success");
     }
     onUpdateHero({
       ...hero,
@@ -544,11 +547,11 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     onUpdateHero({ ...hero, resources: [...resources, resourceToAdd] });
     setIsAddingResource(false);
     setNewResource({ name: "", max: "3" });
-    showToast("Tracker created", "success");
+    showToast("Recurso creado", "success");
   };
   const removeResource = (resId, e) => {
     e.stopPropagation();
-    if (confirm("Delete this tracker?")) {
+    if (confirm("¿Borrar este recurso?")) {
       onUpdateHero({
         ...hero,
         resources: resources.filter((r) => r.id !== resId),
@@ -570,7 +573,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     let newConditions = exists
       ? activeConditions.filter((c) => c !== conditionId)
       : [...activeConditions, conditionId];
-    if (!exists) showToast("Condition applied", "error");
     onUpdateHero({ ...hero, conditions: newConditions });
     setIsAddingCondition(false);
   };
@@ -584,16 +586,16 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     onUpdateHero({ ...hero, weapons: [...weapons, attackToAdd] });
     setIsAddingAttack(false);
     setNewAttack({ name: "", damage: "1d6", stat: "str", type: "melee" });
-    showToast("Weapon added!", "success");
+    showToast("Arma añadida", "success");
   };
   const removeAttack = (attackId, e) => {
     e.stopPropagation();
-    if (confirm("Remove this attack?")) {
+    if (confirm("¿Borrar ataque?")) {
       onUpdateHero({
         ...hero,
         weapons: weapons.filter((w) => w.id !== attackId),
       });
-      showToast("Weapon removed", "info");
+      showToast("Arma eliminada", "info");
     }
   };
   const addSpell = () => {
@@ -609,21 +611,21 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     setNewSpell({
       name: "",
       level: 0,
-      school: "Evocation",
+      school: "Evocación",
       desc: "",
-      time: "1 Action",
+      time: "1 Acción",
     });
-    showToast("Spell scribed!", "success");
+    showToast("Conjuro anotado", "success");
   };
   const removeSpell = (spellId, e) => {
     e.stopPropagation();
-    if (confirm("Remove this spell?")) {
+    if (confirm("¿Borrar conjuro?")) {
       const currentList = hero.spells ? hero.spells : SRD_SPELLS;
       onUpdateHero({
         ...hero,
         spells: currentList.filter((s) => s.id !== spellId),
       });
-      showToast("Spell removed", "info");
+      showToast("Conjuro borrado", "info");
     }
   };
   const updateMaxSlots = (level, change) => {
@@ -658,10 +660,10 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const toggleInspiration = () => {
     const newState = !inspiration;
     onUpdateHero({ ...hero, inspiration: newState });
-    if (newState) showToast("Inspired!", "success");
+    if (newState) showToast("¡Inspirado!", "success");
   };
   const handleDelete = () => {
-    if (confirm(t("confirmDelete"))) onDeleteHero(hero.id);
+    if (confirm("¿Eliminar personaje permanentemente?")) onDeleteHero(hero.id);
   };
   const updateMoney = (currency, value) => {
     const newMoney = { ...money, [currency]: parseInt(value) || 0 };
@@ -672,7 +674,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     const newItem = { id: Date.now(), name: newItemName, qty: 1 };
     onUpdateHero({ ...hero, inventory: [...inventory, newItem] });
     setNewItemName("");
-    showToast("Item added", "success");
+    showToast("Objeto añadido", "success");
   };
   const removeItem = (itemId) => {
     onUpdateHero({
@@ -713,9 +715,9 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 onClick={() => setEditingStat("level")}
                 className="text-xs text-stone-500 cursor-pointer hover:text-yellow-500 hover:underline"
               >
-                {t("level")} {hero.level} {hero.race} {hero.class}{" "}
+                Nivel {hero.level} {hero.race} {hero.class}{" "}
                 <span className="text-[10px] bg-stone-800 px-1 rounded ml-1">
-                  {t("edit")}
+                  Editar
                 </span>
               </p>
             </div>
@@ -739,31 +741,31 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
             onClick={handleShortRestClick}
             className="w-full text-left px-4 py-3 text-stone-200 hover:bg-stone-700 flex items-center gap-3 border-b border-stone-700/50"
           >
-            <Coffee size={16} className="text-orange-400" /> {t("shortRest")}
+            <Coffee size={16} className="text-orange-400" /> Descanso Corto
           </button>
           <button
             onClick={handleLongRest}
             className="w-full text-left px-4 py-3 text-stone-200 hover:bg-stone-700 flex items-center gap-3 border-b border-stone-700/50"
           >
-            <Moon size={16} className="text-blue-400" /> {t("longRest")}
+            <Moon size={16} className="text-blue-400" /> Descanso Largo
           </button>
           <button
             onClick={handleCopySummary}
             className="w-full text-left px-4 py-3 text-stone-200 hover:bg-stone-700 flex items-center gap-3 border-b border-stone-700/50"
           >
-            <Copy size={16} className="text-emerald-400" /> {t("copySummary")}
+            <Copy size={16} className="text-emerald-400" /> Copiar Resumen
           </button>
           <button
             onClick={handleExportJSON}
             className="w-full text-left px-4 py-3 text-stone-200 hover:bg-stone-700 flex items-center gap-3 border-b border-stone-700/50"
           >
-            <Download size={16} className="text-purple-400" /> {t("exportJSON")}
+            <Download size={16} className="text-purple-400" /> Exportar JSON
           </button>
           <button
             onClick={handleDelete}
             className="w-full text-left px-4 py-3 text-red-400 hover:bg-red-900/20 flex items-center gap-3"
           >
-            <Trash2 size={16} /> {t("deleteHero")}
+            <Trash2 size={16} /> Borrar Héroe
           </button>
         </div>
       )}
@@ -772,12 +774,12 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-stone-900 border border-stone-700 p-6 rounded-2xl w-full max-w-xs animate-in zoom-in duration-200">
             <h3 className="text-stone-100 font-bold mb-4 capitalize">
-              {t("edit")} {t(editingStat) || editingStat}
+              Editar {t(editingStat) || editingStat}
             </h3>
             <input
               type="number"
               autoFocus
-              placeholder="Value"
+              placeholder="Valor"
               className="w-full bg-stone-950 border border-stone-600 rounded-lg p-3 text-stone-100 mb-4 focus:border-yellow-500 outline-none"
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
@@ -791,7 +793,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               onClick={() => setEditingStat(null)}
               className="w-full py-2 bg-stone-800 text-stone-400 rounded-lg"
             >
-              Cancel
+              Cancelar
             </button>
           </div>
         </div>
@@ -799,10 +801,8 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
       {isEditingMaxHP && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-stone-900 border border-stone-700 p-6 rounded-2xl w-full max-w-xs animate-in zoom-in duration-200">
-            <h3 className="text-stone-100 font-bold mb-4">{t("editMaxHP")}</h3>
-            <p className="text-xs text-stone-500 mb-2">
-              {t("currentMax")}: {maxHP}
-            </p>
+            <h3 className="text-stone-100 font-bold mb-4">Editar Max PG</h3>
+            <p className="text-xs text-stone-500 mb-2">Actual: {maxHP}</p>
             <input
               type="number"
               autoFocus
@@ -818,7 +818,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               onClick={() => setIsEditingMaxHP(false)}
               className="w-full py-2 bg-stone-800 text-stone-400 rounded-lg"
             >
-              Cancel
+              Cancelar
             </button>
           </div>
         </div>
@@ -827,7 +827,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-stone-900 border border-stone-700 p-6 rounded-2xl w-full max-w-sm animate-in zoom-in duration-200 max-h-[80vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-stone-100 font-bold">Manage Spell Slots</h3>
+              <h3 className="text-stone-100 font-bold">Espacios de Conjuro</h3>
               <button onClick={() => setIsEditingSlots(false)}>
                 <X className="text-stone-500 hover:text-white" />
               </button>
@@ -841,7 +841,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                     className="flex items-center justify-between bg-stone-800 p-2 rounded-lg border border-stone-700"
                   >
                     <span className="text-sm font-bold text-stone-300 w-20">
-                      Level {lvl}
+                      Nivel {lvl}
                     </span>
                     <div className="flex items-center gap-3">
                       <button
@@ -868,78 +868,13 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               onClick={() => setIsEditingSlots(false)}
               className="w-full mt-6 py-3 bg-yellow-600 hover:bg-yellow-500 text-stone-100 rounded-xl font-bold"
             >
-              Done
+              Listo
             </button>
           </div>
         </div>
       )}
-      {showShortRest && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-stone-900 border border-stone-700 p-6 rounded-2xl w-full max-w-sm relative">
-            <button
-              onClick={() => setShowShortRest(false)}
-              className="absolute top-4 right-4 text-stone-500 hover:text-white"
-            >
-              <X />
-            </button>
-            <h3 className="text-stone-100 font-bold mb-2 flex items-center gap-2">
-              <Coffee className="text-orange-400" size={20} /> {t("shortRest")}
-            </h3>
-            <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 mb-4 text-center">
-              <p className="text-stone-400 text-xs uppercase font-bold mb-1">
-                {t("hitDiceRemaining")}
-              </p>
-              <div className="text-3xl font-bold text-white mb-2">
-                {hitDiceTotal - hitDiceUsed}{" "}
-                <span className="text-stone-500 text-lg">/ {hitDiceTotal}</span>
-              </div>
-              <div className="flex justify-center gap-1 mb-2">
-                {Array.from({ length: hitDiceTotal }).map((_, i) => (
-                  <div
-                    key={i}
-                    className={`w-3 h-3 rounded-full ${
-                      i < hitDiceTotal - hitDiceUsed
-                        ? "bg-orange-500"
-                        : "bg-stone-700"
-                    }`}
-                  ></div>
-                ))}
-              </div>
-            </div>
-            <div className="text-center">
-              <button
-                onClick={() => {
-                  if (hitDiceUsed < hitDiceTotal) {
-                    const dieMax = parseInt(hitDieType.substring(1));
-                    const roll = Math.floor(Math.random() * dieMax) + 1;
-                    handleApplyHeal(Math.max(0, roll + mods.con), 1);
-                  } else {
-                    showToast("No Hit Dice left!", "error");
-                  }
-                }}
-                disabled={hitDiceUsed >= hitDiceTotal || currentHP >= maxHP}
-                className="w-full py-4 bg-stone-700 hover:bg-stone-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl mb-3 flex flex-col items-center justify-center gap-1"
-              >
-                <span>Roll Hit Die</span>
-                <span className="text-xs text-stone-400 font-normal">
-                  1{hitDieType} + {mods.con}
-                </span>
-              </button>
-              {hero.class === "Warlock" && (
-                <p className="text-[10px] text-purple-400 mt-2 italic">
-                  *Pact Magic slots will be restored.
-                </p>
-              )}
-              <button
-                onClick={() => setShowShortRest(false)}
-                className="text-stone-500 text-sm hover:text-white mt-2"
-              >
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+
+      {/* DICE TRAY */}
       <div className="fixed bottom-24 right-6 z-40">
         <button
           onClick={() => setShowDiceTray(true)}
@@ -958,7 +893,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               <X />
             </button>
             <h3 className="text-stone-100 font-bold mb-4 flex items-center gap-2">
-              <Dices className="text-yellow-500" /> {t("diceTray")}
+              <Dices className="text-yellow-500" /> Bandeja de Dados
             </h3>
             <div className="grid grid-cols-3 gap-3 mb-4">
               {[4, 6, 8, 10, 12, 20].map((sides) => (
@@ -976,7 +911,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
             </div>
             <div className="flex items-center gap-3 bg-stone-950 p-3 rounded-xl border border-stone-700">
               <span className="text-xs font-bold text-stone-500 uppercase">
-                Modifier
+                Modif
               </span>
               <button
                 onClick={() => setDiceMod((prev) => prev - 1)}
@@ -998,22 +933,25 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         </div>
       )}
 
+      {/* TABS */}
       <div className="flex px-4 border-b border-stone-800 mb-4 overflow-x-auto no-scrollbar">
-        {["combat", "skills", "spells", "inventory", "profile"].map((tab) => (
+        {[
+          { id: "combat", label: "Combate" },
+          { id: "skills", label: "Hab" },
+          { id: "spells", label: "Magia" },
+          { id: "inventory", label: "Equipo" },
+          { id: "profile", label: "Perfil" },
+        ].map((tab) => (
           <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`flex-1 min-w-[70px] pb-3 text-[10px] font-bold border-b-2 transition capitalize ${
-              activeTab === tab
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex-1 min-w-[70px] pb-3 text-[10px] font-bold border-b-2 transition uppercase ${
+              activeTab === tab.id
                 ? "border-yellow-500 text-yellow-500"
                 : "border-transparent text-stone-500"
             }`}
           >
-            {t(
-              tab === "inventory"
-                ? "tabEquip"
-                : `tab${tab.charAt(0).toUpperCase() + tab.slice(1)}`
-            )}
+            {tab.label}
           </button>
         ))}
       </div>
@@ -1035,7 +973,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               >
                 <Star size={20} fill={inspiration ? "currentColor" : "none"} />
                 <span className="text-[10px] font-bold uppercase mt-1">
-                  {t("inspiration")}
+                  Inspir.
                 </span>
               </button>
               <div className="flex-1 bg-stone-800 rounded-xl border border-stone-700 flex p-1 relative">
@@ -1056,7 +994,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                     rollMode === "normal" ? "text-white" : "text-stone-500"
                   }`}
                 >
-                  {t("normal")}
+                  NORM
                 </button>
                 <button
                   onClick={() =>
@@ -1066,7 +1004,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                     rollMode === "adv" ? "text-green-400" : "text-stone-500"
                   }`}
                 >
-                  {t("advantage")}
+                  VENT
                 </button>
                 <button
                   onClick={() =>
@@ -1076,13 +1014,13 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                     rollMode === "dis" ? "text-red-400" : "text-stone-500"
                   }`}
                 >
-                  {t("disadvantage")}
+                  DESV
                 </button>
               </div>
               <div className="bg-stone-800 p-3 rounded-xl border border-stone-700 flex flex-col items-center justify-center w-16 shrink-0">
                 <Zap className="text-yellow-600 mb-1 w-5 h-5" />
                 <span className="text-xs text-stone-400 font-bold uppercase">
-                  {t("init")}
+                  INIT
                 </span>
                 <span className="text-xl font-bold text-yellow-500">
                   {initiative}
@@ -1093,7 +1031,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               <div className="bg-stone-800 p-3 rounded-xl border border-stone-700 flex flex-col items-center justify-center relative overflow-hidden">
                 <Shield className="text-stone-600 absolute opacity-20 -right-2 -bottom-2 w-16 h-16" />
                 <span className="text-xs text-stone-400 font-bold uppercase">
-                  {t("ac")}
+                  CA
                 </span>
                 <span className="text-3xl font-bold text-stone-100">
                   {armorClass}
@@ -1119,7 +1057,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                   }`}
                 />
                 <span className="text-xs text-stone-400 font-bold uppercase">
-                  {t("hp")}
+                  PG
                 </span>
                 <span className="text-xl font-bold text-stone-100 z-10">
                   {currentHP}{" "}
@@ -1132,33 +1070,33 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 onClick={() => changeHP(-1)}
                 className="flex-1 py-3 bg-red-900/20 text-red-400 border border-red-900/50 rounded-lg font-bold hover:bg-red-900/40"
               >
-                - {t("dmg")}
+                - DAÑO
               </button>
               <button
                 onClick={() => changeHP(1)}
                 className="flex-1 py-3 bg-green-900/20 text-green-400 border border-green-900/50 rounded-lg font-bold hover:bg-green-900/40"
               >
-                + {t("heal")}
+                + CURAR
               </button>
             </div>
             <div>
               <div className="flex justify-between items-center mb-2">
                 <h3 className="text-stone-400 font-bold text-sm uppercase tracking-wider">
-                  {t("resources")}
+                  RECURSOS
                 </h3>
                 <button
                   onClick={() => setIsAddingResource(!isAddingResource)}
                   className="text-xs bg-stone-800 border border-stone-600 px-2 py-1 rounded text-stone-300 hover:text-white hover:border-yellow-500 flex items-center gap-1"
                 >
                   {isAddingResource ? <X size={12} /> : <Plus size={12} />}{" "}
-                  {t("addResource")}
+                  AÑADIR
                 </button>
               </div>
               {isAddingResource && (
                 <div className="bg-stone-800 p-2 rounded-xl border border-yellow-500/50 mb-3 grid grid-cols-3 gap-2 animate-in fade-in zoom-in duration-200">
                   <input
                     type="text"
-                    placeholder="Name"
+                    placeholder="Nombre"
                     value={newResource.name}
                     onChange={(e) =>
                       setNewResource({ ...newResource, name: e.target.value })
@@ -1178,7 +1116,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                     onClick={addResource}
                     className="col-span-3 py-1 bg-yellow-600 text-stone-100 text-xs font-bold rounded hover:bg-yellow-500"
                   >
-                    Add
+                    Crear
                   </button>
                 </div>
               )}
@@ -1224,14 +1162,14 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
             <div>
               <div className="flex justify-between items-center mb-2">
                 <h3 className="text-stone-400 font-bold text-sm uppercase tracking-wider">
-                  {t("conditions")}
+                  ESTADOS
                 </h3>
                 <button
                   onClick={() => setIsAddingCondition(!isAddingCondition)}
                   className="text-xs bg-stone-800 border border-stone-600 px-2 py-1 rounded text-stone-300 hover:text-white hover:border-yellow-500 flex items-center gap-1"
                 >
                   {isAddingCondition ? <X size={12} /> : <Plus size={12} />}{" "}
-                  {t("addCondition")}
+                  AÑADIR
                 </button>
               </div>
               {isAddingCondition && (
@@ -1258,7 +1196,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                       exhaustionLevel > 0 ? "text-orange-500" : "text-stone-500"
                     }`}
                   >
-                    {t("exhaustion")}
+                    Agotamiento
                   </span>
                   <div className="flex gap-1">
                     {[1, 2, 3, 4, 5, 6].map((lvl) => (
@@ -1300,11 +1238,11 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
             {currentHP === 0 && (
               <div className="bg-stone-900/80 p-4 rounded-xl border border-red-900/50 animate-in zoom-in duration-300">
                 <h3 className="text-red-400 font-bold text-sm mb-3 uppercase flex items-center gap-2">
-                  <Skull size={16} /> {t("deathSaves")}
+                  <Skull size={16} /> Salvación de Muerte
                 </h3>
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-xs font-bold text-stone-400 w-16">
-                    SUCCESS
+                    EXITOS
                   </span>
                   <div className="flex gap-2">
                     {[0, 1, 2].map((i) => (
@@ -1322,7 +1260,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-xs font-bold text-stone-400 w-16">
-                    FAILURE
+                    FALLOS
                   </span>
                   <div className="flex gap-2">
                     {[0, 1, 2].map((i) => (
@@ -1343,14 +1281,13 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
             <div>
               <div className="flex justify-between items-center mb-3">
                 <h3 className="text-stone-400 font-bold text-sm uppercase tracking-wider">
-                  {t("attacks")}
+                  ATAQUES
                 </h3>
                 <button
                   onClick={() => setIsAddingAttack(!isAddingAttack)}
                   className="text-xs bg-stone-800 border border-stone-600 px-2 py-1 rounded text-stone-300 hover:text-white hover:border-yellow-500 flex items-center gap-1"
                 >
-                  {isAddingAttack ? <X size={12} /> : <Plus size={12} />}{" "}
-                  {t("addWeapon")}
+                  {isAddingAttack ? <X size={12} /> : <Plus size={12} />} AÑADIR
                 </button>
               </div>
               {isAddingAttack && (
@@ -1358,7 +1295,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                   <div className="grid grid-cols-2 gap-2 mb-2">
                     <input
                       type="text"
-                      placeholder="Name"
+                      placeholder="Nombre"
                       value={newAttack.name}
                       onChange={(e) =>
                         setNewAttack({ ...newAttack, name: e.target.value })
@@ -1367,7 +1304,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                     />
                     <input
                       type="text"
-                      placeholder="Dmg"
+                      placeholder="Daño"
                       value={newAttack.damage}
                       onChange={(e) =>
                         setNewAttack({ ...newAttack, damage: e.target.value })
@@ -1381,18 +1318,18 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                       }
                       className="bg-stone-900 border border-stone-600 rounded p-2 text-xs text-white outline-none"
                     >
-                      <option value="str">STR</option>
-                      <option value="dex">DEX</option>
+                      <option value="str">FUE</option>
+                      <option value="dex">DES</option>
                       <option value="int">INT</option>
-                      <option value="wis">WIS</option>
-                      <option value="cha">CHA</option>
+                      <option value="wis">SAB</option>
+                      <option value="cha">CAR</option>
                     </select>
                   </div>
                   <button
                     onClick={addAttack}
                     className="w-full py-2 bg-yellow-600 text-stone-100 text-xs font-bold rounded hover:bg-yellow-500"
                   >
-                    Save
+                    Guardar
                   </button>
                 </div>
               )}
@@ -1412,7 +1349,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                         <div>
                           <h4 className="font-bold text-stone-200">{w.name}</h4>
                           <p className="text-xs text-stone-500">
-                            {w.damage} {w.stat.toUpperCase()}
+                            {w.damage} {w.stat === "str" ? "FUE" : "DES"}
                           </p>
                         </div>
                       </div>
@@ -1435,21 +1372,21 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
             <div>
               <div className="flex justify-between items-center mb-3">
                 <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
-                  <Sparkles size={16} /> {t("features")}
+                  <Sparkles size={16} /> RASGOS
                 </h3>
                 <button
                   onClick={() => setIsAddingFeature(!isAddingFeature)}
                   className="text-xs bg-stone-800 border border-stone-600 px-2 py-1 rounded text-stone-300 hover:text-white hover:border-yellow-500 flex items-center gap-1"
                 >
                   {isAddingFeature ? <X size={12} /> : <Plus size={12} />}{" "}
-                  {t("addFeature")}
+                  AÑADIR
                 </button>
               </div>
               {isAddingFeature && (
                 <div className="bg-stone-800 p-3 rounded-xl border border-yellow-500/50 mb-3 animate-in fade-in zoom-in duration-200">
                   <input
                     type="text"
-                    placeholder={t("featureName")}
+                    placeholder="Nombre Rasgo"
                     value={newFeature.name}
                     onChange={(e) =>
                       setNewFeature({ ...newFeature, name: e.target.value })
@@ -1457,7 +1394,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                     className="w-full bg-stone-900 border border-stone-600 rounded p-2 text-xs text-white outline-none mb-2 focus:border-yellow-500"
                   />
                   <textarea
-                    placeholder={t("featureDesc")}
+                    placeholder="Descripción"
                     value={newFeature.desc}
                     onChange={(e) =>
                       setNewFeature({ ...newFeature, desc: e.target.value })
@@ -1468,7 +1405,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                     onClick={addFeature}
                     className="w-full py-2 bg-yellow-600 text-stone-100 text-xs font-bold rounded hover:bg-yellow-500"
                   >
-                    Add Feature
+                    Guardar
                   </button>
                 </div>
               )}
@@ -1504,14 +1441,14 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 <Eye className="text-stone-400" />
                 <div className="flex flex-col">
                   <span className="font-bold text-stone-200">
-                    {t("passivePerception")}
+                    Percepción Pasiva
                   </span>
                   <span className="text-[10px] text-stone-500">
-                    10 + WIS
+                    10 + SAB
                     {isPerceptionExpert
                       ? " + EXP"
                       : isPerceptionProf
-                      ? " + PROF"
+                      ? " + COMP"
                       : ""}
                   </span>
                 </div>
@@ -1522,17 +1459,17 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
             </div>
             <div>
               <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
-                <Shield size={16} /> {t("savingThrows")}
+                <Shield size={16} /> Salvaciones
               </h3>
               <div className="grid grid-cols-2 gap-2">
                 {Object.keys(mods).map((stat) => {
                   const fullStatName = {
-                    str: "Strength",
-                    dex: "Dexterity",
-                    con: "Constitution",
-                    int: "Intelligence",
-                    wis: "Wisdom",
-                    cha: "Charisma",
+                    str: "Fuerza",
+                    dex: "Destreza",
+                    con: "Constitución",
+                    int: "Inteligencia",
+                    wis: "Sabiduría",
+                    cha: "Carisma",
                   }[stat];
                   const isSaveProficient =
                     saveProficiencies.includes(fullStatName);
@@ -1542,7 +1479,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                     <button
                       key={stat}
                       onClick={() =>
-                        rollCheck(`${stat.toUpperCase()} Save`, saveMod)
+                        rollCheck(`Salvación ${stat.toUpperCase()}`, saveMod)
                       }
                       className={`p-3 rounded-lg border flex justify-between items-center ${
                         isSaveProficient
@@ -1557,7 +1494,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                             : "text-stone-400"
                         }`}
                       >
-                        {t(stat).slice(0, 3)}
+                        {stat.toUpperCase()}
                       </span>
                       <span className="font-mono text-stone-200">
                         {saveMod >= 0 ? "+" : ""}
@@ -1569,10 +1506,9 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               </div>
             </div>
 
-            {/* SKILLS CON EXPERTISE (MEJORADO) */}
             <div>
               <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
-                <Activity size={16} /> {t("skills")}
+                <Activity size={16} /> Habilidades
               </h3>
               <div className="bg-stone-800 rounded-xl border border-stone-700 divide-y divide-stone-700/50">
                 {SKILLS.map((skill) => {
@@ -1585,7 +1521,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                       : isProf
                       ? proficiencyBonus
                       : 0);
-
                   return (
                     <div
                       key={skill.name}
@@ -1626,7 +1561,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                             {skill.name}
                           </span>
                           <span className="text-[10px] text-stone-600 uppercase ml-2">
-                            ({t(skill.stat).slice(0, 3)})
+                            ({skill.stat.toUpperCase()})
                           </span>
                         </div>
                       </div>
@@ -1649,12 +1584,12 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
             </div>
             <div>
               <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
-                <Languages size={16} /> Proficiencies
+                <Languages size={16} /> Idiomas y Competencias
               </h3>
               <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 space-y-4">
                 <div>
                   <h4 className="text-xs font-bold text-stone-500 uppercase mb-2">
-                    Languages
+                    Idiomas
                   </h4>
                   <div className="flex flex-wrap gap-2">
                     {languages.map((lang) => (
@@ -1669,7 +1604,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 </div>
                 <div>
                   <h4 className="text-xs font-bold text-stone-500 uppercase mb-2">
-                    Proficiencies
+                    Competencias
                   </h4>
                   <div className="flex flex-wrap gap-2">
                     {proficiencies.map((prof, idx) => (
@@ -1687,31 +1622,40 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           </div>
         )}
 
-        {/* ... (Spells, Inventory, Profile sin cambios, usar anteriores) ... */}
         {activeTab === "spells" && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
             <div className="flex items-start gap-4">
               <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 grid grid-cols-2 gap-4 flex-1">
                 <div className="flex flex-col items-center border-r border-stone-700">
                   <span className="text-[10px] uppercase font-bold text-stone-500">
-                    {t("spellDC")}
+                    CD Salvación
                   </span>
                   <span className="text-2xl font-bold text-stone-100">
                     {spellSaveDC}
                   </span>
                   <span className="text-[10px] text-stone-600">
-                    8 + Prof + {t(spellCastingStat).slice(0, 3)}
+                    8 + Comp +{" "}
+                    {spellCastingStat === "int"
+                      ? "INT"
+                      : spellCastingStat === "wis"
+                      ? "SAB"
+                      : "CAR"}
                   </span>
                 </div>
                 <div className="flex flex-col items-center">
                   <span className="text-[10px] uppercase font-bold text-stone-500">
-                    {t("spellAtk")}
+                    Ataque Magico
                   </span>
                   <span className="text-2xl font-bold text-yellow-500">
                     +{spellAttackBonus}
                   </span>
                   <span className="text-[10px] text-stone-600">
-                    Prof + {t(spellCastingStat).slice(0, 3)}
+                    Comp +{" "}
+                    {spellCastingStat === "int"
+                      ? "INT"
+                      : spellCastingStat === "wis"
+                      ? "SAB"
+                      : "CAR"}
                   </span>
                 </div>
               </div>
@@ -1720,7 +1664,9 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 className="h-full px-3 bg-stone-800 border border-stone-700 rounded-xl flex flex-col items-center justify-center gap-1 hover:bg-stone-700 hover:text-yellow-500 transition text-stone-400"
               >
                 <Settings size={20} />
-                <span className="text-[10px] font-bold uppercase">Slots</span>
+                <span className="text-[10px] font-bold uppercase">
+                  Espacios
+                </span>
               </button>
             </div>
             <div className="space-y-3">
@@ -1731,8 +1677,8 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                   <div key={lvl}>
                     <div className="flex justify-between items-end mb-2">
                       <h3 className="text-stone-400 font-bold text-sm uppercase flex items-center gap-2">
-                        <Flame size={14} className="text-yellow-600" />{" "}
-                        {t("level")} {lvl}
+                        <Flame size={14} className="text-yellow-600" /> Nivel{" "}
+                        {lvl}
                       </h3>
                       <span className="text-xs text-stone-500">
                         {slotData.used} / {slotData.total}
@@ -1762,7 +1708,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                   className="text-xs bg-stone-800 border border-stone-600 px-2 py-1 rounded text-stone-300 hover:text-white hover:border-yellow-500 flex items-center gap-1"
                 >
                   {isAddingSpell ? <X size={12} /> : <Plus size={12} />}{" "}
-                  {t("scribe")}
+                  Escribir
                 </button>
               </div>
               {isAddingSpell && (
@@ -1772,7 +1718,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                       <Search size={16} className="text-stone-500" />
                       <input
                         type="text"
-                        placeholder={t("searchSpell")}
+                        placeholder="Buscar conjuro..."
                         className="bg-transparent w-full text-xs text-stone-100 outline-none"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
@@ -1784,7 +1730,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                         onClick={handleSpellSearch}
                         className="text-xs font-bold text-yellow-600 hover:text-yellow-500 uppercase"
                       >
-                        {isSearching ? t("searching") : "GO"}
+                        {isSearching ? "..." : "IR"}
                       </button>
                     </div>
                     {searchResults.length > 0 && (
@@ -1797,7 +1743,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                           >
                             <span>{res.name}</span>
                             <span className="text-stone-500">
-                              {res.level === 0 ? "Cantrip" : `Lvl ${res.level}`}
+                              {res.level === 0 ? "Truco" : `Nv ${res.level}`}
                             </span>
                           </button>
                         ))}
@@ -1805,12 +1751,12 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                     )}
                   </div>
                   <div className="text-[10px] text-stone-500 uppercase font-bold mb-2 tracking-wider text-center">
-                    - {t("manualMode")} -
+                    - Manual -
                   </div>
                   <div className="space-y-2 mb-2">
                     <input
                       type="text"
-                      placeholder="Spell Name"
+                      placeholder="Nombre"
                       value={newSpell.name}
                       onChange={(e) =>
                         setNewSpell({ ...newSpell, name: e.target.value })
@@ -1825,16 +1771,16 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                         }
                         className="bg-stone-900 border border-stone-600 rounded p-2 text-xs text-white outline-none"
                       >
-                        <option value="0">{t("cantrips")}</option>
-                        <option value="1">Level 1</option>
-                        <option value="2">Level 2</option>
-                        <option value="3">Level 3</option>
-                        <option value="4">Level 4</option>
-                        <option value="5">Level 5</option>
+                        <option value="0">Truco</option>
+                        <option value="1">Nivel 1</option>
+                        <option value="2">Nivel 2</option>
+                        <option value="3">Nivel 3</option>
+                        <option value="4">Nivel 4</option>
+                        <option value="5">Nivel 5</option>
                       </select>
                       <input
                         type="text"
-                        placeholder="School"
+                        placeholder="Escuela"
                         value={newSpell.school}
                         onChange={(e) =>
                           setNewSpell({ ...newSpell, school: e.target.value })
@@ -1843,7 +1789,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                       />
                     </div>
                     <textarea
-                      placeholder="Description"
+                      placeholder="Descripción"
                       value={newSpell.desc}
                       onChange={(e) =>
                         setNewSpell({ ...newSpell, desc: e.target.value })
@@ -1855,13 +1801,13 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                     onClick={addSpell}
                     className="w-full py-2 bg-yellow-600 text-stone-100 text-xs font-bold rounded hover:bg-yellow-500"
                   >
-                    Add to Spellbook
+                    Añadir al Libro
                   </button>
                 </div>
               )}
               <div>
                 <h3 className="text-stone-500 font-bold text-xs uppercase mb-2">
-                  {t("cantrips")} (0)
+                  Trucos (0)
                 </h3>
                 <div className="space-y-2">
                   {mySpells
@@ -1915,7 +1861,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 return (
                   <div key={lvl}>
                     <h3 className="text-stone-500 font-bold text-xs uppercase mb-2">
-                      {t("level")} {lvl}
+                      Nivel {lvl}
                     </h3>
                     <div className="space-y-2">
                       {spellsOfLevel.map((spell) => (
@@ -1969,7 +1915,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700">
               <h3 className="text-stone-400 font-bold text-xs uppercase mb-3 flex items-center gap-2">
-                <span className="text-yellow-500">●</span> {t("currency")}
+                <span className="text-yellow-500">●</span> Monedas
               </h3>
               <div className="grid grid-cols-5 gap-2">
                 {["cp", "sp", "ep", "gp", "pp"].map((coin) => (
@@ -1989,14 +1935,14 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
             </div>
             <div>
               <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
-                <Backpack size={16} /> {t("equipment")}
+                <Backpack size={16} /> Equipo
               </h3>
               <div className="mb-4 relative">
                 <div className="flex items-center gap-2 bg-stone-900 border border-stone-600 rounded-lg p-2 focus-within:border-yellow-500">
                   <Search size={16} className="text-stone-500" />
                   <input
                     type="text"
-                    placeholder={t("searchItem")}
+                    placeholder="Buscar objeto..."
                     className="bg-transparent w-full text-xs text-stone-100 outline-none"
                     value={itemQuery}
                     onChange={(e) => setItemQuery(e.target.value)}
@@ -2006,7 +1952,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                     onClick={handleItemSearch}
                     className="text-xs font-bold text-yellow-600 hover:text-yellow-500 uppercase"
                   >
-                    {isSearching ? "..." : "GO"}
+                    {isSearching ? "..." : "IR"}
                   </button>
                 </div>
                 {itemResults.length > 0 && (
@@ -2041,7 +1987,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               <div className="flex gap-2 mb-4">
                 <input
                   type="text"
-                  placeholder={t("addItem")}
+                  placeholder="Añadir objeto..."
                   value={newItemName}
                   onChange={(e) => setNewItemName(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && addItem()}
@@ -2060,7 +2006,8 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                     item.type === "armor" ||
                     item.type === "shield" ||
                     item.armorType ||
-                    (item.desc && item.desc.includes("AC "));
+                    (item.desc &&
+                      (item.desc.includes("AC ") || item.desc.includes("CA ")));
                   const formula = findDiceFormula(item.desc);
                   return (
                     <div
@@ -2096,7 +2043,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                                 : "text-stone-200"
                             }`}
                           >
-                            {item.name} {item.isEquipped && "(Equipped)"}
+                            {item.name} {item.isEquipped && "(Eq)"}
                           </span>
                           {item.desc && (
                             <span className="text-[10px] text-stone-500">
@@ -2126,7 +2073,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 })}
                 {inventory.length === 0 && (
                   <p className="text-center text-stone-600 text-sm py-4">
-                    Backpack empty.
+                    Mochila vacía.
                   </p>
                 )}
               </div>
@@ -2151,7 +2098,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               </div>
               <div className="mb-4">
                 <div className="flex justify-between text-xs text-stone-400 mb-1 font-bold">
-                  <span>LEVEL {hero.level}</span>
+                  <span>NIVEL {hero.level}</span>
                   <span
                     onClick={() => setEditingStat("xp")}
                     className="cursor-pointer hover:text-yellow-500"
@@ -2170,10 +2117,10 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <span className="text-xs text-stone-500 uppercase font-bold">
-                    {t("background")}
+                    Trasfondo
                   </span>
                   <p className="text-stone-200">
-                    {details.background || "Unknown"}
+                    {details.background || "Desconocido"}
                   </p>
                 </div>
                 <div
@@ -2181,7 +2128,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                   className="cursor-pointer group"
                 >
                   <span className="text-xs text-stone-500 uppercase font-bold group-hover:text-yellow-500">
-                    {t("level")} ({t("edit")})
+                    Nivel (Editar)
                   </span>
                   <p className="text-stone-200 font-mono">{hero.level}</p>
                 </div>
@@ -2189,7 +2136,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
             </div>
             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700">
               <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
-                <PenTool size={16} /> Core Attributes
+                <PenTool size={16} /> Atributos Base
               </h3>
               <div className="grid grid-cols-3 gap-3">
                 {Object.keys(stats).map((statName) => (
@@ -2199,7 +2146,17 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                     className="bg-stone-900 p-2 rounded-lg border border-stone-600 hover:border-yellow-500 cursor-pointer flex flex-col items-center"
                   >
                     <span className="text-[10px] uppercase text-stone-500 font-bold">
-                      {t(statName).slice(0, 3)}
+                      {statName === "str"
+                        ? "FUE"
+                        : statName === "dex"
+                        ? "DES"
+                        : statName === "con"
+                        ? "CON"
+                        : statName === "int"
+                        ? "INT"
+                        : statName === "wis"
+                        ? "SAB"
+                        : "CAR"}
                     </span>
                     <span className="text-lg font-bold text-stone-100">
                       {stats[statName]}
@@ -2210,12 +2167,12 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
             </div>
             <div>
               <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
-                <Settings size={16} /> {t("appearance")}
+                <Settings size={16} /> Apariencia
               </h3>
               <div className="grid grid-cols-3 gap-2 text-center">
                 <div className="bg-stone-800 p-2 rounded-lg border border-stone-700">
                   <span className="block text-[10px] text-stone-500 uppercase">
-                    {t("age")}
+                    Edad
                   </span>
                   <span className="text-sm font-bold text-stone-200">
                     {details.age || "--"}
@@ -2223,7 +2180,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 </div>
                 <div className="bg-stone-800 p-2 rounded-lg border border-stone-700">
                   <span className="block text-[10px] text-stone-500 uppercase">
-                    {t("height")}
+                    Altura
                   </span>
                   <span className="text-sm font-bold text-stone-200">
                     {details.height || "--"}
@@ -2231,7 +2188,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 </div>
                 <div className="bg-stone-800 p-2 rounded-lg border border-stone-700">
                   <span className="block text-[10px] text-stone-500 uppercase">
-                    {t("weight")}
+                    Peso
                   </span>
                   <span className="text-sm font-bold text-stone-200">
                     {details.weight || "--"}
@@ -2239,7 +2196,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 </div>
                 <div className="bg-stone-800 p-2 rounded-lg border border-stone-700">
                   <span className="block text-[10px] text-stone-500 uppercase">
-                    {t("eyes")}
+                    Ojos
                   </span>
                   <span className="text-sm font-bold text-stone-200">
                     {details.eyes || "--"}
@@ -2247,7 +2204,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 </div>
                 <div className="bg-stone-800 p-2 rounded-lg border border-stone-700">
                   <span className="block text-[10px] text-stone-500 uppercase">
-                    {t("skin")}
+                    Piel
                   </span>
                   <span className="text-sm font-bold text-stone-200">
                     {details.skin || "--"}
@@ -2255,7 +2212,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 </div>
                 <div className="bg-stone-800 p-2 rounded-lg border border-stone-700">
                   <span className="block text-[10px] text-stone-500 uppercase">
-                    {t("hair")}
+                    Pelo
                   </span>
                   <span className="text-sm font-bold text-stone-200">
                     {details.hair || "--"}
@@ -2266,7 +2223,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
             <div className="grid grid-cols-1 gap-4">
               <div className="bg-stone-800 p-4 rounded-xl border border-stone-700">
                 <h3 className="text-stone-500 font-bold text-xs uppercase mb-1 flex items-center gap-2">
-                  <Quote size={12} /> {t("traits")}
+                  <Quote size={12} /> Rasgos
                 </h3>
                 <p className="text-stone-200 text-sm italic">
                   "{details.traits || "..."}"
@@ -2274,7 +2231,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               </div>
               <div className="bg-stone-800 p-4 rounded-xl border border-stone-700">
                 <h3 className="text-stone-500 font-bold text-xs uppercase mb-1">
-                  {t("ideals")}
+                  Ideales
                 </h3>
                 <p className="text-stone-200 text-sm">
                   {details.ideals || "..."}
@@ -2282,7 +2239,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               </div>
               <div className="bg-stone-800 p-4 rounded-xl border border-stone-700">
                 <h3 className="text-stone-500 font-bold text-xs uppercase mb-1">
-                  {t("bonds")}
+                  Vínculos
                 </h3>
                 <p className="text-stone-200 text-sm">
                   {details.bonds || "..."}
@@ -2290,7 +2247,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               </div>
               <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 border-red-900/30">
                 <h3 className="text-red-400 font-bold text-xs uppercase mb-1">
-                  {t("flaws")}
+                  Defectos
                 </h3>
                 <p className="text-stone-300 text-sm">
                   {details.flaws || "..."}
@@ -2300,7 +2257,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
             <div className="grid grid-cols-1 gap-4">
               <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 border-dashed">
                 <h3 className="text-stone-400 font-bold text-sm mb-2 uppercase flex items-center gap-2">
-                  <Users size={16} /> {t("allies")}
+                  <Users size={16} /> Aliados
                 </h3>
                 <textarea
                   className="w-full bg-transparent text-stone-300 text-sm italic outline-none resize-none h-20 placeholder-stone-600"
@@ -2310,7 +2267,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               </div>
               <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 border-dashed">
                 <h3 className="text-stone-400 font-bold text-sm mb-2 uppercase flex items-center gap-2">
-                  <Gem size={16} /> {t("treasure")}
+                  <Gem size={16} /> Tesoro
                 </h3>
                 <textarea
                   className="w-full bg-transparent text-stone-300 text-sm italic outline-none resize-none h-20 placeholder-stone-600"
@@ -2320,16 +2277,84 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               </div>
               <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 border-dashed">
                 <h3 className="text-stone-400 font-bold text-sm mb-2 uppercase flex items-center gap-2">
-                  <ScrollText size={16} /> {t("backstory")}
+                  <ScrollText size={16} /> Historia
                 </h3>
                 <p className="text-sm text-stone-500 italic leading-relaxed">
-                  {details.backstory || "No backstory written yet."}
+                  {details.backstory || "..."}
                 </p>
               </div>
             </div>
           </div>
         )}
       </div>
+
+      {showShortRest && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-stone-900 border border-stone-700 p-6 rounded-2xl w-full max-w-sm relative">
+            <button
+              onClick={() => setShowShortRest(false)}
+              className="absolute top-4 right-4 text-stone-500 hover:text-white"
+            >
+              <X />
+            </button>
+            <h3 className="text-stone-100 font-bold mb-2 flex items-center gap-2">
+              <Coffee className="text-orange-400" size={20} /> Descanso Corto
+            </h3>
+            <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 mb-4 text-center">
+              <p className="text-stone-400 text-xs uppercase font-bold mb-1">
+                Dados de Golpe Restantes
+              </p>
+              <div className="text-3xl font-bold text-white mb-2">
+                {hitDiceTotal - hitDiceUsed}{" "}
+                <span className="text-stone-500 text-lg">/ {hitDiceTotal}</span>
+              </div>
+              <div className="flex justify-center gap-1 mb-2">
+                {Array.from({ length: hitDiceTotal }).map((_, i) => (
+                  <div
+                    key={i}
+                    className={`w-3 h-3 rounded-full ${
+                      i < hitDiceTotal - hitDiceUsed
+                        ? "bg-orange-500"
+                        : "bg-stone-700"
+                    }`}
+                  ></div>
+                ))}
+              </div>
+            </div>
+            <div className="text-center">
+              <button
+                onClick={() => {
+                  if (hitDiceUsed < hitDiceTotal) {
+                    const dieMax = parseInt(hitDieType.substring(1));
+                    const roll = Math.floor(Math.random() * dieMax) + 1;
+                    handleApplyHeal(Math.max(0, roll + mods.con), 1);
+                  } else {
+                    showToast("¡No quedan Dados de Golpe!", "error");
+                  }
+                }}
+                disabled={hitDiceUsed >= hitDiceTotal || currentHP >= maxHP}
+                className="w-full py-4 bg-stone-700 hover:bg-stone-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl mb-3 flex flex-col items-center justify-center gap-1"
+              >
+                <span>Gastar Dado de Golpe</span>
+                <span className="text-xs text-stone-400 font-normal">
+                  1{hitDieType} + {mods.con}
+                </span>
+              </button>
+              {hero.class === "Brujo" && (
+                <p className="text-[10px] text-purple-400 mt-2 italic">
+                  *Espacios de Pacto restaurados.
+                </p>
+              )}
+              <button
+                onClick={() => setShowShortRest(false)}
+                className="text-stone-500 text-sm hover:text-white mt-2"
+              >
+                Listo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {rollResult && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
@@ -2351,7 +2376,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                     {rollResult.droppedRoll}
                   </div>
                   <span className="text-[10px] text-stone-500 mt-1 uppercase">
-                    Dropped
+                    Descartado
                   </span>
                 </div>
                 <div className="flex flex-col items-center scale-110">
@@ -2373,9 +2398,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                         : "text-red-500"
                     }`}
                   >
-                    {rollResult.rollType === "adv"
-                      ? "Advantage"
-                      : "Disadvantage"}
+                    {rollResult.rollType === "adv" ? "Ventaja" : "Desventaja"}
                   </span>
                 </div>
               </div>
@@ -2384,7 +2407,9 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-4 border-4 text-4xl font-bold ${
                   rollResult.isCrit
                     ? "border-yellow-500 text-yellow-500 shadow-yellow-500/20 shadow-lg"
-                    : rollResult.isFail
+                    : ""
+                } ${
+                  rollResult.isFail
                     ? "border-red-600 text-red-600"
                     : "border-stone-600 text-stone-200"
                 }`}
@@ -2402,7 +2427,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 </span>
               ) : (
                 <span>
-                  Roll {rollResult.roll} {rollResult.mod >= 0 ? "+" : "-"}{" "}
+                  Tirada {rollResult.roll} {rollResult.mod >= 0 ? "+" : "-"}{" "}
                   {Math.abs(rollResult.mod)} ={" "}
                   <strong className="text-white text-lg">
                     {rollResult.total}
@@ -2419,15 +2444,14 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                     : "bg-stone-700 hover:bg-stone-600 text-stone-200"
                 }`}
               >
-                <Hammer size={18} /> {t("rollDamage")}{" "}
-                {rollResult.isCrit && "(x2)"}
+                <Hammer size={18} /> Tirar Daño {rollResult.isCrit && "(x2)"}
               </button>
             )}
             <button
               onClick={() => setRollResult(null)}
               className="w-full py-3 bg-stone-800 hover:bg-stone-700 text-stone-100 rounded-xl font-bold"
             >
-              Close
+              Cerrar
             </button>
           </div>
         </div>

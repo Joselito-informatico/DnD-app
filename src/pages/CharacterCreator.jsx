@@ -19,8 +19,9 @@ import {
   Dices,
   RotateCcw,
   X,
+  Book,
 } from "lucide-react";
-import { RACES, CLASSES } from "../data/srd";
+import { RACES, CLASSES, BACKGROUNDS } from "../data/srd";
 import { getRandomDetails } from "../utils/randomizer";
 import { useLanguage } from "../context/LanguageContext";
 import { searchSpells } from "../utils/dndApi";
@@ -28,6 +29,7 @@ import { searchSpells } from "../utils/dndApi";
 export function CharacterCreator({ onBack, onSave }) {
   const { t } = useLanguage();
 
+  // Flujo: 1.Raza -> 2.Clase -> 3.Stats -> 4.Trasfondo -> [5.Hechizos] -> 6.Identidad
   const [step, setStep] = useState(1);
   const [selectedRace, setSelectedRace] = useState(null);
   const [selectedClass, setSelectedClass] = useState(null);
@@ -43,6 +45,9 @@ export function CharacterCreator({ onBack, onSave }) {
   const [rolledPool, setRolledPool] = useState([]);
   const [selectedRollId, setSelectedRollId] = useState(null);
 
+  const [selectedBg, setSelectedBg] = useState(null);
+  const [classSkills, setClassSkills] = useState([]);
+
   const [startingSpells, setStartingSpells] = useState([]);
   const [spellQuery, setSpellQuery] = useState("");
   const [spellResults, setSpellResults] = useState([]);
@@ -51,7 +56,6 @@ export function CharacterCreator({ onBack, onSave }) {
   const [details, setDetails] = useState({
     name: "",
     alignment: "",
-    background: "",
     avatar: "",
     age: "",
     height: "",
@@ -63,30 +67,47 @@ export function CharacterCreator({ onBack, onSave }) {
     ideals: "",
     bonds: "",
     flaws: "",
+    backstory: "",
   });
 
   const isCaster = selectedClass?.spellcasting !== undefined;
 
-  // --- NAVEGACIÓN ---
   const handleNext = () => {
     if (step === 1 && selectedRace) setStep(2);
     else if (step === 2 && selectedClass) setStep(3);
     else if (step === 3) {
-      if (Object.values(baseStats).some((v) => v === 0)) {
-        if (!confirm("Some stats are 0. Continue?")) return;
+      if (Object.values(baseStats).some((v) => v === 0))
+        if (!confirm("¿Algunos atributos son 0. Continuar?")) return;
+      setStep(4);
+    } else if (step === 4) {
+      if (!selectedBg) {
+        alert("Por favor selecciona un Trasfondo.");
+        return;
       }
-      setStep(isCaster ? 4 : 5);
-    } else if (step === 4) setStep(5);
-    else if (step === 5) finishCreation();
+      const max = selectedClass?.skillInfo?.count || 2;
+      if (classSkills.length < max) {
+        alert(`Elige ${max} habilidades de tu clase.`);
+        return;
+      }
+      setStep(isCaster ? 5 : 6);
+    } else if (step === 5) setStep(6);
+    else if (step === 6) finishCreation();
   };
 
   const handleBackStep = () => {
     if (step === 1) onBack();
-    else if (step === 5 && !isCaster) setStep(3);
+    else if (step === 6 && !isCaster) setStep(4);
     else setStep(step - 1);
   };
 
-  // --- LÓGICA DE DADOS ---
+  const toggleClassSkill = (skillName) => {
+    const max = selectedClass?.skillInfo?.count || 2;
+    const isSelected = classSkills.includes(skillName);
+    if (isSelected) setClassSkills(classSkills.filter((s) => s !== skillName));
+    else if (classSkills.length < max)
+      setClassSkills([...classSkills, skillName]);
+  };
+
   const rollAttributePool = () => {
     const newPool = Array.from({ length: 6 }, (_, i) => {
       const rolls = Array.from(
@@ -102,28 +123,15 @@ export function CharacterCreator({ onBack, onSave }) {
     setSelectedRollId(null);
   };
 
-  const clearPool = () => {
-    setRolledPool([]);
-    setBaseStats({ str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 });
-    setSelectedRollId(null);
-  };
-
-  const handleSelectRoll = (id) => {
-    if (selectedRollId === id) setSelectedRollId(null);
-    else setSelectedRollId(id);
-  };
-
   const handleAssignStat = (statKey) => {
     if (selectedRollId !== null) {
       const roll = rolledPool.find((r) => r.id === selectedRollId);
       if (!roll) return;
-
       const newPool = rolledPool.map((r) => {
         if (r.assignedTo === statKey) return { ...r, assignedTo: null };
         if (r.id === selectedRollId) return { ...r, assignedTo: statKey };
         return r;
       });
-
       setRolledPool(newPool);
       setBaseStats((prev) => ({ ...prev, [statKey]: roll.value }));
       setSelectedRollId(null);
@@ -135,31 +143,6 @@ export function CharacterCreator({ onBack, onSave }) {
       setRolledPool(newPool);
       setBaseStats((prev) => ({ ...prev, [statKey]: 0 }));
     }
-  };
-
-  const manualUpdateStat = (key, value) => {
-    if (rolledPool.length > 0) return;
-    const val = parseInt(value) || 0;
-    setBaseStats((prev) => ({
-      ...prev,
-      [key]: Math.max(0, Math.min(18, val)),
-    }));
-  };
-
-  // --- UTILIDADES ---
-  const getRaceBonus = (statKey) => selectedRace?.bonuses?.[statKey] || 0;
-  const getTotalStat = (statKey) => baseStats[statKey] + getRaceBonus(statKey);
-  const getMod = (score) => {
-    const mod = Math.floor((score - 10) / 2);
-    return mod > 0 ? `+${mod}` : mod;
-  };
-  const handleAutoFill = () => {
-    const random = getRandomDetails();
-    setDetails((prev) => ({
-      ...random,
-      name: prev.name || random.name,
-      avatar: prev.avatar,
-    }));
   };
 
   const handleSpellSearch = async () => {
@@ -179,7 +162,6 @@ export function CharacterCreator({ onBack, onSave }) {
     setStartingSpells(startingSpells.filter((s) => s.id !== id));
   };
 
-  // --- FINALIZAR ---
   const finishCreation = () => {
     const finalStats = {
       str: getTotalStat("str"),
@@ -205,13 +187,13 @@ export function CharacterCreator({ onBack, onSave }) {
           qty: item.qty || 1,
           desc:
             item.type === "armor"
-              ? `AC ${item.ac}`
+              ? `CA ${item.ac}`
               : item.type === "weapon"
               ? `${item.damage}`
               : "",
-          type: item.type, // Asegurar que pasamos el tipo (armor/weapon/item)
-          ac: item.ac, // Asegurar que pasamos la AC
-          armorType: item.type === "armor" ? "Heavy" : null, // Simplificación para auto-detectar
+          type: item.type,
+          ac: item.ac,
+          armorType: item.type === "armor" ? "Heavy" : null,
         });
         if (item.type === "weapon")
           starterWeapons.push({
@@ -223,6 +205,9 @@ export function CharacterCreator({ onBack, onSave }) {
           });
       });
     }
+
+    const bgSkills = selectedBg ? selectedBg.skills : [];
+    const allSkills = [...new Set([...classSkills, ...bgSkills])];
 
     const newHero = {
       name: details.name.trim() || `${selectedRace.name} ${selectedClass.name}`,
@@ -238,9 +223,10 @@ export function CharacterCreator({ onBack, onSave }) {
       spellSlots: selectedClass.spellcasting?.slots || {},
       spells: startingSpells,
       features: selectedClass.features || [],
+      skillProfs: allSkills,
       details: {
         ...details,
-        background: details.background || "Unknown",
+        background: selectedBg?.name || "Desconocido",
         alignment: details.alignment || "Neutral",
       },
     };
@@ -248,27 +234,40 @@ export function CharacterCreator({ onBack, onSave }) {
   };
 
   const getStepTitle = () => {
-    if (step === 1) return t("step1");
-    if (step === 2) return t("step2");
-    if (step === 3) return "Assign Stats";
-    if (step === 4) return t("cantrips");
-    if (step === 5) return t("step4");
+    if (step === 1) return "Elegir Especie";
+    if (step === 2) return "Elegir Clase";
+    if (step === 3) return "Asignar Atributos";
+    if (step === 4) return "Trasfondo y Habilidades";
+    if (step === 5) return "Conjuros";
+    if (step === 6) return "Identidad";
     return "";
   };
 
+  const getRaceBonus = (statKey) => selectedRace?.bonuses?.[statKey] || 0;
+  const getTotalStat = (statKey) => baseStats[statKey] + getRaceBonus(statKey);
+  const getMod = (score) => {
+    const mod = Math.floor((score - 10) / 2);
+    return mod > 0 ? `+${mod}` : mod;
+  };
+
+  // CONFIGURACIÓN EN ESPAÑOL
   const statConfig = [
-    { id: "str", label: t("str"), icon: Sword, color: "text-red-400" },
-    { id: "dex", label: t("dex"), icon: Zap, color: "text-yellow-400" },
-    { id: "con", label: t("con"), icon: Heart, color: "text-orange-400" },
-    { id: "int", label: t("int"), icon: Brain, color: "text-blue-400" },
-    { id: "wis", label: t("wis"), icon: Eye, color: "text-emerald-400" },
-    {
-      id: "cha",
-      label: t("cha"),
-      icon: MessageCircle,
-      color: "text-purple-400",
-    },
+    { id: "str", label: "FUE", icon: Sword, color: "text-red-400" },
+    { id: "dex", label: "DES", icon: Zap, color: "text-yellow-400" },
+    { id: "con", label: "CON", icon: Heart, color: "text-orange-400" },
+    { id: "int", label: "INT", icon: Brain, color: "text-blue-400" },
+    { id: "wis", label: "SAB", icon: Eye, color: "text-emerald-400" },
+    { id: "cha", label: "CAR", icon: MessageCircle, color: "text-purple-400" },
   ];
+
+  const handleAutoFill = () => {
+    const random = getRandomDetails();
+    setDetails((prev) => ({
+      ...random,
+      name: prev.name || random.name,
+      avatar: prev.avatar,
+    }));
+  };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300 pb-24 px-6 pt-6">
@@ -285,15 +284,13 @@ export function CharacterCreator({ onBack, onSave }) {
               {getStepTitle()}
             </h1>
             <p className="text-xs text-stone-500">
-              {t("level")} {isCaster && step === 5 ? "4" : step} /{" "}
-              {isCaster ? 5 : 4}
+              Paso {step} / {isCaster ? 6 : 5}
             </p>
           </div>
         </div>
       </header>
 
       <div className="grid grid-cols-1 gap-4">
-        {/* 1. RAZA */}
         {step === 1 &&
           RACES.map((race) => (
             <div
@@ -329,7 +326,6 @@ export function CharacterCreator({ onBack, onSave }) {
             </div>
           ))}
 
-        {/* 2. CLASE */}
         {step === 2 &&
           CLASSES.map((cls) => (
             <div
@@ -355,17 +351,16 @@ export function CharacterCreator({ onBack, onSave }) {
               </div>
               <div className="text-sm text-stone-400 space-y-1">
                 <p>
-                  <span className="text-stone-500">Hit Die:</span> {cls.hitDie}
+                  <span className="text-stone-500">DG:</span> {cls.hitDie}
                 </p>
                 <p>
-                  <span className="text-stone-500">Primary:</span>{" "}
+                  <span className="text-stone-500">Principal:</span>{" "}
                   {cls.primaryStat.toUpperCase()}
                 </p>
               </div>
             </div>
           ))}
 
-        {/* 3. STATS */}
         {step === 3 && (
           <div className="space-y-4">
             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 text-center relative overflow-hidden">
@@ -373,23 +368,33 @@ export function CharacterCreator({ onBack, onSave }) {
                 <div className="py-4">
                   <Dices size={48} className="mx-auto text-stone-600 mb-2" />
                   <p className="text-stone-400 text-sm mb-4">
-                    Roll 5d6 (keep 3) six times.
+                    Tira 5d6 (guarda 3) seis veces.
                   </p>
                   <button
                     onClick={rollAttributePool}
                     className="px-6 py-2 bg-yellow-600 hover:bg-yellow-500 text-white font-bold rounded-full transition shadow-lg"
                   >
-                    ROLL STATS
+                    TIRAR DADOS
                   </button>
                 </div>
               ) : (
                 <div>
                   <div className="flex justify-between items-center mb-3">
                     <span className="text-xs font-bold text-stone-500 uppercase tracking-widest">
-                      Pool
+                      Reserva
                     </span>
                     <button
-                      onClick={clearPool}
+                      onClick={() => {
+                        setRolledPool([]);
+                        setBaseStats({
+                          str: 0,
+                          dex: 0,
+                          con: 0,
+                          int: 0,
+                          wis: 0,
+                          cha: 0,
+                        });
+                      }}
                       className="text-xs text-red-400 flex items-center gap-1 hover:underline"
                     >
                       <RotateCcw size={12} /> Reset
@@ -402,14 +407,17 @@ export function CharacterCreator({ onBack, onSave }) {
                       return (
                         <button
                           key={roll.id}
-                          onClick={() => !isUsed && handleSelectRoll(roll.id)}
+                          onClick={() =>
+                            !isUsed &&
+                            setSelectedRollId(isSelected ? null : roll.id)
+                          }
                           disabled={isUsed}
                           className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold text-lg transition-all duration-200 border-2 ${
                             isUsed
                               ? "bg-stone-900 border-stone-800 text-stone-700 opacity-50 scale-90"
                               : isSelected
-                              ? "bg-yellow-500 border-yellow-300 text-stone-900 scale-110 shadow-lg shadow-yellow-500/20"
-                              : "bg-stone-700 border-stone-600 text-stone-300 hover:border-yellow-500"
+                              ? "bg-yellow-500 border-yellow-300 text-stone-900 scale-110"
+                              : "bg-stone-700 border-stone-600 text-stone-300"
                           }`}
                         >
                           {roll.value}
@@ -417,15 +425,9 @@ export function CharacterCreator({ onBack, onSave }) {
                       );
                     })}
                   </div>
-                  <p className="text-[10px] text-stone-500 mt-3 animate-pulse">
-                    {selectedRollId !== null
-                      ? "Now tap an attribute below to assign."
-                      : "Tap a number to select it."}
-                  </p>
                 </div>
               )}
             </div>
-
             <div className="space-y-3">
               {statConfig.map((stat) => {
                 const raceBonus = getRaceBonus(stat.id);
@@ -433,7 +435,6 @@ export function CharacterCreator({ onBack, onSave }) {
                 const total = getTotalStat(stat.id);
                 const isAssignMode = rolledPool.length > 0;
                 const isFilled = baseVal > 0;
-
                 return (
                   <div
                     key={stat.id}
@@ -444,11 +445,8 @@ export function CharacterCreator({ onBack, onSave }) {
                       isAssignMode && selectedRollId !== null && !isFilled
                         ? "border-yellow-500/50 bg-stone-800/80 animate-pulse"
                         : "border-stone-700"
-                    } ${isAssignMode && isFilled ? "border-stone-700" : ""}`}
+                    }`}
                   >
-                    {isFilled && (
-                      <div className="absolute inset-0 bg-yellow-500/5 z-0"></div>
-                    )}
                     <div className="flex items-center gap-3 w-1/3 z-10">
                       <div
                         className={`p-2 rounded-lg bg-stone-900 ${stat.color}`}
@@ -479,7 +477,10 @@ export function CharacterCreator({ onBack, onSave }) {
                             type="number"
                             value={baseVal === 0 ? "" : baseVal}
                             onChange={(e) =>
-                              manualUpdateStat(stat.id, e.target.value)
+                              setBaseStats((p) => ({
+                                ...p,
+                                [stat.id]: parseInt(e.target.value) || 0,
+                              }))
                             }
                             placeholder="10"
                             className="w-12 h-10 bg-stone-900 border border-stone-600 rounded text-center text-stone-100 outline-none focus:border-yellow-500 font-bold"
@@ -495,7 +496,7 @@ export function CharacterCreator({ onBack, onSave }) {
                           {raceBonus}
                         </div>
                         <span className="text-[9px] text-stone-500 uppercase mt-1">
-                          Race
+                          Raza
                         </span>
                       </div>
                       <div className="h-8 w-px bg-stone-700 mx-1"></div>
@@ -515,12 +516,101 @@ export function CharacterCreator({ onBack, onSave }) {
           </div>
         )}
 
-        {/* 4. HECHIZOS (SOLO CASTERS) */}
-        {step === 4 && isCaster && (
+        {step === 4 && (
+          <div className="space-y-6 animate-in slide-in-from-right duration-300">
+            <div>
+              <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase flex items-center gap-2">
+                <Book size={16} /> Elegir Trasfondo
+              </h3>
+              <div className="grid grid-cols-1 gap-2">
+                {BACKGROUNDS.map((bg) => (
+                  <div
+                    key={bg.name}
+                    onClick={() => setSelectedBg(bg)}
+                    className={`p-3 rounded-xl border-2 cursor-pointer transition ${
+                      selectedBg?.name === bg.name
+                        ? "bg-stone-800 border-yellow-500"
+                        : "bg-stone-800/50 border-stone-700 hover:border-stone-600"
+                    }`}
+                  >
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="font-bold text-stone-100">
+                        {bg.name}
+                      </span>
+                      {selectedBg?.name === bg.name && (
+                        <Check size={16} className="text-yellow-500" />
+                      )}
+                    </div>
+                    <p className="text-xs text-stone-500 line-clamp-1">
+                      {bg.desc}
+                    </p>
+                    <div className="flex gap-2 mt-2">
+                      {bg.skills.map((s) => (
+                        <span
+                          key={s}
+                          className="text-[10px] bg-stone-900 px-2 py-1 rounded text-stone-400 border border-stone-700"
+                        >
+                          {s}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div className="flex justify-between items-end mb-3">
+                <h3 className="text-stone-400 font-bold text-sm uppercase flex items-center gap-2">
+                  <Shield size={16} /> Habilidades de Clase
+                </h3>
+                <span className="text-xs font-bold text-yellow-500">
+                  {classSkills.length} / {selectedClass.skillInfo?.count || 2}{" "}
+                  selec.
+                </span>
+              </div>
+              <div className="bg-stone-800 p-4 rounded-xl border border-stone-700">
+                <p className="text-xs text-stone-500 mb-3">
+                  Elige de tu lista de clase (Las del trasfondo se añaden
+                  solas).
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {selectedClass.skillInfo?.list.map((skill) => {
+                    const isBgSkill = selectedBg?.skills.includes(skill);
+                    const isSelected = classSkills.includes(skill);
+                    return (
+                      <button
+                        key={skill}
+                        onClick={() => !isBgSkill && toggleClassSkill(skill)}
+                        disabled={isBgSkill}
+                        className={`p-2 rounded-lg text-xs font-bold text-left border transition flex justify-between items-center ${
+                          isBgSkill
+                            ? "bg-stone-900/50 border-stone-800 text-stone-500"
+                            : isSelected
+                            ? "bg-yellow-500/20 border-yellow-500 text-yellow-500"
+                            : "bg-stone-900 border-stone-700 text-stone-300 hover:border-stone-500"
+                        }`}
+                      >
+                        {skill}
+                        {isBgSkill && (
+                          <span className="text-[9px] uppercase opacity-50">
+                            (BG)
+                          </span>
+                        )}
+                        {isSelected && <Check size={14} />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {step === 5 && isCaster && (
           <div className="space-y-4 animate-in slide-in-from-right duration-300">
             <div className="bg-stone-800/50 p-4 rounded-xl border border-stone-700 mb-2 text-center">
               <p className="text-stone-400 text-sm">
-                Search and add your starting Cantrips & Lvl 1 Spells.
+                Busca y añade tus Trucos y Conjuros Nv1.
               </p>
             </div>
             <div className="relative">
@@ -528,7 +618,7 @@ export function CharacterCreator({ onBack, onSave }) {
                 <Search size={18} className="text-stone-500" />
                 <input
                   type="text"
-                  placeholder="Fireball, Cure Wounds..."
+                  placeholder="Bola de fuego, Curar..."
                   className="bg-transparent w-full text-sm text-stone-100 outline-none"
                   value={spellQuery}
                   onChange={(e) => setSpellQuery(e.target.value)}
@@ -538,7 +628,7 @@ export function CharacterCreator({ onBack, onSave }) {
                   onClick={handleSpellSearch}
                   className="text-xs font-bold text-yellow-600 hover:text-yellow-500 uppercase"
                 >
-                  {isSearchingSpell ? "..." : "SEARCH"}
+                  {isSearchingSpell ? "..." : "BUSCAR"}
                 </button>
               </div>
               {spellResults.length > 0 && (
@@ -552,7 +642,7 @@ export function CharacterCreator({ onBack, onSave }) {
                       <span>{res.name}</span>
                       <div className="flex items-center gap-2">
                         <span className="text-stone-500 text-xs">
-                          {res.level === 0 ? "Cantrip" : `Lvl ${res.level}`}
+                          {res.level === 0 ? "Truco" : `Nv ${res.level}`}
                         </span>
                         <Plus size={14} className="text-yellow-500" />
                       </div>
@@ -572,7 +662,7 @@ export function CharacterCreator({ onBack, onSave }) {
                       {spell.name}
                     </p>
                     <p className="text-xs text-stone-500">
-                      {spell.level === 0 ? "Cantrip" : `Level ${spell.level}`} •{" "}
+                      {spell.level === 0 ? "Truco" : `Nivel ${spell.level}`} •{" "}
                       {spell.school}
                     </p>
                   </div>
@@ -586,24 +676,15 @@ export function CharacterCreator({ onBack, onSave }) {
               ))}
               {startingSpells.length === 0 && (
                 <div className="text-center py-8 text-stone-600 italic border-2 border-dashed border-stone-800 rounded-xl">
-                  Spellbook is empty.
+                  Grimorio vacío.
                 </div>
               )}
             </div>
           </div>
         )}
 
-        {/* 5. IDENTIDAD */}
-        {step === 5 && (
+        {step === 6 && (
           <div className="space-y-4 animate-in slide-in-from-right duration-300">
-            <div className="flex justify-end">
-              <button
-                onClick={handleAutoFill}
-                className="flex items-center gap-2 text-xs bg-purple-900/30 text-purple-400 border border-purple-500/50 px-3 py-2 rounded-lg hover:bg-purple-900/50 transition"
-              >
-                <Sparkles size={14} /> {t("autoFill")}
-              </button>
-            </div>
             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 space-y-3">
               <div className="flex items-center gap-4">
                 <div className="w-16 h-16 bg-stone-900 rounded-full flex-shrink-0 border-2 border-stone-600 overflow-hidden flex items-center justify-center">
@@ -620,11 +701,11 @@ export function CharacterCreator({ onBack, onSave }) {
                 </div>
                 <div className="flex-1 space-y-1">
                   <label className="text-xs font-bold text-stone-400 uppercase">
-                    {t("avatarLabel")}
+                    Avatar (URL)
                   </label>
                   <input
                     type="text"
-                    placeholder={t("avatarPlaceholder")}
+                    placeholder="https://..."
                     value={details.avatar}
                     onChange={(e) =>
                       setDetails({ ...details, avatar: e.target.value })
@@ -636,11 +717,11 @@ export function CharacterCreator({ onBack, onSave }) {
             </div>
             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 space-y-2">
               <label className="text-sm font-bold text-stone-300 flex items-center gap-2">
-                <User size={16} /> {t("charName")}
+                <User size={16} /> Nombre del Personaje
               </label>
               <input
                 type="text"
-                placeholder="Ex: Valeros the Brave"
+                placeholder="Ej: Valeros el Bravo"
                 value={details.name}
                 onChange={(e) =>
                   setDetails({ ...details, name: e.target.value })
@@ -648,93 +729,32 @@ export function CharacterCreator({ onBack, onSave }) {
                 className="w-full bg-stone-900 border border-stone-600 rounded-lg p-3 text-stone-100 placeholder-stone-600 focus:outline-none focus:border-yellow-500 transition"
               />
             </div>
-            <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <input
-                  type="text"
-                  placeholder={t("alignment")}
-                  value={details.alignment}
-                  onChange={(e) =>
-                    setDetails({ ...details, alignment: e.target.value })
-                  }
-                  className="bg-stone-900 border border-stone-600 rounded-lg p-2 text-sm text-stone-100 focus:border-yellow-500 outline-none"
-                />
-                <input
-                  type="text"
-                  placeholder={t("background")}
-                  value={details.background}
-                  onChange={(e) =>
-                    setDetails({ ...details, background: e.target.value })
-                  }
-                  className="bg-stone-900 border border-stone-600 rounded-lg p-2 text-sm text-stone-100 focus:border-yellow-500 outline-none"
-                />
-              </div>
-              <div className="grid grid-cols-3 gap-3">
-                <input
-                  type="text"
-                  placeholder={t("age")}
-                  className="bg-stone-900 border border-stone-600 rounded-lg p-2 text-sm text-stone-100 outline-none"
-                  value={details.age}
-                  onChange={(e) =>
-                    setDetails({ ...details, age: e.target.value })
-                  }
-                />
-                <input
-                  type="text"
-                  placeholder={t("height")}
-                  className="bg-stone-900 border border-stone-600 rounded-lg p-2 text-sm text-stone-100 outline-none"
-                  value={details.height}
-                  onChange={(e) =>
-                    setDetails({ ...details, height: e.target.value })
-                  }
-                />
-                <input
-                  type="text"
-                  placeholder={t("weight")}
-                  className="bg-stone-900 border border-stone-600 rounded-lg p-2 text-sm text-stone-100 outline-none"
-                  value={details.weight}
-                  onChange={(e) =>
-                    setDetails({ ...details, weight: e.target.value })
-                  }
-                />
-              </div>
-            </div>
+
             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 space-y-3">
               <h3 className="text-xs font-bold text-stone-500 uppercase flex items-center gap-2">
-                <ScrollText size={14} /> {t("roleplayTitle")}
+                <ScrollText size={14} /> Personalidad (de{" "}
+                {selectedBg?.name || "Trasfondo"})
               </h3>
-              <textarea
-                placeholder={t("traits")}
-                value={details.traits}
-                onChange={(e) =>
-                  setDetails({ ...details, traits: e.target.value })
-                }
-                className="w-full bg-stone-900 border border-stone-600 rounded-lg p-2 text-sm text-stone-100 h-16 resize-none outline-none focus:border-yellow-500"
-              />
-              <textarea
-                placeholder={t("ideals")}
-                value={details.ideals}
-                onChange={(e) =>
-                  setDetails({ ...details, ideals: e.target.value })
-                }
-                className="w-full bg-stone-900 border border-stone-600 rounded-lg p-2 text-sm text-stone-100 h-16 resize-none outline-none focus:border-yellow-500"
-              />
-              <textarea
-                placeholder={t("bonds")}
-                value={details.bonds}
-                onChange={(e) =>
-                  setDetails({ ...details, bonds: e.target.value })
-                }
-                className="w-full bg-stone-900 border border-stone-600 rounded-lg p-2 text-sm text-stone-100 h-16 resize-none outline-none focus:border-yellow-500"
-              />
-              <textarea
-                placeholder={t("flaws")}
-                value={details.flaws}
-                onChange={(e) =>
-                  setDetails({ ...details, flaws: e.target.value })
-                }
-                className="w-full bg-stone-900 border border-stone-600 rounded-lg p-2 text-sm text-stone-100 h-16 resize-none outline-none focus:border-red-500/50"
-              />
+
+              {["traits", "ideals", "bonds", "flaws"].map((field) => (
+                <div key={field} className="relative">
+                  <input
+                    list={`list-${field}`}
+                    placeholder={`Selecciona o escribe ${field}...`}
+                    value={details[field]}
+                    onChange={(e) =>
+                      setDetails({ ...details, [field]: e.target.value })
+                    }
+                    className="w-full bg-stone-900 border border-stone-600 rounded-lg p-2 text-sm text-stone-100 outline-none focus:border-yellow-500"
+                  />
+                  <datalist id={`list-${field}`}>
+                    {selectedBg &&
+                      selectedBg[field]?.map((opt, i) => (
+                        <option key={i} value={opt} />
+                      ))}
+                  </datalist>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -746,8 +766,8 @@ export function CharacterCreator({ onBack, onSave }) {
           disabled={step === 1 ? !selectedRace : !selectedClass}
           className="w-full py-4 bg-yellow-500 text-stone-900 font-bold rounded-xl shadow-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-yellow-400 transition flex items-center justify-center gap-2"
         >
-          {step === 5 ? t("complete") : t("next")}{" "}
-          {step !== 5 && <ArrowLeft className="rotate-180" size={20} />}
+          {step === 6 ? "Completar" : "Siguiente"}{" "}
+          {step !== 6 && <ArrowLeft className="rotate-180" size={20} />}
         </button>
       </div>
     </div>

@@ -1,192 +1,106 @@
 import { useState } from "react";
-import {
-  Book,
-  Users,
-  Shield,
-  AlertTriangle,
-  ChevronRight,
-  ChevronDown,
-  Sword,
-} from "lucide-react";
-import { RACES, CLASSES, CONDITIONS, COMBAT_ACTIONS } from "../data/srd";
-import { useLanguage } from "../context/LanguageContext";
+import { ArrowLeft, BookOpen, Skull, Shield, Sword } from "lucide-react";
+import { CONDITIONS, COMBAT_ACTIONS, CLASSES, RACES } from "../data/srd";
 
-export function Compendium() {
-  const { t } = useLanguage();
-  const [section, setSection] = useState("races"); // 'races', 'classes', 'conditions', 'actions'
-  const [expandedId, setExpandedId] = useState(null);
-
-  const toggleExpand = (id) => {
-    setExpandedId(expandedId === id ? null : id);
-  };
+export function Compendium({ onBack }) {
+  const [section, setSection] = useState("actions");
 
   return (
-    <div className="pb-24 pt-6 px-6 animate-in fade-in duration-300">
-      <h1 className="text-3xl font-bold text-stone-100 mb-6 flex items-center gap-3">
-        <Book className="text-yellow-500" /> {t("navCompendium")}
-      </h1>
-
-      {/* Selector de Categoría */}
-      <div className="flex gap-2 mb-6 overflow-x-auto no-scrollbar pb-2">
+    <div className="flex flex-col h-screen bg-neutral-900 pb-20">
+      <header className="flex items-center gap-4 p-6 bg-stone-900 border-b border-stone-800">
         <button
-          onClick={() => setSection("races")}
-          className={`px-4 py-2 rounded-full border text-xs font-bold transition flex items-center gap-2 whitespace-nowrap ${
-            section === "races"
-              ? "bg-yellow-500 border-yellow-500 text-stone-900"
-              : "bg-stone-800 border-stone-700 text-stone-400"
-          }`}
+          onClick={onBack}
+          className="p-2 text-stone-400 hover:text-white"
         >
-          <Users size={14} /> {t("races")}
+          <ArrowLeft />
         </button>
+        <h1 className="text-xl font-bold text-stone-100 flex items-center gap-2">
+          <BookOpen className="text-yellow-500" /> Compendio SRD
+        </h1>
+      </header>
+
+      <div className="flex p-4 gap-2 overflow-x-auto border-b border-stone-800">
         <button
-          onClick={() => setSection("classes")}
-          className={`px-4 py-2 rounded-full border text-xs font-bold transition flex items-center gap-2 whitespace-nowrap ${
-            section === "classes"
-              ? "bg-yellow-500 border-yellow-500 text-stone-900"
-              : "bg-stone-800 border-stone-700 text-stone-400"
+          onClick={() => setSection("actions")}
+          className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition ${
+            section === "actions"
+              ? "bg-yellow-500 text-black"
+              : "bg-stone-800 text-stone-400"
           }`}
         >
-          <Shield size={14} /> {t("classes")}
+          Acciones
         </button>
         <button
           onClick={() => setSection("conditions")}
-          className={`px-4 py-2 rounded-full border text-xs font-bold transition flex items-center gap-2 whitespace-nowrap ${
+          className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition ${
             section === "conditions"
-              ? "bg-yellow-500 border-yellow-500 text-stone-900"
-              : "bg-stone-800 border-stone-700 text-stone-400"
+              ? "bg-yellow-500 text-black"
+              : "bg-stone-800 text-stone-400"
           }`}
         >
-          <AlertTriangle size={14} /> {t("conditions")}
+          Estados
         </button>
         <button
-          onClick={() => setSection("actions")}
-          className={`px-4 py-2 rounded-full border text-xs font-bold transition flex items-center gap-2 whitespace-nowrap ${
-            section === "actions"
-              ? "bg-yellow-500 border-yellow-500 text-stone-900"
-              : "bg-stone-800 border-stone-700 text-stone-400"
+          onClick={() => setSection("classes")}
+          className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition ${
+            section === "classes"
+              ? "bg-yellow-500 text-black"
+              : "bg-stone-800 text-stone-400"
           }`}
         >
-          <Sword size={14} /> Actions
+          Clases
         </button>
       </div>
 
-      {/* Contenido */}
-      <div className="space-y-3">
-        {section === "races" &&
-          RACES.map((race) => (
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {section === "actions" &&
+          COMBAT_ACTIONS.map((act, i) => (
             <div
-              key={race.id}
-              className="bg-stone-800 border border-stone-700 rounded-xl overflow-hidden"
+              key={i}
+              className="bg-stone-800 p-4 rounded-xl border border-stone-700"
             >
-              <button
-                onClick={() => toggleExpand(race.id)}
-                className="w-full p-4 flex justify-between items-center text-left hover:bg-stone-700/50 transition"
-              >
-                <span className="font-bold text-stone-200">{race.name}</span>
-                {expandedId === race.id ? (
-                  <ChevronDown size={16} className="text-yellow-500" />
-                ) : (
-                  <ChevronRight size={16} className="text-stone-500" />
-                )}
-              </button>
-              {expandedId === race.id && (
-                <div className="p-4 pt-0 text-sm text-stone-400 border-t border-stone-700/50 bg-stone-900/30">
-                  <p className="mb-2 italic">{race.description}</p>
-                  <div className="grid grid-cols-2 gap-2 text-xs mb-2">
-                    <span className="text-stone-500">
-                      Speed: {race.speed}ft
-                    </span>
-                    <span className="text-stone-500">Size: {race.size}</span>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {race.traits.map((tr) => (
-                      <span
-                        key={tr}
-                        className="bg-stone-700 text-stone-300 px-2 py-1 rounded text-xs"
-                      >
-                        {tr}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-
-        {section === "classes" &&
-          CLASSES.map((cls) => (
-            <div
-              key={cls.id}
-              className="bg-stone-800 border border-stone-700 rounded-xl overflow-hidden"
-            >
-              <button
-                onClick={() => toggleExpand(cls.id)}
-                className="w-full p-4 flex justify-between items-center text-left hover:bg-stone-700/50 transition"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="font-bold text-stone-200">{cls.name}</span>
-                  <span className="text-[10px] bg-stone-900 px-2 py-1 rounded text-stone-500">
-                    Hit Die: {cls.hitDie}
-                  </span>
-                </div>
-                {expandedId === cls.id ? (
-                  <ChevronDown size={16} className="text-yellow-500" />
-                ) : (
-                  <ChevronRight size={16} className="text-stone-500" />
-                )}
-              </button>
-              {expandedId === cls.id && (
-                <div className="p-4 pt-0 text-sm text-stone-400 border-t border-stone-700/50 bg-stone-900/30">
-                  <p className="mb-1">
-                    <strong className="text-stone-300">Primary:</strong>{" "}
-                    {cls.primaryStat.toUpperCase()}
-                  </p>
-                  <p className="mb-1">
-                    <strong className="text-stone-300">Saves:</strong>{" "}
-                    {cls.saves.join(", ")}
-                  </p>
-                  <p className="mb-2">
-                    <strong className="text-stone-300">SRD Subclass:</strong>{" "}
-                    {cls.srdSubclass}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {cls.proficiencies.map((prof) => (
-                      <span
-                        key={prof}
-                        className="bg-stone-700 text-stone-300 px-2 py-1 rounded text-xs"
-                      >
-                        {prof}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
+              <h3 className="font-bold text-yellow-500 flex items-center gap-2">
+                <Sword size={16} /> {act.name}
+              </h3>
+              <p className="text-sm text-stone-300 mt-1">{act.desc}</p>
             </div>
           ))}
 
         {section === "conditions" &&
-          CONDITIONS.map((cond) => (
+          CONDITIONS.map((cond, i) => (
             <div
-              key={cond.id}
-              className="bg-stone-800 border border-stone-700 rounded-xl p-4"
+              key={i}
+              className="bg-stone-800 p-4 rounded-xl border border-stone-700"
             >
-              <h3 className="font-bold text-red-400 mb-1 flex items-center gap-2">
-                <AlertTriangle size={14} /> {cond.name}
+              <h3 className="font-bold text-red-400 flex items-center gap-2">
+                <Skull size={16} /> {cond.name}
               </h3>
-              <p className="text-sm text-stone-400">{cond.desc}</p>
+              <p className="text-sm text-stone-300 mt-1">{cond.desc}</p>
             </div>
           ))}
 
-        {section === "actions" &&
-          COMBAT_ACTIONS.map((act) => (
+        {section === "classes" &&
+          CLASSES.map((cls, i) => (
             <div
-              key={act.id}
-              className="bg-stone-800 border border-stone-700 rounded-xl p-4"
+              key={i}
+              className="bg-stone-800 p-4 rounded-xl border border-stone-700"
             >
-              <h3 className="font-bold text-yellow-500 mb-1 flex items-center gap-2">
-                <Sword size={14} /> {act.name}
+              <h3 className="font-bold text-blue-400 flex items-center gap-2">
+                <Shield size={16} /> {cls.name}
               </h3>
-              <p className="text-sm text-stone-400">{act.desc}</p>
+              <p className="text-xs text-stone-500 mb-2">
+                DG: {cls.hitDie} | Principal: {cls.primaryStat.toUpperCase()}
+              </p>
+              <div className="flex flex-wrap gap-1">
+                {cls.proficiencies.map((p, j) => (
+                  <span
+                    key={j}
+                    className="text-[10px] bg-stone-900 px-2 py-1 rounded text-stone-400"
+                  >
+                    {p}
+                  </span>
+                ))}
+              </div>
             </div>
           ))}
       </div>
