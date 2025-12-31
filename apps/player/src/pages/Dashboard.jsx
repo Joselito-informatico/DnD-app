@@ -1,256 +1,111 @@
-import { useState } from "react";
-import {
-  Plus,
-  Download,
-  Upload,
-  Trash2,
-  Sword,
-  Shield,
-  Zap,
-  Heart,
-  Skull,
-  Music,
-  Leaf,
-  Eye,
-  Flame,
-  Book,
-  Crosshair,
-  Ghost,
-  Dices,
-  Info, // Icono para el botón legal
-  X,
-  User,
-} from "lucide-react";
-import { useLanguage } from "../context/LanguageContext";
+import { Plus, Trash2, Sword, Shield, User } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 
-export function Dashboard({
-  heroes,
-  onNavigate,
-  onCreate,
-  onImport,
-  onRandom,
-}) {
-  const { t } = useLanguage();
-  const [showAbout, setShowAbout] = useState(false); // Estado para el modal legal
+export function Dashboard({ heroes, onSelectHero, onDeleteHero }) {
+  const navigate = useNavigate();
 
-  // Mapa de Iconos por Clase (Adaptado a Español SRD 5.2)
-  const getClassIcon = (className) => {
-    const c = className?.toLowerCase() || "";
-    // Buscamos tanto en español como en inglés por seguridad
-    if (c.includes("bárbaro") || c.includes("barbarian"))
-      return <Skull size={20} className="text-red-500" />;
-    if (c.includes("bardo") || c.includes("bard"))
-      return <Music size={20} className="text-pink-500" />;
-    if (c.includes("clérigo") || c.includes("cleric"))
-      return <Heart size={20} className="text-stone-300" />;
-    if (c.includes("druida") || c.includes("druid"))
-      return <Leaf size={20} className="text-green-500" />;
-    if (c.includes("guerrero") || c.includes("fighter"))
-      return <Sword size={20} className="text-stone-400" />;
-    if (c.includes("monje") || c.includes("monk"))
-      return <Zap size={20} className="text-blue-300" />;
-    if (c.includes("paladín") || c.includes("paladin"))
-      return <Shield size={20} className="text-yellow-500" />;
-    if (c.includes("explorador") || c.includes("ranger"))
-      return <Crosshair size={20} className="text-green-700" />;
-    if (c.includes("pícaro") || c.includes("rogue"))
-      return <Ghost size={20} className="text-stone-600" />;
-    if (c.includes("hechicero") || c.includes("sorcerer"))
-      return <Flame size={20} className="text-orange-500" />;
-    if (c.includes("brujo") || c.includes("warlock"))
-      return <Eye size={20} className="text-purple-500" />;
-    if (c.includes("mago") || c.includes("wizard"))
-      return <Book size={20} className="text-blue-500" />;
-    return <User size={20} />;
-  };
-
-  const handleFileUpload = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      try {
-        const imported = JSON.parse(evt.target.result);
-        if (Array.isArray(imported)) {
-          if (
-            confirm("¿Importar reemplazará tu lista actual. ¿Estás seguro?")
-          ) {
-            onImport(imported);
-          }
-        } else {
-          alert("Formato JSON inválido. Se espera un array de héroes.");
-        }
-      } catch (err) {
-        alert("Error al leer el archivo JSON.");
-      }
-    };
-    reader.readAsText(file);
+  const handlePlay = (heroId) => {
+    onSelectHero(heroId);
+    navigate("/play");
   };
 
   return (
-    <div className="p-6 pb-24 min-h-screen animate-in fade-in duration-500">
-      {/* HEADER */}
-      <header className="mb-8 flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-black text-stone-100 tracking-tight">
-            {t("appTitle")}
-          </h1>
-          <p className="text-stone-500 text-sm mt-1">{t("subTitle")}</p>
-        </div>
-        <div className="flex gap-2">
-          {/* Botón About / Legal */}
-          <button
-            onClick={() => setShowAbout(true)}
-            className="p-2 bg-stone-800 rounded-full text-stone-400 hover:text-yellow-500 transition"
-            title="Licencia y Créditos"
-          >
-            <Info size={20} />
-          </button>
-
-          {/* Botón Importar */}
-          <label className="p-2 bg-stone-800 rounded-full text-stone-400 hover:text-white cursor-pointer transition">
-            <Upload size={20} />
-            <input
-              type="file"
-              accept=".json"
-              className="hidden"
-              onChange={handleFileUpload}
-            />
-          </label>
-        </div>
+    <div className="p-6 pb-32 animate-in fade-in duration-500">
+      <header className="mb-8 mt-4">
+        <h1 className="text-3xl font-black text-stone-100 tracking-tight">
+          Mis Héroes
+        </h1>
+        <p className="text-stone-500">Gestiona tus personajes y aventuras.</p>
       </header>
 
-      {/* Lista de Héroes */}
-      <div className="grid grid-cols-1 gap-4">
-        {heroes.length === 0 ? (
-          <div className="text-center py-12 border-2 border-dashed border-stone-800 rounded-2xl">
-            <Ghost size={48} className="mx-auto text-stone-700 mb-4" />
-            <p className="text-stone-500">{t("noHeroes")}</p>
+      {heroes.length === 0 ? (
+        <div className="text-center py-16 border-2 border-dashed border-stone-800 rounded-3xl bg-stone-900/50">
+          <div className="w-20 h-20 bg-stone-800 rounded-full flex items-center justify-center mx-auto mb-4">
+            <User size={32} className="text-stone-600" />
           </div>
-        ) : (
-          heroes.map((hero) => {
-            const hpPct =
-              hero.maxHP > 0
-                ? Math.min(
-                    100,
-                    Math.max(
-                      0,
-                      ((hero.currentHP ?? hero.maxHP) / hero.maxHP) * 100
-                    )
-                  )
-                : 100;
-            const hp = hero.currentHP ?? hero.maxHP;
-
-            return (
-              <div
-                key={hero.id}
-                onClick={() => onNavigate(hero)}
-                className="group bg-stone-800 border border-stone-700 p-4 rounded-2xl flex items-center justify-between cursor-pointer hover:border-yellow-500 transition-all duration-200 shadow-lg"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-stone-900 rounded-xl flex items-center justify-center border border-stone-800 group-hover:border-yellow-500/50 overflow-hidden">
-                    {hero.details?.avatar ? (
-                      <img
-                        src={hero.details.avatar}
-                        alt="avatar"
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      getClassIcon(hero.class)
-                    )}
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-lg text-stone-200 group-hover:text-yellow-500 transition">
-                      {hero.name}
-                    </h3>
-                    <p className="text-xs text-stone-500">
-                      Nivel {hero.level} {hero.race} {hero.class}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex flex-col items-end w-24">
-                  <span className="text-xs font-bold text-stone-400 mb-1">
-                    PG {hp}/{hero.maxHP}
-                  </span>
-                  <div className="h-1.5 w-full bg-stone-900 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full transition-all duration-500 ${
-                        hp === 0 ? "bg-red-500" : "bg-green-500"
-                      }`}
-                      style={{ width: `${hpPct}%` }}
-                    ></div>
-                  </div>
-                </div>
-              </div>
-            );
-          })
-        )}
-      </div>
-
-      {/* Botones de Acción */}
-      <div className="mt-6 space-y-3">
-        <button
-          onClick={onCreate}
-          className="w-full py-4 bg-yellow-500 text-stone-900 font-bold rounded-xl shadow-lg hover:bg-yellow-400 transition flex items-center justify-center gap-2 active:scale-95"
-        >
-          <Plus size={20} /> {t("createHero")}
-        </button>
-
-        <button
-          onClick={onRandom}
-          className="w-full py-3 bg-stone-800 text-stone-400 font-bold rounded-xl border border-stone-700 hover:bg-stone-700 hover:text-white transition flex items-center justify-center gap-2"
-        >
-          <Dices size={18} /> {t("randomHero")}
-        </button>
-      </div>
-
-      {/* MODAL ABOUT / LEGAL (SRD 5.2 Requirement) */}
-      {showAbout && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-stone-900 border border-stone-700 p-6 rounded-2xl w-full max-w-sm relative shadow-2xl">
-            <button
-              onClick={() => setShowAbout(false)}
-              className="absolute top-4 right-4 text-stone-500 hover:text-white"
+          <h3 className="text-xl font-bold text-stone-300 mb-2">Sin Héroes</h3>
+          <p className="text-stone-500 text-sm max-w-[200px] mx-auto mb-6">
+            Aún no has creado ningún personaje para tu aventura.
+          </p>
+          <Link
+            to="/create"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-yellow-600 hover:bg-yellow-500 text-white font-bold rounded-xl transition shadow-lg shadow-yellow-900/20"
+          >
+            <Plus size={20} strokeWidth={3} />
+            Crear Héroe
+          </Link>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4">
+          {heroes.map((hero) => (
+            <div
+              key={hero.id}
+              className="group relative bg-stone-800 rounded-2xl border border-stone-700 overflow-hidden hover:border-yellow-500/50 transition-all duration-300 shadow-lg"
             >
-              <X />
-            </button>
+              {/* Fondo decorativo de clase (Opcional) */}
+              <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-yellow-500/10 to-transparent rounded-bl-full -mr-10 -mt-10 pointer-events-none" />
 
-            <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-              <Book size={20} className="text-yellow-500" />{" "}
-              {t("aboutTitle") || "Legal"}
-            </h2>
+              <div className="p-5 flex items-center gap-4 relative z-10">
+                {/* Avatar */}
+                <div className="w-16 h-16 rounded-2xl bg-stone-900 border-2 border-stone-600 overflow-hidden flex-shrink-0 shadow-inner">
+                  {hero.details?.avatar ? (
+                    <img
+                      src={hero.details.avatar}
+                      alt={hero.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <User className="text-stone-700" size={32} />
+                    </div>
+                  )}
+                </div>
 
-            <div className="space-y-4 text-sm text-stone-400 max-h-[60vh] overflow-y-auto pr-2">
-              <div>
-                <h3 className="font-bold text-stone-200 mb-1">
-                  {t("appTitle")}
-                </h3>
-                <p>v1.8 (SRD 5.2 Edition)</p>
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-xl font-bold text-stone-100 truncate leading-tight">
+                    {hero.name}
+                  </h2>
+                  <p className="text-xs text-yellow-600 font-bold uppercase tracking-wider mb-1">
+                    Nivel {hero.level} • {hero.class}
+                  </p>
+                  <p className="text-xs text-stone-500 truncate">
+                    {hero.race} • {hero.details?.background || "Aventurero"}
+                  </p>
+                </div>
               </div>
 
-              <div className="p-3 bg-stone-950 rounded-xl border border-stone-800">
-                <h3 className="font-bold text-stone-200 mb-2 text-xs uppercase tracking-wider">
-                  Licencia OGL / CC-BY
-                </h3>
-                <p className="text-xs leading-relaxed italic opacity-80">
-                  {t("licenseText") ||
-                    "This work includes material taken from the System Reference Document 5.1 (“SRD 5.1”) by Wizards of the Coast LLC and available at https://dnd.wizards.com/resources/systems-reference-document. The SRD 5.1 is licensed under the Creative Commons Attribution 4.0 International License available at https://creativecommons.org/licenses/by/4.0/legalcode."}
-                </p>
-              </div>
-
-              <div className="text-xs text-center pt-2 opacity-50">
-                <p>Not affiliated with Wizards of the Coast.</p>
+              {/* Botonera inferior */}
+              <div className="flex border-t border-stone-700 bg-stone-900/50">
+                <button
+                  onClick={() => {
+                    if (confirm("¿Eliminar este héroe permanentemente?")) {
+                      onDeleteHero(hero.id);
+                    }
+                  }}
+                  className="p-4 text-stone-500 hover:text-red-500 hover:bg-red-900/20 transition flex items-center justify-center border-r border-stone-700"
+                >
+                  <Trash2 size={18} />
+                </button>
+                <button
+                  onClick={() => handlePlay(hero.id)}
+                  className="flex-1 p-4 text-stone-300 hover:text-yellow-400 hover:bg-yellow-500/10 transition font-bold uppercase tracking-wider text-sm flex items-center justify-center gap-2"
+                >
+                  <Sword size={16} /> Jugar
+                </button>
               </div>
             </div>
+          ))}
 
-            <button
-              onClick={() => setShowAbout(false)}
-              className="w-full mt-6 py-3 bg-stone-800 hover:bg-stone-700 text-stone-100 rounded-xl font-bold transition"
-            >
-              Cerrar
-            </button>
-          </div>
+          <Link
+            to="/create"
+            className="mt-4 p-4 border-2 border-dashed border-stone-700 rounded-2xl flex items-center justify-center gap-2 text-stone-500 hover:text-stone-300 hover:border-stone-500 hover:bg-stone-800 transition group"
+          >
+            <div className="w-8 h-8 rounded-full bg-stone-800 flex items-center justify-center group-hover:bg-stone-700">
+              <Plus size={16} />
+            </div>
+            <span className="font-bold">Crear Nuevo Personaje</span>
+          </Link>
         </div>
       )}
     </div>

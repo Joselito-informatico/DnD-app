@@ -1,30 +1,70 @@
-import { Users, Dices, Book } from 'lucide-react';
-import { useLanguage } from '../context/LanguageContext';
+import { useLocation, useNavigate } from "react-router-dom";
+import { LayoutGrid, Book, Dices } from "lucide-react";
 
-export function BottomNav({ activeTab, onChange }) {
-  const { t } = useLanguage();
+export function BottomNav() {
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const tabs = [
-    { id: 'heroes', icon: Users, label: t('navHeroes') },
-    { id: 'dice', icon: Dices, label: t('navDice') },
-    { id: 'compendium', icon: Book, label: t('navCompendium') },
+    {
+      id: "dashboard",
+      path: "/",
+      icon: LayoutGrid,
+      label: "Héroes",
+    },
+    {
+      id: "compendium",
+      path: "/compendium",
+      icon: Book,
+      label: "Manual",
+    },
+    {
+      id: "dice",
+      path: "/dice",
+      icon: Dices,
+      label: "Dados",
+    },
   ];
 
   return (
-    <div className="fixed bottom-0 left-0 w-full bg-stone-950 border-t border-stone-800 px-6 py-3 flex justify-between items-center z-50 shadow-2xl">
-      {tabs.map((tab) => {
-        const isActive = activeTab === tab.id;
-        return (
-          <button
-            key={tab.id}
-            onClick={() => onChange(tab.id)}
-            className={`flex flex-col items-center gap-1 transition-all duration-300 ${isActive ? 'text-yellow-500 scale-110' : 'text-stone-500 hover:text-stone-300'}`}
-          >
-            <tab.icon size={24} strokeWidth={isActive ? 2.5 : 2} />
-            <span className="text-[10px] font-bold uppercase tracking-wider">{tab.label}</span>
-          </button>
-        );
-      })}
-    </div>
+    <nav className="fixed bottom-0 left-0 w-full bg-stone-900 border-t border-stone-800 pb-safe pt-2 px-6 z-50">
+      <div className="flex justify-around items-center">
+        {tabs.map((tab) => {
+          const isActive = location.pathname === tab.path;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => navigate(tab.path)}
+              className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all duration-300 ${
+                isActive
+                  ? "text-yellow-500 -translate-y-2"
+                  : "text-stone-500 hover:text-stone-300"
+              }`}
+            >
+              <div
+                className={`p-2 rounded-full transition-all ${
+                  isActive
+                    ? "bg-yellow-500/10 shadow-[0_0_15px_rgba(234,179,8,0.3)]"
+                    : ""
+                }`}
+              >
+                <tab.icon
+                  size={24}
+                  strokeWidth={isActive ? 2.5 : 2}
+                  className="transition-transform duration-300"
+                />
+              </div>
+              <span
+                className={`text-[10px] font-bold uppercase tracking-wider ${
+                  isActive ? "opacity-100" : "opacity-0 h-0 overflow-hidden"
+                }`}
+              >
+                {tab.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </nav>
   );
 }

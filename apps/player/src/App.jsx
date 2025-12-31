@@ -1,122 +1,120 @@
 import { useState, useEffect } from "react";
-import { ToastProvider } from "./context/ToastContext";
-import { LanguageProvider } from "./context/LanguageContext";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Dashboard } from "./pages/Dashboard";
 import { CharacterCreator } from "./pages/CharacterCreator";
 import { CombatView } from "./pages/CombatView";
 import { DicePage } from "./pages/DicePage";
-import { Compendium } from "./pages/Compendium";
+import { Compendium } from "./pages/Compendium"; // <--- Tu nueva vista
 import { BottomNav } from "./components/BottomNav";
+import { LanguageProvider } from "./context/LanguageContext";
+import { ToastProvider } from "./context/ToastContext";
 
-function AppContent() {
-  // --- ESTADO DE LA APP ---
-  const [view, setView] = useState("dashboard"); // 'dashboard', 'creator', 'hero', 'dice', 'compendium'
+export default function App() {
+  // Estado global de héroes (Persistencia en LocalStorage)
   const [heroes, setHeroes] = useState(() => {
     const saved = localStorage.getItem("dnd_heroes");
     return saved ? JSON.parse(saved) : [];
   });
-  const [activeHero, setActiveHero] = useState(null);
 
-  // Guardar automáticamente al cambiar héroes
+  const [selectedHeroId, setSelectedHeroId] = useState(null);
+
   useEffect(() => {
     localStorage.setItem("dnd_heroes", JSON.stringify(heroes));
   }, [heroes]);
 
-  // --- ACCIONES ---
-  const handleSaveHero = (newHero) => {
-    setHeroes([...heroes, newHero]);
-    setView("dashboard");
+  const addHero = (hero) => {
+    setHeroes([...heroes, hero]);
   };
 
-  const handleUpdateHero = (updatedHero) => {
-    const updatedList = heroes.map((h) =>
-      h.id === updatedHero.id ? updatedHero : h
-    );
-    setHeroes(updatedList);
-    setActiveHero(updatedHero); // Mantener la vista actualizada
+  const updateHero = (updatedHero) => {
+    setHeroes(heroes.map((h) => (h.id === updatedHero.id ? updatedHero : h)));
   };
 
-  const handleDeleteHero = (heroId) => {
-    const updatedList = heroes.filter((h) => h.id !== heroId);
-    setHeroes(updatedList);
-    setActiveHero(null);
-    setView("dashboard");
+  const deleteHero = (id) => {
+    setHeroes(heroes.filter((h) => h.id !== id));
+    if (selectedHeroId === id) setSelectedHeroId(null);
   };
 
-  const handleImport = (importedData) => {
-    setHeroes(importedData);
-    setView("dashboard");
-  };
+  const activeHero = heroes.find((h) => h.id === selectedHeroId);
 
-  const handleNavigate = (hero) => {
-    setActiveHero(hero);
-    setView("hero");
-  };
-
-  // --- RENDERIZADO DE VISTAS ---
-  return (
-    <div className="min-h-screen bg-neutral-900 text-stone-100 font-sans selection:bg-yellow-500 selection:text-stone-900">
-      {/* VISTA: DASHBOARD (Lista de Héroes) */}
-      {view === "dashboard" && (
-        <Dashboard
-          heroes={heroes}
-          onNavigate={handleNavigate}
-          onCreate={() => setView("creator")}
-          onImport={handleImport}
-          onRandom={() => {
-            // Import dinámico para evitar ciclos si fuera necesario, o uso directo
-            import("./utils/randomizer").then((mod) => {
-              const randomHero = mod.generateRandomHero();
-              handleSaveHero(randomHero);
-            });
-          }}
-        />
-      )}
-
-      {/* VISTA: CREADOR DE PERSONAJES */}
-      {view === "creator" && (
-        <CharacterCreator
-          onBack={() => setView("dashboard")}
-          onSave={handleSaveHero}
-        />
-      )}
-
-      {/* VISTA: HOJA DE PERSONAJE (COMBATE) */}
-      {view === "hero" && activeHero && (
-        <CombatView
-          hero={activeHero}
-          onBack={() => {
-            setActiveHero(null);
-            setView("dashboard");
-          }}
-          onUpdateHero={handleUpdateHero}
-          onDeleteHero={handleDeleteHero}
-        />
-      )}
-
-      {/* VISTA: DADOS RAPIDOS */}
-      {view === "dice" && <DicePage />}
-
-      {/* VISTA: COMPENDIO */}
-      {view === "compendium" && (
-        <Compendium onBack={() => setView("dashboard")} />
-      )}
-
-      {/* BARRA DE NAVEGACIÓN INFERIOR (Solo visible en dashboard, dados y compendio) */}
-      {["dashboard", "dice", "compendium"].includes(view) && (
-        <BottomNav activeTab={view} onChange={setView} />
-      )}
-    </div>
-  );
-}
-
-// Punto de entrada con Proveedores de Contexto
-export default function App() {
   return (
     <LanguageProvider>
       <ToastProvider>
-        <AppContent />
+        <BrowserRouter>
+          <div className="bg-neutral-900 min-h-screen text-stone-200 font-sans">
+            <Routes>
+              {/* DASHBOARD: Lista de Personajes */}
+              <Route
+                path="/"
+                element={
+                  <Dashboard
+                    heroes={heroes}
+                    onSelectHero={(id) => setSelectedHeroId(id)}
+                    onDeleteHero={deleteHero}
+                  />
+                }
+              />
+
+              {/* CREATOR: Nuevo Personaje */}
+              <Route
+                path="/create"
+                element={
+                  <CharacterCreator
+                    onBack={() => window.history.back()}
+                    onSave={(hero) => {
+                      addHero(hero);
+                      window.location.href = "/";
+                    }}
+                  />
+                }
+              />
+
+              {/* COMBAT: La vista principal de juego */}
+              <Route
+                path="/play"
+                element={
+                  activeHero ? (
+                    <CombatView
+                      hero={activeHero}
+                      onBack={() => setSelectedHeroId(null)}
+                      onUpdateHero={updateHero}
+                      onDeleteHero={(id) => {
+                        deleteHero(id);
+                        window.location.href = "/";
+                      }}
+                    />
+                  ) : (
+                    <Navigate to="/" replace />
+                  )
+                }
+              />
+
+              {/* COMPENDIUM: Referencia Rápida */}
+              <Route path="/compendium" element={<Compendium />} />
+
+              {/* DICE: Lanzador de dados independiente */}
+              <Route path="/dice" element={<DicePage />} />
+
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+
+            {/* BARRA DE NAVEGACIÓN INFERIOR */}
+            {/* Solo la mostramos si NO estamos en combate o creando personaje */}
+            {/* (O puedes decidir mostrarla siempre. Aquí la mostramos para navegar entre Home/Compendio/Dados) */}
+            <IsNavVisible>
+              <BottomNav />
+            </IsNavVisible>
+          </div>
+        </BrowserRouter>
       </ToastProvider>
     </LanguageProvider>
   );
+}
+
+// Helper para ocultar la nav en vistas inmersivas
+function IsNavVisible({ children }) {
+  const path = window.location.pathname;
+  // Ocultamos la nav en Combate (/play) y Creación (/create) para ganar espacio
+  if (path === "/play" || path === "/create") return null;
+  return children;
 }
