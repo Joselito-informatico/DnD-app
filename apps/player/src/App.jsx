@@ -1,16 +1,35 @@
 import { useState, useEffect } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  useLocation,
+} from "react-router-dom";
 import { Dashboard } from "./pages/Dashboard";
 import { CharacterCreator } from "./pages/CharacterCreator";
 import { CombatView } from "./pages/CombatView";
 import { DicePage } from "./pages/DicePage";
-import { Compendium } from "./pages/Compendium"; // <--- Tu nueva vista
+import { Compendium } from "./pages/Compendium";
 import { BottomNav } from "./components/BottomNav";
 import { LanguageProvider } from "./context/LanguageContext";
 import { ToastProvider } from "./context/ToastContext";
 
+// Componente para controlar la visibilidad de la navegación
+function NavigationController({ children }) {
+  const location = useLocation();
+  // Rutas donde NO queremos ver la barra de navegación (Modo inmersivo)
+  const hideNavRoutes = ["/play", "/create"];
+
+  if (hideNavRoutes.includes(location.pathname)) {
+    return null;
+  }
+
+  return children;
+}
+
 export default function App() {
-  // Estado global de héroes (Persistencia en LocalStorage)
+  // Estado persistente: Carga héroes guardados o inicia array vacío
   const [heroes, setHeroes] = useState(() => {
     const saved = localStorage.getItem("dnd_heroes");
     return saved ? JSON.parse(saved) : [];
@@ -18,6 +37,7 @@ export default function App() {
 
   const [selectedHeroId, setSelectedHeroId] = useState(null);
 
+  // Efecto: Guarda automáticamente en LocalStorage cada vez que cambian los héroes
   useEffect(() => {
     localStorage.setItem("dnd_heroes", JSON.stringify(heroes));
   }, [heroes]);
@@ -41,9 +61,9 @@ export default function App() {
     <LanguageProvider>
       <ToastProvider>
         <BrowserRouter>
-          <div className="bg-neutral-900 min-h-screen text-stone-200 font-sans">
+          <div className="bg-neutral-900 min-h-screen text-stone-200 font-sans pb-20">
             <Routes>
-              {/* DASHBOARD: Lista de Personajes */}
+              {/* DASHBOARD: Pantalla Principal */}
               <Route
                 path="/"
                 element={
@@ -55,7 +75,7 @@ export default function App() {
                 }
               />
 
-              {/* CREATOR: Nuevo Personaje */}
+              {/* CREATOR: Crear Personaje */}
               <Route
                 path="/create"
                 element={
@@ -69,7 +89,7 @@ export default function App() {
                 }
               />
 
-              {/* COMBAT: La vista principal de juego */}
+              {/* COMBAT: Hoja de Personaje y Juego */}
               <Route
                 path="/play"
                 element={
@@ -89,32 +109,23 @@ export default function App() {
                 }
               />
 
-              {/* COMPENDIUM: Referencia Rápida */}
+              {/* COMPENDIUM: Manual de Reglas y Hechizos */}
               <Route path="/compendium" element={<Compendium />} />
 
-              {/* DICE: Lanzador de dados independiente */}
+              {/* DICE: Lanzador de Dados */}
               <Route path="/dice" element={<DicePage />} />
 
+              {/* Fallback: Redirigir a Home si la ruta no existe */}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
 
-            {/* BARRA DE NAVEGACIÓN INFERIOR */}
-            {/* Solo la mostramos si NO estamos en combate o creando personaje */}
-            {/* (O puedes decidir mostrarla siempre. Aquí la mostramos para navegar entre Home/Compendio/Dados) */}
-            <IsNavVisible>
+            {/* BARRA DE NAVEGACIÓN INFERIOR (Visible solo fuera de combate/creación) */}
+            <NavigationController>
               <BottomNav />
-            </IsNavVisible>
+            </NavigationController>
           </div>
         </BrowserRouter>
       </ToastProvider>
     </LanguageProvider>
   );
-}
-
-// Helper para ocultar la nav en vistas inmersivas
-function IsNavVisible({ children }) {
-  const path = window.location.pathname;
-  // Ocultamos la nav en Combate (/play) y Creación (/create) para ganar espacio
-  if (path === "/play" || path === "/create") return null;
-  return children;
 }

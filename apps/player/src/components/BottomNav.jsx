@@ -27,24 +27,24 @@ export function BottomNav() {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 w-full bg-stone-900 border-t border-stone-800 pb-safe pt-2 px-6 z-50">
-      <div className="flex justify-around items-center">
+    <nav className="fixed bottom-0 left-0 w-full bg-stone-900 border-t border-stone-800 pb-4 pt-2 px-6 z-50 safe-area-bottom">
+      <div className="flex justify-around items-center h-14">
         {tabs.map((tab) => {
           const isActive = location.pathname === tab.path;
           return (
             <button
               key={tab.id}
               onClick={() => navigate(tab.path)}
-              className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all duration-300 ${
+              className={`relative flex flex-col items-center justify-center gap-1 w-16 transition-all duration-300 ${
                 isActive
-                  ? "text-yellow-500 -translate-y-2"
+                  ? "text-yellow-500 -translate-y-1"
                   : "text-stone-500 hover:text-stone-300"
               }`}
             >
               <div
-                className={`p-2 rounded-full transition-all ${
+                className={`p-1.5 rounded-full transition-all ${
                   isActive
-                    ? "bg-yellow-500/10 shadow-[0_0_15px_rgba(234,179,8,0.3)]"
+                    ? "bg-yellow-500/10 shadow-[0_0_15px_rgba(234,179,8,0.2)]"
                     : ""
                 }`}
               >
@@ -55,7 +55,7 @@ export function BottomNav() {
                 />
               </div>
               <span
-                className={`text-[10px] font-bold uppercase tracking-wider ${
+                className={`text-[10px] font-bold uppercase tracking-wider transition-opacity duration-300 ${
                   isActive ? "opacity-100" : "opacity-0 h-0 overflow-hidden"
                 }`}
               >
