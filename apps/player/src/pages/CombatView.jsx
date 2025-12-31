@@ -2,10 +2,6 @@ import { useState } from "react";
 import {
   ArrowLeft,
   Shield,
-  Heart,
-  Zap,
-  Sword,
-  X,
   Activity,
   Settings,
   Moon,
@@ -16,17 +12,7 @@ import {
   Plus,
   Flame,
   Sparkles,
-  Star,
-  Languages,
   Eye,
-  Skull,
-  Coffee,
-  Quote,
-  Users,
-  Gem,
-  PenTool,
-  AlertTriangle,
-  Minus,
   Search,
   Dices,
   Copy,
@@ -36,19 +22,23 @@ import {
   ToggleLeft,
   ToggleRight,
   Crown,
+  AlertTriangle,
+  Minus,
+  Coffee,
+  X,
+  Sword,
 } from "lucide-react";
 
-// --- IMPORTACIONES ACTUALIZADAS ---
 import { CLASSES } from "../data/character";
 import { SKILLS, CONDITIONS, XP_TABLE } from "../data/rules";
-import { SPELLS as SRD_SPELLS } from "../data/spells"; // Usamos la BD completa como fallback
-// ----------------------------------
+import { SPELLS as SRD_SPELLS } from "../data/spells";
 
 import { useLanguage } from "../context/LanguageContext";
 import { useToast } from "../context/ToastContext";
 import { searchSpells, searchEquipment } from "../utils/dndApi";
 import { rollDamage, findDiceFormula } from "../utils/dice";
-import { calculateAC } from "../utils/rules";
+import { calculateAC } from "../utils/rules"; // Lógica delegada al Core
+import { CombatStats } from "../components/combat/CombatStats"; // Nuevo componente modular
 
 export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const { t } = useLanguage();
@@ -95,6 +85,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
 
+  // --- CÁLCULOS PRINCIPALES ---
   const proficiencyBonus = Math.floor(2 + (hero.level - 1) / 4);
   const getModifier = (score) => Math.floor((score - 10) / 2);
   const stats = hero.stats;
@@ -110,43 +101,16 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const fallbackMaxHP = 10 + mods.con + (hero.level - 1) * 6;
   const maxHP = hero.maxHP || fallbackMaxHP;
   const currentHP = hero.currentHP ?? maxHP;
-  const hpPercent = Math.min(100, Math.max(0, (currentHP / maxHP) * 100));
 
-  let calculatedAC = calculateAC(hero.inventory || [], mods.dex, hero.features);
-
-  const hasArmor = (hero.inventory || []).some(
-    (i) =>
-      i.isEquipped &&
-      i.type === "armor" &&
-      i.armorType !== "Escudo" &&
-      i.armorType !== "shield"
-  );
-  const hasBarbarianDefense = (hero.features || []).some(
-    (f) => f.name === "Defensa sin Armadura" && f.desc.includes("CON")
-  );
-  const hasMonkDefense = (hero.features || []).some(
-    (f) => f.name === "Defensa sin Armadura" && f.desc.includes("SAB")
+  // CÁLCULO DE CA DELEGADO AL CORE
+  const armorClass = calculateAC(
+    hero.inventory || [],
+    hero.stats,
+    hero.features,
+    hero.class
   );
 
-  if (!hasArmor) {
-    if (hasBarbarianDefense) calculatedAC = 10 + mods.dex + mods.con;
-    if (hasMonkDefense) calculatedAC = 10 + mods.dex + mods.wis;
-
-    const equippedShield = (hero.inventory || []).find(
-      (i) =>
-        i.isEquipped &&
-        (i.type === "shield" ||
-          i.armorType === "shield" ||
-          i.armorType === "Escudo" ||
-          i.name.toLowerCase().includes("escudo"))
-    );
-    if (equippedShield && hasBarbarianDefense)
-      calculatedAC += parseInt(equippedShield.ac) || 2;
-  }
-  const armorClass = calculatedAC;
-  const initiative = mods.dex >= 0 ? `+${mods.dex}` : mods.dex;
   const inspiration = hero.inspiration || false;
-
   const skillProfs = hero.skillProfs || [];
   const expertises = hero.expertises || [];
 
@@ -164,10 +128,8 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const heroClassData = CLASSES.find((c) => c.name === hero.class);
   const saveProficiencies =
     hero.saveProficiencies || (heroClassData ? heroClassData.saves : []);
-  const proficiencies = heroClassData ? heroClassData.proficiencies : [];
-  const hitDieType = heroClassData ? heroClassData.hitDie : "d8";
-  const hitDiceUsed = hero.hitDiceUsed || 0;
   const hitDiceTotal = hero.level;
+  const hitDiceUsed = hero.hitDiceUsed || 0;
   const deathSaves = hero.deathSaves || { successes: 0, failures: 0 };
   const xp = hero.xp || 0;
   const currentLevelBaseXP = XP_TABLE[hero.level] || 0;
@@ -202,11 +164,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
       : "wis";
   const spellAttackBonus = mods[spellCastingStat] + proficiencyBonus;
   const spellSaveDC = 8 + proficiencyBonus + mods[spellCastingStat];
-  const languages = ["Común"];
-  if (hero.race === "Elfo") languages.push("Élfico");
-  if (hero.race === "Enano") languages.push("Enano");
-  if (hero.race === "Tiefling") languages.push("Infernal");
-  if (hero.race === "Humano") languages.push("Un idioma extra");
 
   const getD20Roll = () => {
     const r1 = Math.floor(Math.random() * 20) + 1;
@@ -313,48 +270,37 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
       });
     }
   };
+
   const toggleEquip = (itemId) => {
     const updatedInventory = inventory.map((item) => {
       if (item.id === itemId) return { ...item, isEquipped: !item.isEquipped };
+
       const currentItem = inventory.find((i) => i.id === itemId);
-      if (
-        currentItem &&
-        currentItem.type === "armor" &&
-        currentItem.armorType !== "shield" &&
-        currentItem.armorType !== "Escudo"
-      ) {
-        if (
-          item.type === "armor" &&
-          item.armorType !== "shield" &&
-          item.armorType !== "Escudo" &&
-          item.id !== itemId
-        )
-          return { ...item, isEquipped: false };
+      const isShield =
+        currentItem?.type === "shield" ||
+        currentItem?.armorCategory === "shield" ||
+        currentItem?.armorType === "Escudo";
+
+      if (currentItem?.type === "armor" && !isShield && item.id === itemId) {
+        return { ...item, isEquipped: !item.isEquipped };
       }
+
+      if (currentItem?.type === "armor" && !isShield && item.type === "armor") {
+        const itemIsShield =
+          item.armorCategory === "shield" || item.armorType === "Escudo";
+        if (!itemIsShield && item.id !== itemId) {
+          return { ...item, isEquipped: false };
+        }
+      }
+
       return item;
     });
     onUpdateHero({ ...hero, inventory: updatedInventory });
   };
+
   const handleShortRestClick = () => {
     setShowMenu(false);
     setShowShortRest(true);
-  };
-  const handleApplyHeal = (amount, diceCost) => {
-    const newHP = Math.min(maxHP, currentHP + amount);
-    const newHitDiceUsed = hitDiceUsed + diceCost;
-    let newSlots = spellSlots;
-    if (hero.class === "Brujo") {
-      newSlots = { ...spellSlots };
-      Object.keys(newSlots).forEach((level) => (newSlots[level].used = 0));
-      showToast("Magia de Pacto restaurada!", "success");
-    }
-    onUpdateHero({
-      ...hero,
-      currentHP: newHP,
-      hitDiceUsed: newHitDiceUsed,
-      spellSlots: newSlots,
-    });
-    showToast(`Curado ${amount} PG`, "success");
   };
   const updateXP = (val) => {
     const newXP = Math.max(0, parseInt(val) || 0);
@@ -455,7 +401,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     showToast("Exportado correctamente", "success");
   };
   const handleCopySummary = () => {
-    const summary = `**${hero.name}** | ${hero.race} ${hero.class} ${hero.level}\n❤️ PG: ${currentHP}/${maxHP} | 🛡️ CA: ${armorClass} | ⚡ Init: ${initiative}\n📝 PP: ${passivePerception} | CD: ${spellSaveDC}`;
+    const summary = `**${hero.name}** | ${hero.race} ${hero.class} ${hero.level}\n❤️ PG: ${currentHP}/${maxHP} | 🛡️ CA: ${armorClass} | ⚡ Init: ${mods.dex}\n📝 PP: ${passivePerception} | CD: ${spellSaveDC}`;
     navigator.clipboard.writeText(summary);
     setShowMenu(false);
     showToast("Resumen copiado", "success");
@@ -657,12 +603,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
     };
     onUpdateHero({ ...hero, spellSlots: newSlots });
   };
-  const updateDeathSave = (type, index) => {
-    const currentVal = deathSaves[type];
-    const newVal = index + 1 === currentVal ? index : index + 1;
-    const newSaves = { ...deathSaves, [type]: newVal };
-    onUpdateHero({ ...hero, deathSaves: newSaves });
-  };
   const toggleInspiration = () => {
     const newState = !inspiration;
     onUpdateHero({ ...hero, inspiration: newState });
@@ -741,6 +681,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         </button>
       </header>
 
+      {/* MENÚ FLOTANTE */}
       {showMenu && (
         <div className="absolute top-20 right-6 z-20 w-56 bg-stone-800 border border-stone-700 rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in duration-200 origin-top-right">
           <button
@@ -776,6 +717,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         </div>
       )}
 
+      {/* MODALES DE EDICIÓN */}
       {editingStat && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-stone-900 border border-stone-700 p-6 rounded-2xl w-full max-w-xs animate-in zoom-in duration-200">
@@ -939,7 +881,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         </div>
       )}
 
-      {/* TABS */}
+      {/* TABS DE NAVEGACIÓN */}
       <div className="flex px-4 border-b border-stone-800 mb-4 overflow-x-auto no-scrollbar">
         {[
           { id: "combat", label: "Combate" },
@@ -966,112 +908,65 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         className="flex-1 overflow-y-auto px-6 space-y-6 pb-24"
         onClick={() => setShowMenu(false)}
       >
-        {/* TAB COMBAT */}
+        {/* --- PESTAÑA DE COMBATE (REFACTORIZADA) --- */}
         {activeTab === "combat" && (
           <div className="space-y-6 animate-in slide-in-from-left duration-200">
-            <div className="flex gap-3 mb-2">
-              <button
-                onClick={toggleInspiration}
-                className={`p-3 rounded-xl border flex flex-col items-center justify-center transition w-16 shrink-0 ${
-                  inspiration
-                    ? "bg-yellow-500/20 border-yellow-500 text-yellow-500"
-                    : "bg-stone-800 border-stone-700 text-stone-500 grayscale"
-                }`}
-              >
-                <Star size={20} fill={inspiration ? "currentColor" : "none"} />
-                <span className="text-[10px] font-bold uppercase mt-1">
-                  Inspir.
-                </span>
-              </button>
-              <div className="flex-1 bg-stone-800 rounded-xl border border-stone-700 flex p-1 relative">
-                <div
-                  className={`absolute top-1 bottom-1 w-[32%] bg-stone-700 rounded-lg transition-all duration-300 ${
-                    rollMode === "adv"
-                      ? "left-[34%]"
-                      : rollMode === "dis"
-                      ? "left-[67%]"
-                      : "left-1"
-                  }`}
-                ></div>
-                <button
-                  onClick={() =>
-                    setRollMode(rollMode === "normal" ? "normal" : "normal")
-                  }
-                  className={`flex-1 z-10 text-[10px] font-bold uppercase py-2 rounded-lg transition ${
-                    rollMode === "normal" ? "text-white" : "text-stone-500"
-                  }`}
-                >
-                  NORM
-                </button>
-                <button
-                  onClick={() =>
-                    setRollMode(rollMode === "adv" ? "normal" : "adv")
-                  }
-                  className={`flex-1 z-10 text-[10px] font-bold uppercase py-2 rounded-lg transition ${
-                    rollMode === "adv" ? "text-green-400" : "text-stone-500"
-                  }`}
-                >
-                  VENT
-                </button>
-                <button
-                  onClick={() =>
-                    setRollMode(rollMode === "dis" ? "normal" : "dis")
-                  }
-                  className={`flex-1 z-10 text-[10px] font-bold uppercase py-2 rounded-lg transition ${
-                    rollMode === "dis" ? "text-red-400" : "text-stone-500"
-                  }`}
-                >
-                  DESV
-                </button>
-              </div>
-              <div className="bg-stone-800 p-3 rounded-xl border border-stone-700 flex flex-col items-center justify-center w-16 shrink-0">
-                <Zap className="text-yellow-600 mb-1 w-5 h-5" />
-                <span className="text-xs text-stone-400 font-bold uppercase">
-                  INIT
-                </span>
-                <span className="text-xl font-bold text-yellow-500">
-                  {initiative}
-                </span>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-stone-800 p-3 rounded-xl border border-stone-700 flex flex-col items-center justify-center relative overflow-hidden">
-                <Shield className="text-stone-600 absolute opacity-20 -right-2 -bottom-2 w-16 h-16" />
-                <span className="text-xs text-stone-400 font-bold uppercase">
-                  CA
-                </span>
-                <span className="text-3xl font-bold text-stone-100">
-                  {armorClass}
-                </span>
-              </div>
+            {/* 1. Nuevo Componente de Estadísticas */}
+            <CombatStats
+              ac={armorClass}
+              initiative={mods.dex}
+              hp={currentHP}
+              maxHp={maxHP}
+              inspiration={inspiration}
+              onToggleInspiration={toggleInspiration}
+              onEditHp={() => setIsEditingMaxHP(true)}
+              onRollInitiative={() => rollCheck("Iniciativa", mods.dex)}
+            />
+
+            {/* 2. Selector de Ventaja/Desventaja */}
+            <div className="bg-stone-800 rounded-xl border border-stone-700 flex p-1 relative">
               <div
-                onClick={() => setIsEditingMaxHP(true)}
-                className={`p-3 rounded-xl border flex flex-col items-center justify-center transition duration-300 relative overflow-hidden cursor-pointer hover:border-yellow-500 ${
-                  currentHP === 0
-                    ? "bg-red-900/30 border-red-500 animate-pulse"
-                    : "bg-stone-800 border-stone-700"
+                className={`absolute top-1 bottom-1 w-[32%] bg-stone-700 rounded-lg transition-all duration-300 ${
+                  rollMode === "adv"
+                    ? "left-[34%]"
+                    : rollMode === "dis"
+                    ? "left-[67%]"
+                    : "left-1"
+                }`}
+              ></div>
+              <button
+                onClick={() =>
+                  setRollMode(rollMode === "normal" ? "normal" : "normal")
+                }
+                className={`flex-1 z-10 text-[10px] font-bold uppercase py-2 rounded-lg transition ${
+                  rollMode === "normal" ? "text-white" : "text-stone-500"
                 }`}
               >
-                <div className="absolute bottom-0 left-0 h-1 bg-stone-700 w-full">
-                  <div
-                    className="h-full bg-green-500 transition-all duration-500"
-                    style={{ width: `${hpPercent}%` }}
-                  ></div>
-                </div>
-                <Heart
-                  className={`mb-1 w-5 h-5 ${
-                    currentHP === 0 ? "text-red-500" : "text-red-500"
-                  }`}
-                />
-                <span className="text-xs text-stone-400 font-bold uppercase">
-                  PG
-                </span>
-                <span className="text-xl font-bold text-stone-100 z-10">
-                  {currentHP}{" "}
-                  <span className="text-sm text-stone-500">/ {maxHP}</span>
-                </span>
-              </div>
+                NORM
+              </button>
+              <button
+                onClick={() =>
+                  setRollMode(rollMode === "adv" ? "normal" : "adv")
+                }
+                className={`flex-1 z-10 text-[10px] font-bold uppercase py-2 rounded-lg transition ${
+                  rollMode === "adv" ? "text-green-400" : "text-stone-500"
+                }`}
+              >
+                VENT
+              </button>
+              <button
+                onClick={() =>
+                  setRollMode(rollMode === "dis" ? "normal" : "dis")
+                }
+                className={`flex-1 z-10 text-[10px] font-bold uppercase py-2 rounded-lg transition ${
+                  rollMode === "dis" ? "text-red-400" : "text-stone-500"
+                }`}
+              >
+                DESV
+              </button>
             </div>
+
+            {/* 3. Botones Rápidos de Curación/Daño */}
             <div className="flex gap-2">
               <button
                 onClick={() => changeHP(-1)}
@@ -1087,7 +982,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               </button>
             </div>
 
-            {/* ATAQUES Y ARMAS */}
+            {/* 4. Lista de Ataques */}
             <div>
               <div className="flex justify-between items-center mb-3">
                 <h3 className="text-stone-400 font-bold text-sm uppercase tracking-wider">
@@ -1180,6 +1075,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               </div>
             </div>
 
+            {/* 5. Recursos, Estados y Rasgos */}
             <div>
               <div className="flex justify-between items-center mb-2">
                 <h3 className="text-stone-400 font-bold text-sm uppercase tracking-wider">
@@ -1407,7 +1303,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         {/* TAB SKILLS */}
         {activeTab === "skills" && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
-            {/* Contenido de habilidades (Mantenido igual) */}
             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Eye className="text-stone-400" />
@@ -1560,7 +1455,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         {/* TAB SPELLS */}
         {activeTab === "spells" && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
-            {/* Stats de Magia */}
             <div className="flex items-start gap-4">
               <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 grid grid-cols-2 gap-4 flex-1">
                 <div className="flex flex-col items-center border-r border-stone-700">
@@ -1865,7 +1759,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         {/* TAB INVENTORY */}
         {activeTab === "inventory" && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
-            {/* Monedas y Equipo (Mantenido igual) */}
             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700">
               <h3 className="text-stone-400 font-bold text-xs uppercase mb-3 flex items-center gap-2">
                 <span className="text-yellow-500">●</span> Monedas
@@ -2037,7 +1930,6 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         {/* TAB PROFILE */}
         {activeTab === "profile" && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
-            {/* Contenido de perfil se mantiene igual */}
             <div className="bg-stone-800 p-5 rounded-xl border border-stone-700">
               <div className="flex items-center gap-4 mb-4 pb-4 border-b border-stone-700">
                 <div className="w-16 h-16 bg-stone-700 rounded-full flex items-center justify-center border-2 border-yellow-500/50">
@@ -2092,7 +1984,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
             </div>
             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700">
               <h3 className="text-stone-400 font-bold text-sm mb-3 uppercase tracking-wider flex items-center gap-2">
-                <PenTool size={16} /> Atributos Base
+                <Settings size={16} /> Atributos Base
               </h3>
               <div className="grid grid-cols-3 gap-3">
                 {Object.keys(stats).map((statName) => (
@@ -2121,11 +2013,10 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
                 ))}
               </div>
             </div>
-            {/* Resto de detalles de perfil */}
             <div className="grid grid-cols-1 gap-4">
               <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 border-dashed">
                 <h3 className="text-stone-400 font-bold text-sm mb-2 uppercase flex items-center gap-2">
-                  <Users size={16} /> Aliados
+                  <User size={16} /> Aliados
                 </h3>
                 <textarea
                   className="w-full bg-transparent text-stone-300 text-sm italic outline-none resize-none h-20 placeholder-stone-600"
@@ -2135,7 +2026,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
               </div>
               <div className="bg-stone-800 p-4 rounded-xl border border-stone-700 border-dashed">
                 <h3 className="text-stone-400 font-bold text-sm mb-2 uppercase flex items-center gap-2">
-                  <Gem size={16} /> Tesoro
+                  <Backpack size={16} /> Tesoro
                 </h3>
                 <textarea
                   className="w-full bg-transparent text-stone-300 text-sm italic outline-none resize-none h-20 placeholder-stone-600"
@@ -2156,6 +2047,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         )}
       </div>
 
+      {/* MODAL DE RESULTADO DE TIRADA */}
       {rollResult && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-stone-900 border border-stone-700 p-6 rounded-2xl shadow-2xl w-full max-w-sm relative text-center">
