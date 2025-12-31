@@ -6,6 +6,7 @@
     "packages/*"
   ],
   "scripts": {
-    "player": "npm run dev --workspace=apps/player"
+    "player": "npm run dev --workspace=apps/player",
+    "build:player": "npm run build --workspace=apps/player"
   }
 }
