@@ -1,3 +1,5 @@
+import { ARMOR_TYPES } from "@dnd/core";
+
 // Fuente: SRD 5.1 Español - Armas, Armaduras y Equipo
 
 // ==========================================
@@ -361,6 +363,7 @@ export const ARMOR = [
   {
     name: "Acolchada",
     category: "Ligera",
+    armorCategory: ARMOR_TYPES.LIGHT,
     ac: "11 + Des",
     strength: "-",
     stealth: "Desventaja",
@@ -370,6 +373,7 @@ export const ARMOR = [
   {
     name: "Cuero",
     category: "Ligera",
+    armorCategory: ARMOR_TYPES.LIGHT,
     ac: "11 + Des",
     strength: "-",
     stealth: "-",
@@ -379,6 +383,7 @@ export const ARMOR = [
   {
     name: "Cuero tachonado",
     category: "Ligera",
+    armorCategory: ARMOR_TYPES.LIGHT,
     ac: "12 + Des",
     strength: "-",
     stealth: "-",
@@ -390,6 +395,7 @@ export const ARMOR = [
   {
     name: "Pieles",
     category: "Media",
+    armorCategory: ARMOR_TYPES.MEDIUM,
     ac: "12 + Des (max 2)",
     strength: "-",
     stealth: "-",
@@ -399,6 +405,7 @@ export const ARMOR = [
   {
     name: "Camisote de mallas",
     category: "Media",
+    armorCategory: ARMOR_TYPES.MEDIUM,
     ac: "13 + Des (max 2)",
     strength: "-",
     stealth: "-",
@@ -408,6 +415,7 @@ export const ARMOR = [
   {
     name: "Cota de escamas",
     category: "Media",
+    armorCategory: ARMOR_TYPES.MEDIUM,
     ac: "14 + Des (max 2)",
     strength: "-",
     stealth: "Desventaja",
@@ -417,6 +425,7 @@ export const ARMOR = [
   {
     name: "Coraza",
     category: "Media",
+    armorCategory: ARMOR_TYPES.MEDIUM,
     ac: "14 + Des (max 2)",
     strength: "-",
     stealth: "-",
@@ -426,6 +435,7 @@ export const ARMOR = [
   {
     name: "Semiplacas",
     category: "Media",
+    armorCategory: ARMOR_TYPES.MEDIUM,
     ac: "15 + Des (max 2)",
     strength: "-",
     stealth: "Desventaja",
@@ -437,6 +447,7 @@ export const ARMOR = [
   {
     name: "Cota de anillas",
     category: "Pesada",
+    armorCategory: ARMOR_TYPES.HEAVY,
     ac: "14",
     strength: "-",
     stealth: "Desventaja",
@@ -446,6 +457,7 @@ export const ARMOR = [
   {
     name: "Cota de mallas",
     category: "Pesada",
+    armorCategory: ARMOR_TYPES.HEAVY,
     ac: "16",
     strength: "Fue 13",
     stealth: "Desventaja",
@@ -455,6 +467,7 @@ export const ARMOR = [
   {
     name: "Cota de bandas",
     category: "Pesada",
+    armorCategory: ARMOR_TYPES.HEAVY,
     ac: "17",
     strength: "Fue 15",
     stealth: "Desventaja",
@@ -464,6 +477,7 @@ export const ARMOR = [
   {
     name: "Placas",
     category: "Pesada",
+    armorCategory: ARMOR_TYPES.HEAVY,
     ac: "18",
     strength: "Fue 15",
     stealth: "Desventaja",
@@ -475,6 +489,7 @@ export const ARMOR = [
   {
     name: "Escudo",
     category: "Escudo",
+    armorCategory: ARMOR_TYPES.SHIELD,
     ac: "+2",
     strength: "-",
     stealth: "-",
