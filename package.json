@@ -7,6 +7,6 @@
   ],
   "scripts": {
     "player": "npm run dev --workspace=apps/player",
-    "build:player": "npm run build --workspace=apps/player"
+    "build:player": "cd apps/player && npm run build"
   }
 }
