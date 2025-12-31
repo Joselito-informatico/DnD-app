@@ -27,6 +27,7 @@ import {
   Coffee,
   X,
   Sword,
+  Weight,
 } from "lucide-react";
 
 import { CLASSES } from "../data/character";
@@ -37,8 +38,9 @@ import { useLanguage } from "../context/LanguageContext";
 import { useToast } from "../context/ToastContext";
 import { searchSpells, searchEquipment } from "../utils/dndApi";
 import { rollDamage, findDiceFormula } from "../utils/dice";
-import { calculateAC } from "../utils/rules"; // Lógica delegada al Core
-import { CombatStats } from "../components/combat/CombatStats"; // Nuevo componente modular
+import { calculateAC } from "../utils/rules";
+import { CombatStats } from "../components/combat/CombatStats";
+import { InventoryStats } from "../components/combat/InventoryStats"; // <--- NUEVO COMPONENTE
 
 export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   const { t } = useLanguage();
@@ -454,6 +456,8 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
       isEquipped: false,
       damage: item.damage,
       stat: attackStat,
+      weight: item.weight || "0", // Importar peso
+      cost: item.cost || "0",
     };
 
     let newInventoryList = [...inventory, newItem];
@@ -617,7 +621,7 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
   };
   const addItem = () => {
     if (!newItemName.trim()) return;
-    const newItem = { id: Date.now(), name: newItemName, qty: 1 };
+    const newItem = { id: Date.now(), name: newItemName, qty: 1, weight: "0" };
     onUpdateHero({ ...hero, inventory: [...inventory, newItem] });
     setNewItemName("");
     showToast("Objeto añadido", "success");
@@ -1759,6 +1763,13 @@ export function CombatView({ hero, onBack, onUpdateHero, onDeleteHero }) {
         {/* TAB INVENTORY */}
         {activeTab === "inventory" && (
           <div className="space-y-6 animate-in slide-in-from-right duration-200">
+            {/* NUEVO: ESTADÍSTICAS DE INVENTARIO Y PESO */}
+            <InventoryStats
+              inventory={inventory}
+              money={money}
+              strength={stats.str}
+            />
+
             <div className="bg-stone-800 p-4 rounded-xl border border-stone-700">
               <h3 className="text-stone-400 font-bold text-xs uppercase mb-3 flex items-center gap-2">
                 <span className="text-yellow-500">●</span> Monedas
