@@ -1,385 +1,347 @@
-import React, { useState, useEffect } from "react";
+import { useState } from "react";
 import {
-  searchSpells,
-  searchEquipment,
-  searchRules,
-  searchCharacterOptions,
-} from "../utils/dndApi";
-import { rollDamage } from "../utils/dice";
-import { useToast } from "../context/ToastContext";
-import { CLASSES } from "../data/character";
+  Search,
+  Book,
+  Sword,
+  Shield,
+  Zap,
+  Skull,
+  ScrollText,
+  X,
+  ChevronRight,
+  Filter,
+} from "lucide-react";
 
-// Listas estáticas para filtros de hechizos
-const SCHOOLS = [
-  "Abjuración",
-  "Adivinación",
-  "Conjuración",
-  "Encantamiento",
-  "Evocación",
-  "Ilusión",
-  "Nigromancia",
-  "Transmutación",
-];
-const ITEM_CATEGORIES = [
-  "Simple",
-  "Marcial",
-  "Ligera",
-  "Media",
-  "Pesada",
-  "Escudo",
-  "Poción",
-  "Anillo",
-  "Objeto Maravilloso",
-];
+// Importamos TODA la data local disponible
+import { SPELLS } from "../data/spells";
+import { WEAPONS, ARMOR, ADVENTURING_GEAR, MAGIC_ITEMS } from "../data/items";
+import { CONDITIONS, SKILLS } from "../data/rules";
+import { CLASSES, RACES } from "../data/character";
+import { useDataSearch } from "../hooks/useDataSearch";
 
 export function Compendium() {
-  const [activeTab, setActiveTab] = useState("spells"); // 'spells', 'items', 'rules', 'options'
-  const [query, setQuery] = useState("");
-  const [filters, setFilters] = useState({
-    level: "",
-    class: "",
-    school: "",
-    category: "",
-  });
-  const [results, setResults] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [expandedId, setExpandedId] = useState(null);
+  const [activeTab, setActiveTab] = useState("spells");
+  const [selectedItem, setSelectedItem] = useState(null);
 
-  const { showToast } = useToast();
-
-  // Limpiar al cambiar pestaña
-  useEffect(() => {
-    setFilters({ level: "", class: "", school: "", category: "" });
-    setQuery("");
-    setResults([]);
-  }, [activeTab]);
-
-  // Búsqueda
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      setExpandedId(null);
-      let data = [];
-
-      // Si no hay query ni filtros, vaciamos (o podríamos mostrar todo)
-      if (
-        query.length === 0 &&
-        !filters.level &&
-        !filters.class &&
-        !filters.school &&
-        !filters.category
-      ) {
-        // Excepción: Para reglas y opciones, quizás queramos ver la lista completa por defecto si no es muy larga
-        if (activeTab === "rules" || activeTab === "options") {
-          // Dejar pasar para cargar todo
-        } else {
-          setResults([]);
-          setLoading(false);
-          return;
-        }
-      }
-
-      if (activeTab === "spells") {
-        data = await searchSpells(query, {
-          level: filters.level,
-          class: filters.class,
-          school: filters.school,
-        });
-      } else if (activeTab === "items") {
-        data = await searchEquipment(query, {
-          category: filters.category,
-        });
-      } else if (activeTab === "rules") {
-        data = await searchRules(query);
-      } else if (activeTab === "options") {
-        data = await searchCharacterOptions(query);
-      }
-
-      setResults(data);
-      setLoading(false);
-    };
-
-    const timeoutId = setTimeout(() => {
-      fetchData();
-    }, 300);
-
-    return () => clearTimeout(timeoutId);
-  }, [query, activeTab, filters]);
-
-  const toggleExpand = (name) => {
-    setExpandedId(expandedId === name ? null : name);
-  };
-
-  const handleRoll = (item, e) => {
-    e.stopPropagation();
-    if (!item.damage) return;
-    const result = rollDamage(item.damage);
-    showToast(
-      `🎲 ${item.name}: ${result.finalTotal} (${result.rolls.join("+")}${
-        result.damageMod ? "+" + result.damageMod : ""
-      })`,
-      "success"
-    );
-  };
-
-  const tabs = [
-    { id: "spells", label: "📖 Hechizos", color: "text-red-700" },
-    { id: "items", label: "🛡️ Equipo", color: "text-blue-700" },
-    { id: "rules", label: "⚖️ Reglas", color: "text-yellow-700" },
-    { id: "options", label: "👤 Opciones", color: "text-purple-700" },
+  // Unificamos inventario para la búsqueda de objetos
+  const ALL_ITEMS = [
+    ...WEAPONS,
+    ...ARMOR,
+    ...ADVENTURING_GEAR,
+    ...(MAGIC_ITEMS || []),
   ];
 
-  return (
-    <div className="p-4 max-w-4xl mx-auto pb-24">
-      {/* --- HEADER --- */}
-      <header className="mb-4">
-        <h1 className="text-3xl font-bold text-stone-800 mb-4">Compendio</h1>
-
-        {/* TABS SCROLLABLE */}
-        <div className="flex bg-stone-200 p-1 rounded-lg mb-4 overflow-x-auto no-scrollbar">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 min-w-[80px] py-2 text-xs sm:text-sm font-bold rounded-md transition-all whitespace-nowrap ${
-                activeTab === tab.id
-                  ? `bg-white ${tab.color} shadow-sm`
-                  : "text-stone-500 hover:text-stone-700"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+  // Configuración de las pestañas y sus fuentes de datos
+  const TABS = {
+    spells: {
+      label: "Conjuros",
+      icon: Zap,
+      data: SPELLS,
+      keys: ["name", "school", "level"],
+      renderItem: (spell) => (
+        <div className="flex justify-between items-center w-full">
+          <div>
+            <p className="font-bold text-stone-200">{spell.name}</p>
+            <p className="text-[10px] text-stone-500">
+              {spell.level === 0 ? "Truco" : `Nivel ${spell.level}`} •{" "}
+              {spell.school}
+            </p>
+          </div>
+          {spell.damage && (
+            <span className="text-xs bg-stone-900 px-2 py-1 rounded text-stone-400 font-mono">
+              {spell.damage}
+            </span>
+          )}
         </div>
+      ),
+    },
+    items: {
+      label: "Equipo",
+      icon: Sword,
+      data: ALL_ITEMS,
+      keys: ["name", "category", "type"],
+      renderItem: (item) => (
+        <div className="flex justify-between items-center w-full">
+          <div>
+            <p className="font-bold text-stone-200">{item.name}</p>
+            <p className="text-[10px] text-stone-500">
+              {item.category || item.type} • {item.cost || "-"}
+            </p>
+          </div>
+          {item.ac && (
+            <span className="text-xs text-blue-400 font-bold">
+              CA {item.ac}
+            </span>
+          )}
+          {item.damage && (
+            <span className="text-xs text-red-400 font-bold">
+              {item.damage}
+            </span>
+          )}
+        </div>
+      ),
+    },
+    rules: {
+      label: "Reglas",
+      icon: Book,
+      data: [...CONDITIONS, ...SKILLS],
+      keys: ["name", "desc"],
+      renderItem: (rule) => (
+        <div>
+          <p className="font-bold text-stone-200">{rule.name}</p>
+          <p className="text-[10px] text-stone-500 truncate max-w-[200px]">
+            {rule.desc || "Regla básica"}
+          </p>
+        </div>
+      ),
+    },
+    classes: {
+      label: "Clases/Razas",
+      icon: Shield,
+      data: [...CLASSES, ...RACES],
+      keys: ["name"],
+      renderItem: (entry) => (
+        <div className="flex justify-between items-center w-full">
+          <p className="font-bold text-stone-200">{entry.name}</p>
+          <span className="text-[10px] bg-stone-800 px-2 rounded text-stone-500">
+            {entry.hitDie ? "Clase" : "Raza"}
+          </span>
+        </div>
+      ),
+    },
+  };
 
-        {/* BUSCADOR */}
-        <div className="relative mb-3">
+  const currentTab = TABS[activeTab];
+
+  // Usamos el Hook para filtrar la data de la pestaña actual
+  const { query, setQuery, results } = useDataSearch(
+    currentTab.data,
+    currentTab.keys
+  );
+
+  return (
+    <div className="flex flex-col h-screen bg-neutral-900 pb-24">
+      {/* HEADER DE BÚSQUEDA */}
+      <div className="p-6 pb-4 bg-neutral-900 sticky top-0 z-10 border-b border-stone-800">
+        <h1 className="text-2xl font-bold text-stone-100 mb-4 flex items-center gap-2">
+          <Book className="text-yellow-500" /> Compendio
+        </h1>
+
+        <div className="relative">
+          <Search
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500"
+            size={18}
+          />
           <input
             type="text"
-            placeholder={`Buscar en ${
-              tabs.find((t) => t.id === activeTab)?.label.split(" ")[1]
-            }...`}
+            placeholder={`Buscar en ${currentTab.label}...`}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="w-full p-3 pl-10 rounded-xl border border-stone-300 bg-white shadow-sm focus:ring-2 focus:ring-stone-500 focus:outline-none"
+            className="w-full bg-stone-800 border border-stone-700 rounded-xl py-3 pl-10 pr-4 text-stone-100 outline-none focus:border-yellow-500 transition shadow-lg"
           />
-          <span className="absolute left-3 top-3.5 text-stone-400">🔍</span>
-        </div>
-
-        {/* FILTROS (Solo visible en Hechizos y Objetos) */}
-        {activeTab === "spells" && (
-          <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
-            <select
-              value={filters.level}
-              onChange={(e) =>
-                setFilters({ ...filters, level: e.target.value })
-              }
-              className="px-3 py-2 rounded-lg bg-stone-100 border border-stone-300 text-sm font-medium text-stone-700 outline-none"
+          {query && (
+            <button
+              onClick={() => setQuery("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-500 hover:text-white"
             >
-              <option value="">Nivel</option>
-              {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((l) => (
-                <option key={l} value={l}>
-                  {l === 0 ? "Truco" : `Nivel ${l}`}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={filters.class}
-              onChange={(e) =>
-                setFilters({ ...filters, class: e.target.value })
-              }
-              className="px-3 py-2 rounded-lg bg-stone-100 border border-stone-300 text-sm font-medium text-stone-700 outline-none"
-            >
-              <option value="">Clase</option>
-              {CLASSES.map((c) => (
-                <option key={c.name} value={c.name}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={filters.school}
-              onChange={(e) =>
-                setFilters({ ...filters, school: e.target.value })
-              }
-              className="px-3 py-2 rounded-lg bg-stone-100 border border-stone-300 text-sm font-medium text-stone-700 outline-none"
-            >
-              <option value="">Escuela</option>
-              {SCHOOLS.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        {activeTab === "items" && (
-          <select
-            value={filters.category}
-            onChange={(e) =>
-              setFilters({ ...filters, category: e.target.value })
-            }
-            className="w-full px-3 py-2 rounded-lg bg-stone-100 border border-stone-300 text-sm font-medium text-stone-700 outline-none"
-          >
-            <option value="">Todas las Categorías</option>
-            {ITEM_CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        )}
-      </header>
-
-      {/* --- RESULTADOS --- */}
-      <div className="space-y-3">
-        {loading && (
-          <p className="text-center text-stone-500 animate-pulse">
-            Consultando archivos...
-          </p>
-        )}
-
-        {!loading && results.length === 0 && (
-          <div className="text-center text-stone-400 mt-10">
-            <p className="text-4xl mb-2">📜</p>
-            <p>No se encontraron resultados.</p>
-          </div>
-        )}
-
-        {results.map((item, index) => (
-          <Card
-            key={index}
-            item={item}
-            type={activeTab}
-            expanded={expandedId === item.name}
-            onToggle={() => toggleExpand(item.name)}
-            onRoll={(e) => handleRoll(item, e)}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// --- SUB-COMPONENTE: TARJETA ---
-function Card({ item, type, expanded, onToggle, onRoll }) {
-  // Determinamos el color del borde según el tipo
-  let borderClass = "border-l-4 border-stone-400";
-  if (type === "spells") borderClass = "border-l-4 border-red-500";
-  if (type === "items") borderClass = "border-l-4 border-blue-500";
-  if (type === "rules") borderClass = "border-l-4 border-yellow-500";
-  if (type === "options") borderClass = "border-l-4 border-purple-500";
-
-  const bgClass = expanded
-    ? "bg-white ring-2 ring-stone-200 shadow-md"
-    : "bg-white hover:bg-stone-50 shadow-sm";
-
-  return (
-    <div
-      onClick={onToggle}
-      className={`relative p-4 rounded-lg border border-stone-200 cursor-pointer transition-all ${borderClass} ${bgClass}`}
-    >
-      <div className="flex justify-between items-start">
-        <div>
-          <h3 className="text-lg font-bold text-stone-800">{item.name}</h3>
-
-          {/* Subtítulo Dinámico */}
-          <div className="text-xs text-stone-500 uppercase tracking-wide flex gap-2">
-            {type === "spells" && (
-              <>
-                <span className="font-bold text-red-600">
-                  {item.level === 0 ? "Truco" : "Nvl " + item.level}
-                </span>
-                <span>•</span>
-                <span>{item.school}</span>
-              </>
-            )}
-            {type === "items" && (
-              <>
-                <span className="font-bold text-blue-600">
-                  {item.category || item.type}
-                </span>
-                {item.damage && <span>• {item.damage}</span>}
-                {item.ac && <span>• CA {item.ac}</span>}
-              </>
-            )}
-            {(type === "rules" || type === "options") && (
-              <span className="font-bold text-stone-600">{item.category}</span>
-            )}
-          </div>
-        </div>
-        <div className="text-stone-400 font-mono text-xl">
-          {expanded ? "−" : "+"}
+              <X size={16} />
+            </button>
+          )}
         </div>
       </div>
 
-      {expanded && (
-        <div className="mt-3 pt-3 border-t border-stone-100 text-sm text-stone-700 animate-fadeIn">
-          {/* Grid de detalles para Hechizos/Objetos */}
-          {(type === "spells" || type === "items") && (
-            <div className="grid grid-cols-2 gap-x-4 gap-y-2 mb-3 bg-stone-50 p-3 rounded border border-stone-100">
-              {type === "spells" ? (
-                <>
-                  <p>
-                    <span className="font-semibold">Tiempo:</span> {item.time}
+      {/* TABS DE NAVEGACIÓN */}
+      <div className="flex px-4 gap-2 overflow-x-auto no-scrollbar py-2 bg-neutral-900">
+        {Object.entries(TABS).map(([key, config]) => {
+          const Icon = config.icon;
+          const isActive = activeTab === key;
+          return (
+            <button
+              key={key}
+              onClick={() => {
+                setActiveTab(key);
+                setQuery("");
+              }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all border ${
+                isActive
+                  ? "bg-yellow-500 text-stone-900 border-yellow-500 shadow-lg shadow-yellow-500/20"
+                  : "bg-stone-800 text-stone-400 border-stone-700 hover:bg-stone-700"
+              }`}
+            >
+              <Icon size={14} />
+              {config.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* LISTA DE RESULTADOS */}
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2">
+        {results.length === 0 ? (
+          <div className="text-center py-10 opacity-50">
+            <ScrollText size={48} className="mx-auto mb-2 text-stone-600" />
+            <p className="text-stone-500">No se encontraron resultados.</p>
+          </div>
+        ) : (
+          results.map((item, idx) => (
+            <button
+              key={item.id || idx} // Fallback a idx si no hay id
+              onClick={() => setSelectedItem(item)}
+              className="w-full bg-stone-800/50 hover:bg-stone-800 p-4 rounded-xl border border-stone-800 hover:border-stone-600 transition text-left flex items-center justify-between group"
+            >
+              {currentTab.renderItem(item)}
+              <ChevronRight
+                size={16}
+                className="text-stone-600 group-hover:text-yellow-500 transition"
+              />
+            </button>
+          ))
+        )}
+      </div>
+
+      {/* MODAL DE DETALLE (EL "POP-UP" DEL LIBRO) */}
+      {selectedItem && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-stone-900 border border-stone-700 w-full max-w-lg h-[85vh] sm:h-auto sm:max-h-[80vh] rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col relative animate-in slide-in-from-bottom duration-300">
+            {/* Header del Modal */}
+            <div className="p-6 border-b border-stone-800 bg-stone-900 sticky top-0 z-10">
+              <div className="flex justify-between items-start gap-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-stone-100 leading-tight">
+                    {selectedItem.name}
+                  </h2>
+                  <p className="text-sm text-stone-400 mt-1">
+                    {selectedItem.level !== undefined
+                      ? selectedItem.level === 0
+                        ? "Truco"
+                        : `Nivel ${selectedItem.level}`
+                      : ""}
+                    {selectedItem.school && ` • ${selectedItem.school}`}
+                    {selectedItem.category && ` • ${selectedItem.category}`}
+                    {selectedItem.type &&
+                      !selectedItem.category &&
+                      ` • ${selectedItem.type}`}
                   </p>
-                  <p>
-                    <span className="font-semibold">Alcance:</span> {item.range}
-                  </p>
-                  <p>
-                    <span className="font-semibold">Duración:</span>{" "}
-                    {item.duration}
-                  </p>
-                  <p>
-                    <span className="font-semibold">Comp:</span>{" "}
-                    {item.components}
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p>
-                    <span className="font-semibold">Coste:</span>{" "}
-                    {item.cost || "-"}
-                  </p>
-                  <p>
-                    <span className="font-semibold">Peso:</span>{" "}
-                    {item.weight || "-"}
-                  </p>
-                  {item.properties && (
-                    <p className="col-span-2 border-t border-stone-200 mt-1 pt-1">
-                      <span className="font-semibold">Propiedades:</span>{" "}
-                      {item.properties}
-                    </p>
+                </div>
+                <button
+                  onClick={() => setSelectedItem(null)}
+                  className="p-2 bg-stone-800 rounded-full text-stone-400 hover:text-white hover:bg-stone-700 transition"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            {/* Contenido Scrollable */}
+            <div className="p-6 overflow-y-auto custom-scrollbar space-y-6">
+              {/* Stats Grid (Si tiene datos numéricos) */}
+              {(selectedItem.time ||
+                selectedItem.range ||
+                selectedItem.duration ||
+                selectedItem.ac ||
+                selectedItem.damage) && (
+                <div className="grid grid-cols-2 gap-3">
+                  {selectedItem.time && (
+                    <div className="bg-stone-950 p-2 rounded-lg border border-stone-800">
+                      <span className="text-[10px] uppercase font-bold text-stone-500 block">
+                        Tiempo
+                      </span>
+                      <span className="text-sm text-stone-200">
+                        {selectedItem.time}
+                      </span>
+                    </div>
                   )}
-                </>
+                  {selectedItem.range && (
+                    <div className="bg-stone-950 p-2 rounded-lg border border-stone-800">
+                      <span className="text-[10px] uppercase font-bold text-stone-500 block">
+                        Alcance
+                      </span>
+                      <span className="text-sm text-stone-200">
+                        {selectedItem.range}
+                      </span>
+                    </div>
+                  )}
+                  {selectedItem.duration && (
+                    <div className="bg-stone-950 p-2 rounded-lg border border-stone-800">
+                      <span className="text-[10px] uppercase font-bold text-stone-500 block">
+                        Duración
+                      </span>
+                      <span className="text-sm text-stone-200">
+                        {selectedItem.duration}
+                      </span>
+                    </div>
+                  )}
+                  {selectedItem.damage && (
+                    <div className="bg-stone-950 p-2 rounded-lg border border-red-900/30">
+                      <span className="text-[10px] uppercase font-bold text-red-500 block">
+                        Daño
+                      </span>
+                      <span className="text-sm text-stone-200 font-mono">
+                        {selectedItem.damage}
+                      </span>
+                    </div>
+                  )}
+                  {selectedItem.ac && (
+                    <div className="bg-stone-950 p-2 rounded-lg border border-blue-900/30">
+                      <span className="text-[10px] uppercase font-bold text-blue-500 block">
+                        Clase de Armadura
+                      </span>
+                      <span className="text-sm text-stone-200 font-mono">
+                        {selectedItem.ac}
+                      </span>
+                    </div>
+                  )}
+                </div>
               )}
+
+              {/* Descripción Principal */}
+              <div className="prose prose-invert prose-sm max-w-none text-stone-300 leading-relaxed">
+                {/* Renderizamos descripción, manejando saltos de línea si es texto plano */}
+                {selectedItem.desc?.split("\n").map((par, i) => (
+                  <p key={i} className="mb-2 last:mb-0">
+                    {par}
+                  </p>
+                ))}
+
+                {/* Propiedades de Items */}
+                {selectedItem.properties && (
+                  <p className="mt-4 text-stone-400">
+                    <strong className="text-stone-200">Propiedades:</strong>{" "}
+                    {selectedItem.properties}
+                  </p>
+                )}
+
+                {/* Rasgos de Raza/Clase */}
+                {selectedItem.traits && (
+                  <div className="mt-4 space-y-2">
+                    <strong className="text-stone-200 block mb-2">
+                      Rasgos:
+                    </strong>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedItem.traits.map((t) => (
+                        <span
+                          key={t}
+                          className="bg-stone-800 px-2 py-1 rounded text-xs border border-stone-700"
+                        >
+                          {t}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-          )}
 
-          {/* Detalles extra para Razas/Clases */}
-          {item.details && (
-            <div className="mb-3 p-2 bg-purple-50 text-purple-900 rounded text-xs font-mono">
-              {item.details}
-            </div>
-          )}
-
-          <div className="prose prose-sm max-w-none text-stone-600">
-            <p className="whitespace-pre-line leading-relaxed">{item.desc}</p>
-          </div>
-
-          {item.damage && (
-            <div className="mt-4 flex justify-end">
+            {/* Footer Fijo (Opcional: Botones de Acción Futura) */}
+            <div className="p-4 bg-stone-900 border-t border-stone-800 text-center">
               <button
-                onClick={onRoll}
-                className="flex items-center gap-2 bg-white hover:bg-stone-100 text-stone-800 px-4 py-2 rounded-lg text-sm font-bold border border-stone-300 shadow-sm active:scale-95 transition-all"
+                onClick={() => setSelectedItem(null)}
+                className="text-sm text-stone-500 hover:text-stone-300 font-bold uppercase tracking-wider"
               >
-                🎲 Tirar {item.damage}
+                Cerrar Referencia
               </button>
             </div>
-          )}
+          </div>
         </div>
       )}
     </div>
